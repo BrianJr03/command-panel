@@ -6,3 +6,6 @@ local.properties
 *.iml
 .kotlin/
 .DS_Store
+
+# Local porting reference (contains the fork's code + upstream patch context — never publish)
+fork-port/
