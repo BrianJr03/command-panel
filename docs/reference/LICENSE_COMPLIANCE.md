@@ -66,10 +66,13 @@ helper for privileged calls, an overlay on the bottom display — is an architec
    (verified `gh repo view` → `visibility=PRIVATE`), with a local copy kept. No binaries, keystore, `local.properties`
    or mapping file were ever committed to it, and it has no GitHub releases. This closes the one item that was
    outside §2.3.
-2. **Command Panel stays unpublished.** It has no git remote (local only) and tracks no binaries/keystore. It contains
-   staged fork code (`fork-port/`) that is the fork's own authorship but was written
-   against BDSA's codebase. It stays unpublished until each ported feature has been integrated and its upstream
-   dependencies rewritten.
+2. **Command Panel published publicly — 2026-11-17.** With every ported feature integrated and its upstream
+   dependencies rewritten, and with `fork-port/` purged from git history (see §6), Command Panel was pushed to a
+   **public** GitHub repo. What is published is the app in `app/` plus project docs — it contains **no BDSA
+   (stormpanda) code**, so BDSA's licence (which governs BDSA's code, not Brian's own) does not restrict it. It does
+   bundle AYN's stock icons/strings (AYN's IP, not BDSA's) and OFL fonts (with notices); publishing those publicly is
+   an accepted decision by the owner (Brian), for personal/non-commercial use. No keystore or signing secret is
+   tracked (`.gitignore` excludes `*.jks`/`*.keystore`/`*.apk`); release signing runs in CI from repo secrets.
 3. **AYN assets.** Command Panel reuses the stock app's icons and strings. That concerns AYN, not BDSA, and is for
    personal use only.
 
@@ -96,10 +99,11 @@ Arrange mode, Replay Buffer, launcher icon). Findings:
 - **Still unpublished / private.** Command Panel has **no git remote** and tracks no binaries/keystore; the fork is
   **private** (`gh repo view` → `PRIVATE`); no upstream `LICENSE`/`README`/binary is copied into `app/src/`.
 
-**Open item:** `fork-port/` is tracked in Command Panel's local git and its `patches/*.patch` carry upstream base
-lines as diff context (stormpanda's code). This is a local porting artifact only — Command Panel is unpublished, so
-nothing is redistributed — but `fork-port/` must be removed (or git-excluded) before any publication, since the app
-ships from `app/`, not `fork-port/`.
+**Open item — RESOLVED 2026-11-17.** `fork-port/` (whose `patches/*.patch` carried upstream base lines as diff
+context) was first git-excluded, then **purged from all git history** with `git-filter-repo --path fork-port
+--invert-paths` before the public push (a full-history backup bundle was kept locally). `git log --all -- 'fork-port/*'`
+now returns nothing, so no stormpanda code is present in any published commit; the directory remains on disk as Brian's
+untracked local porting reference.
 
 ## Files in this folder
 

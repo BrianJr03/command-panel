@@ -1,0 +1,167 @@
+name: Build Release
+
+on:
+  push:
+    branches:
+      - main  # Early-access build on push to main — only when versionName changes
+    paths:
+      - 'app/build.gradle.kts'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a new GitHub release?'
+        required: true
+        type: boolean
+        default: true
+      release_tag:
+        description: 'Release tag (e.g., v0.1.0) — new release, or existing release to attach to'
+        required: true
+        type: string
+      release_name:
+        description: 'Release name (only used if creating a new release)'
+        required: false
+        type: string
+        default: ''
+      prerelease:
+        description: 'Mark as pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  version-check:
+    name: Check versionName Change
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need the previous commit to compare versionName
+
+      - name: Check if versionName changed
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger — skipping version check."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qi '\[skip-version-check\]'; then
+            echo "Found [skip-version-check] — forcing build."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          CURRENT=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          PREVIOUS=$(git show HEAD~1:app/build.gradle.kts 2>/dev/null | grep 'versionName' | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+          echo "Current versionName:  $CURRENT"
+          echo "Previous versionName: $PREVIOUS"
+          if [ "$CURRENT" = "$PREVIOUS" ]; then
+            echo "versionName unchanged ($CURRENT) — skipping build."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "versionName bumped: $PREVIOUS → $CURRENT"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-release:
+    name: Build Signed Release APK
+    needs: version-check
+    if: needs.version-check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Extract version info
+        id: version
+        run: |
+          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "Extracted version: ${VERSION_NAME}"
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/keystore.jks
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/keystore.jks \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD \
+            --stacktrace
+
+      - name: Rename APK
+        id: rename
+        run: |
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          APK_NAME="command-panel-${VERSION_NAME}.apk"
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${APK_NAME}"
+          echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
+          echo "Renamed APK to: ${APK_NAME}"
+
+      # --- Manual release flow (workflow_dispatch) ---
+
+      - name: Create release and upload APK
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_name || inputs.release_tag }}
+          prerelease: ${{ inputs.prerelease }}
+          body_path: app/src/main/res/raw/patch_notes.md
+          files: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK to existing release
+        if: github.event_name == 'workflow_dispatch' && !inputs.create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Early-access flow (push to main with a versionName bump) ---
+
+      - name: Upload early-access APK artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: command-panel-${{ steps.version.outputs.version_name }}
+          path: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+          retention-days: 90
+
+      - name: Cleanup keystore
+        if: always()
+        run: rm -f ${{ github.workspace }}/keystore.jks

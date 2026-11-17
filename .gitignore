@@ -9,3 +9,10 @@ local.properties
 
 # Local porting reference (contains the fork's code + upstream patch context — never publish)
 fork-port/
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+# Build outputs
+*.apk
