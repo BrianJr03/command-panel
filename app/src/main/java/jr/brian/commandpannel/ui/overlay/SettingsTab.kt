@@ -100,13 +100,14 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
 /** The "60/120 FPS MODE" pill (stock `bg_60/bg_120_frame_rate_mode` gradients), rendered in Compose. */
 @Composable
 private fun FrameRatePill(is120: Boolean) {
+    // Solid two-colour gradient (no fade to transparent) so the pill reads as a filled badge.
     val brush = if (is120) {
         androidx.compose.ui.graphics.Brush.horizontalGradient(
-            listOf(Color(0xFFE066FF), Color(0x00D11AFF)),
+            listOf(Color(0xFFE066FF), Color(0xFFD11AFF)),
         )
     } else {
         androidx.compose.ui.graphics.Brush.horizontalGradient(
-            listOf(Color(0xFF1BBDDE), Color(0x000070E7)),
+            listOf(Color(0xFF1BBDDE), Color(0xFF0070E7)),
         )
     }
     Box(

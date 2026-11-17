@@ -69,8 +69,7 @@ fun TccIconButton(
     // Column-highlight nav styles draw the selection around the whole item and show a bare icon.
     val columnHighlight = isNav && navRenderer.columnHighlight
 
-    val base0 = if (onClick != null) modifier.clickable { onClick() } else modifier
-    val base = if (columnHighlight && active) base0.then(navRenderer.highlight(paint)) else base0
+    val base = if (onClick != null) modifier.clickable { onClick() } else modifier
 
     val iconTint = if (columnHighlight) navRenderer.iconTint(paint, active)
     else lookTileIconTint(spec, colors, lookColors, active, index)
@@ -88,19 +87,25 @@ fun TccIconButton(
     Column(
         modifier = base,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(if (columnHighlight) 5.dp else 3.dp),
     ) {
         if (showIcon) {
-            Box(
-                modifier = if (columnHighlight) Modifier.size(circleSize)
-                else Modifier.size(circleSize).tccTile(spec, colors, lookColors, selected = active, index = index),
-                contentAlignment = Alignment.Center,
-            ) {
+            // Column-highlight nav (glass pill, etc.) boxes just the icon — with padding so the selection has room —
+            // and lets the label sit below it, instead of cramming the whole icon+label column into the box.
+            val iconContainer = when {
+                columnHighlight && active ->
+                    Modifier.then(navRenderer.highlight(paint)).padding(horizontal = 14.dp, vertical = 9.dp)
+                columnHighlight -> Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                else -> Modifier.size(circleSize).tccTile(spec, colors, lookColors, selected = active, index = index)
+            }
+            val imageModifier = if (columnHighlight) Modifier.size(circleSize - iconInset * 2)
+            else Modifier.padding(iconInset).size(circleSize - iconInset * 2)
+            Box(modifier = iconContainer, contentAlignment = Alignment.Center) {
                 Image(
                     painter = icon.painter(),
                     contentDescription = label,
                     colorFilter = stockIconColorFilter(iconTint),
-                    modifier = Modifier.padding(iconInset).size(circleSize - iconInset * 2),
+                    modifier = imageModifier,
                 )
             }
         }
