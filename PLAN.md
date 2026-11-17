@@ -42,9 +42,18 @@ launcher icon. Library resources and RxTool crash strings were left out.
 Verified on the Thor: placeholder screen renders stock icons/strings; `:probe` reproduces the recorded results
 (15 PASS / 3 expected FAIL); 2 unit tests guard the resource import.
 
-### 1. Privileged layer
-`PServerBinder` client and startup self-grant (appops, `WRITE_SECURE_SETTINGS`, doze whitelist).
-Root `app_process` helper with a versioned Binder protocol, client death watch, and helper respawn.
+### 1. Privileged layer — done 2026-11-16
+`VendorRootShell` (AYN `PServerBinder`, root shell), `HiddenApi` (exemptions), `PermissionGranter` (startup
+self-grant, each permission checked before granting), and the root `app_process` helper: `RootHelperMain`
+publishes its `IRootHelper` binder via `ServiceManager.addService` under a per-applicationId name, `RootHelper`
+adopts it with `getService` and a death-watch, and the helper exits when the app's client token dies. `IRootHelper`
+(AIDL) exposes `exec`, per-display brightness, identity, attachClient, shutdown. `PrivilegedAccess` is the Hilt
+`@Singleton` facade. R8 keep rules protect the reflectively-launched helper.
+Verified on the Thor via the Diagnostics screen: helper up as `uid=0 ctx=u:r:pservice:s0`; shell `id -u => 0` and
+`getBrightness(0)` round-trip through it; all five grants succeed; `WRITE_SECURE_SETTINGS granted=true`; helper
+service gone after the app is force-stopped; stock assistant untouched. Release (minified) build passes.
+Not yet wired: `setDisplayBrightness` exercised for real (used in phase 4), helper auto-respawn on unexpected death
+(added with the foreground service in phase 2).
 
 ### 2. Overlay host and input
 Foreground service owns the display-4 overlay and the AYN button state machine
