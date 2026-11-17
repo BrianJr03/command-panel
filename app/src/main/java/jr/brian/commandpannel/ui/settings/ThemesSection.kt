@@ -117,7 +117,16 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         var link by remember { mutableStateOf("") }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val follow = { if (link.isNotBlank() && !state.themeBusy) { vm.addSource(link); link = "" } }
-            LinkField(link, Modifier.weight(1f), onSubmit = follow) { link = it }
+            GamepadTextField(
+                value = link,
+                onValueChange = { link = it.take(300) },
+                textStyle = TextStyle(color = p.textPrimary, fontSize = 14.sp),
+                modifier = Modifier.weight(1f),
+                placeholder = stringResource(R.string.theme_repo_hint),
+                // The keyboard's Go key follows the link (taps outside the field don't land while the keyboard is up).
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { follow() }),
+            )
             Chip(stringResource(R.string.theme_repo_add), enabled = link.isNotBlank() && !state.themeBusy, onClick = follow)
         }
         state.repoMessage?.let { InfoLine(it) }
@@ -249,31 +258,5 @@ private fun SourceCard(source: ThemeSource, state: SettingsState, vm: SettingsVi
                 if (confirmRemove) vm.removeSource(source.id) else confirmRemove = true
             }
         }
-    }
-}
-
-/** Single-line field for pasting a theme repo link (opens the keyboard when focused). */
-@Composable
-private fun LinkField(value: String, modifier: Modifier, onSubmit: () -> Unit, onChange: (String) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = controlShape(10.dp)
-    Box(
-        modifier.clip(shape)
-            .background(if (focused) p.surfaceHigh else p.surfaceHigh.copy(alpha = 0.5f))
-            .border(if (focused) 1.5.dp else 1.dp, if (focused) p.accent else p.border, shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        if (value.isEmpty()) Text(stringResource(R.string.theme_repo_hint), color = p.textTertiary, fontSize = 14.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = { onChange(it.take(300)) },
-            singleLine = true,
-            textStyle = TextStyle(color = p.textPrimary, fontSize = 14.sp),
-            cursorBrush = SolidColor(p.accent),
-            // The keyboard's Go key follows the link (taps outside the field don't land while the keyboard is up).
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { onSubmit() }),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
-        )
     }
 }

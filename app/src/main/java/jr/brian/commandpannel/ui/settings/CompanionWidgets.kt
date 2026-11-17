@@ -101,6 +101,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -378,5 +379,85 @@ internal fun <T> sortedByLabel(options: List<Pair<T, Int>>): List<Pair<T, Int>> 
     return remember(options, res.configuration) {
         val collator = java.text.Collator.getInstance(res.configuration.locales[0])
         options.sortedWith(compareBy(collator) { res.getString(it.second) })
+    }
+}
+
+/**
+ * A single-line text field that works like a button on the gamepad. D-pad focus lands on the field without entering
+ * it, so up/down keep moving through the screen. A / center / Enter (or a tap) starts editing and opens the keyboard.
+ * While editing, D-pad up/down or B / Back stop editing and hand focus back to the field instead of leaving the
+ * screen. A raw text field would trap the D-pad (it moves the cursor) and let B close the companion.
+ */
+@Composable
+internal fun GamepadTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    textStyle: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default,
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions = androidx.compose.foundation.text.KeyboardActions.Default,
+    verticalPadding: Dp = 10.dp,
+) {
+    var editing by remember { mutableStateOf(false) }
+    var fieldHadFocus by remember { mutableStateOf(false) }
+    val outer = focusState()
+    val outerRequester = remember { FocusRequester() }
+    val fieldRequester = remember { FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val shape = controlShape(10.dp)
+    val active = outer.value || editing
+    fun stopEditing() {
+        editing = false
+        keyboard?.hide()
+        runCatching { outerRequester.requestFocus() }
+    }
+    LaunchedEffect(editing) {
+        if (editing) {
+            runCatching { fieldRequester.requestFocus() }
+            keyboard?.show()
+        }
+    }
+    // Newer Android routes Back through the back dispatcher rather than key events; catch it there too.
+    androidx.activity.compose.BackHandler(enabled = editing) { stopEditing() }
+    Box(
+        modifier.clip(shape)
+            .background(if (active) p.surfaceHigh else p.surfaceHigh.copy(alpha = 0.5f))
+            .border(if (active) 1.5.dp else 1.dp, if (active) p.accent else p.border, shape)
+            .focusRequester(outerRequester)
+            .focusControl(outer) { editing = true }
+            .padding(horizontal = 12.dp, vertical = verticalPadding),
+    ) {
+        if (value.isEmpty() && placeholder != null) Text(placeholder, color = p.textTertiary, style = textStyle)
+        androidx.compose.foundation.text.BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = textStyle,
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(p.accent),
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            modifier = Modifier.fillMaxWidth()
+                .focusRequester(fieldRequester)
+                // Only reachable while editing, so D-pad navigation never lands inside the text.
+                .focusProperties { canFocus = editing }
+                .onFocusChanged {
+                    // Touching elsewhere ends editing too.
+                    if (fieldHadFocus && !it.isFocused) editing = false
+                    fieldHadFocus = it.isFocused
+                }
+                .onPreviewKeyEvent { e ->
+                    when (e.key) {
+                        // Consume both down and up so Back never reaches the activity.
+                        Key.DirectionUp, Key.DirectionDown, Key.Back, Key.ButtonB, Key.Escape -> {
+                            if (e.type == KeyEventType.KeyUp) stopEditing()
+                            true
+                        }
+                        else -> false
+                    }
+                },
+        )
+        // While not editing, a tap anywhere on the field starts editing (the disabled text field would swallow it).
+        if (!editing) Box(Modifier.matchParentSize().noRippleClickable { editing = true })
     }
 }

@@ -102,7 +102,13 @@ internal fun ThemeStudioScreen(
         // ---- top bar: back, name, save actions ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Chip(stringResource(R.string.theme_back), onClick = onClose)
-            NameField(draft.name, Modifier.weight(1f)) { draft = draft.copy(name = it) }
+            GamepadTextField(
+                value = draft.name,
+                onValueChange = { draft = draft.copy(name = it.take(40)) },
+                textStyle = tccDisplayTextStyle().merge(TextStyle(color = p.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)),
+                modifier = Modifier.weight(1f),
+                verticalPadding = 8.dp,
+            )
             message?.let { InfoLine(it, p.success) }
             // Looks synced from a theme repo are replaced on update, so edits always save as the user's own copy.
             val fromRepo = draft.source != null
@@ -187,25 +193,6 @@ private enum class PreviewKind(@StringRes val titleRes: Int) {
     SETTINGS(R.string.theme_preview_settings),
     MODE(R.string.theme_preview_mode),
     CARDS(R.string.theme_preview_cards),
-}
-
-@Composable
-private fun NameField(name: String, modifier: Modifier, onChange: (String) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = controlShape(10.dp)
-    BasicTextField(
-        value = name,
-        onValueChange = { onChange(it.take(40)) },
-        singleLine = true,
-        textStyle = tccDisplayTextStyle().merge(TextStyle(color = p.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)),
-        cursorBrush = SolidColor(p.accent),
-        modifier = modifier
-            .clip(shape)
-            .background(if (focused) p.surfaceHigh else p.surface.copy(alpha = 0.6f))
-            .border(if (focused) 1.5.dp else 1.dp, if (focused) p.accent else p.border, shape)
-            .onFocusChanged { focused = it.isFocused }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    )
 }
 
 /** One look part (cards, tiles, …): its options are the styles the built-in looks use, named after the first look that uses each. */
