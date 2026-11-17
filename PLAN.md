@@ -168,6 +168,14 @@ Done (cont.):
   root to `/sdcard/Documents/CommandPanel/backups`, restore latest). General card. Verified on device: exported
   valid JSON, "Restored 6 settings".
 
+- **Overlay look system (8)** — full 16-look system ported (your code; fonts are OFL 1.1, bundled with
+  THIRD_PARTY_NOTICES). CP-native `TccLookSpec` + the 5 trait-style enums + `LookTraits`, `TccLookColors`
+  (palette-derived), 13 renderer files + built-in card/tile/gauge/slider/nav renderers, look-aware text/casing.
+  Overlay widgets delegate to the active look; `Appearance → Overlay look` picker (live). Verified on device:
+  stock unchanged; Aurora Glass, Comic Panel, E-Ink, Tactical HUD, Terminal, Neon Arcade, Segment LCD all render
+  faithfully. Known gap: the "60 FPS MODE" pill keeps its stock gradient across looks (not routed through the
+  fpsBadge renderer yet).
+
 Backlog (remaining fork features, roughly easiest → hardest):
 - **Dark-on-TV tap-to-wake (7)** — done: ported ExternalDisplayTapWaker (adapted to SystemSettings/root), wired
   into the service; 1x1 FLAG_WATCH_OUTSIDE_TOUCH windows per display arm only when close_screen_when_output_video=1
@@ -175,7 +183,6 @@ Backlog (remaining fork features, roughly easiest → hardest):
   node read); the tap->wake path needs an external display to fully exercise.
 - Quick-toggle drag-reorder (12) — rewrite the 160 upstream lines flagged in the manifest; drag-drop UI.
 - Arrange mode (3) — needs the overlay cards made addressable.
-- Look system + 16 looks (8) — large; renderers + fonts + license notices.
 - Replay buffer (11) — largest; needs Command Panel's own screen-capture pipeline in the helper first.
 - Nav bar Home/Launch reorder (1) — BDSA-specific; likely not applicable.
 
