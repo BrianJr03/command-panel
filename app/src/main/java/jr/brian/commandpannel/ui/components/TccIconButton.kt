@@ -114,13 +114,13 @@ fun TccIconButton(
         Text(
             text = labelText,
             color = labelColor,
-            fontSize = labelSize,
+            fontSize = if (isNav) labelSize * navRenderer.labelScale else labelSize,
             textAlign = TextAlign.Center,
             // Nav labels stay on one line and are width-capped so a long app name can't push the other buttons.
             maxLines = if (isNav) 1 else 2,
             overflow = TextOverflow.Ellipsis,
             style = jr.brian.commandpannel.ui.theme.tccTextStyle(),
-            modifier = if (isNav) Modifier.widthIn(max = circleSize * 2f) else Modifier,
+            modifier = if (isNav) Modifier.widthIn(max = circleSize * 2f * navRenderer.labelScale) else Modifier,
         )
     }
 }

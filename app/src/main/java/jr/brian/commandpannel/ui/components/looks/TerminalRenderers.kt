@@ -294,6 +294,8 @@ internal object TerminalNav : LookNavRenderer {
     override fun label(text: String, selected: Boolean): String = terminalNavLabel(text, selected)
 
     override val showIcon: Boolean get() = false
+
+    override val labelScale: Float get() = 1.6f
 }
 
 /**
