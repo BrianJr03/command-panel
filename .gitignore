@@ -16,3 +16,6 @@ fork-port/
 keystore.properties
 # Build outputs
 *.apk
+
+# Local planning scratch — not for the repo
+PLAN.md
