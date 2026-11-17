@@ -23,6 +23,7 @@ import jr.brian.commandpannel.system.FontNeeds
 import jr.brian.commandpannel.system.ThemeFolder
 import jr.brian.commandpannel.system.ThemeSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -164,7 +165,8 @@ private fun SavedLookCard(
                     InfoLine(stringResource(R.string.theme_from_repo, state.themeSources.firstOrNull { it.id == id }?.name ?: id), p.accent)
                 }
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Wraps instead of squeezing: wide look fonts (e.g. mono) don't fit all four buttons on one line.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Chip(stringResource(if (active) R.string.theme_applied else R.string.theme_apply), selected = active) {
                         vm.selectLook(look.ref)
                     }

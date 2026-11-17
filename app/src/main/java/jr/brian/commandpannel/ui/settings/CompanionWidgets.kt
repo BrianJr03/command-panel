@@ -89,6 +89,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -120,14 +121,29 @@ import androidx.compose.ui.unit.sp
 internal fun focusState(): MutableState<Boolean> = remember { mutableStateOf(false) }
 
 /** Makes a node focusable, reports focus into [focused], and fires [onActivate] on A / center / enter. */
-internal fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: () -> Unit): Modifier =
-    onFocusChanged { focused.value = it.isFocused }
+internal fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: () -> Unit): Modifier = composed {
+    // Reports this control's on-screen bounds to [LocalFocusedBounds] when it gains focus (pane D-pad handling).
+    val tracker = LocalFocusedBounds.current
+    val bounds = remember { arrayOfNulls<androidx.compose.ui.geometry.Rect>(1) }
+    onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+        .onFocusChanged {
+            focused.value = it.isFocused
+            if (it.isFocused) tracker?.rect = bounds[0]
+        }
         .onKeyEvent { e ->
             if (e.type == KeyEventType.KeyDown &&
                 (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.ButtonA)
             ) { onActivate(); true } else false
         }
         .focusable()
+}
+
+/** Bounds of the most recently focused companion control, so a pane can tell where a D-pad move landed. */
+internal class FocusedBounds {
+    var rect: androidx.compose.ui.geometry.Rect? = null
+}
+
+internal val LocalFocusedBounds = androidx.compose.runtime.staticCompositionLocalOf<FocusedBounds?> { null }
 
 // ---- theming hooks ----
 // With "Companion follows overlay look" off, CompanionTheme provides the stock spec and the default palette, so
@@ -477,27 +493,38 @@ internal fun Modifier.bringIntoViewOnFocus(): Modifier {
 }
 
 /**
- * Lets the D-pad reach the ends of a scrolling pane. Up / Down move focus as usual; when there's nothing further in
- * that direction (the move fails), the pane scrolls to its very top / bottom instead of doing nothing, so headings and
- * other non-focusable content above the first control (or below the last) still come into view. Other keys and
- * Left / Right are untouched.
+ * D-pad handling for a scrolling content pane, run after the focused control had its chance (onKeyEvent, so reorder
+ * lists and text fields keep their own D-pad use):
+ * - Up / Down move focus as usual; when there's nothing further that way, the pane scrolls to its very top / bottom, so
+ *   headings and other non-focusable content above the first control (or below the last) still come into view.
+ * - Left moves to a control on the same row (e.g. Edit to Apply); otherwise it goes to [onLeaveLeft] (the rail) rather
+ *   than jumping to whatever control happens to be nearest on another row.
  */
 @Composable
-internal fun Modifier.scrollToEdgesWhenFocusLeaves(scroll: androidx.compose.foundation.ScrollState): Modifier {
+internal fun Modifier.paneDpadNavigation(scroll: androidx.compose.foundation.ScrollState, onLeaveLeft: () -> Unit): Modifier {
     val scope = rememberCoroutineScope()
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    // onKeyEvent (not preview) runs after the focused control had its chance, so controls that use the D-pad
-    // themselves (reorder lists, text fields while editing) keep working.
+    val tracker = LocalFocusedBounds.current
     return onKeyEvent { e ->
         val direction = when (e.key) {
             Key.DirectionUp -> androidx.compose.ui.focus.FocusDirection.Up
             Key.DirectionDown -> androidx.compose.ui.focus.FocusDirection.Down
+            Key.DirectionLeft -> androidx.compose.ui.focus.FocusDirection.Left
             else -> return@onKeyEvent false
         }
-        if (e.type == KeyEventType.KeyDown && !focusManager.moveFocus(direction)) {
-            scope.launch { scroll.animateScrollTo(if (direction == androidx.compose.ui.focus.FocusDirection.Up) 0 else scroll.maxValue) }
+        if (e.type == KeyEventType.KeyDown) {
+            if (direction == androidx.compose.ui.focus.FocusDirection.Left) {
+                val before = tracker?.rect
+                val moved = focusManager.moveFocus(direction)
+                val after = tracker?.rect
+                val sameRow = moved && before != null && after != null && after != before &&
+                    after.top < before.bottom && after.bottom > before.top
+                if (!sameRow) onLeaveLeft()
+            } else if (!focusManager.moveFocus(direction)) {
+                scope.launch { scroll.animateScrollTo(if (direction == androidx.compose.ui.focus.FocusDirection.Up) 0 else scroll.maxValue) }
+            }
         }
-        // Handled here (moved or scrolled), so the default navigation doesn't move focus a second time.
+        // Handled here (moved, scrolled or sent to the rail), so default navigation doesn't move focus a second time.
         true
     }
 }

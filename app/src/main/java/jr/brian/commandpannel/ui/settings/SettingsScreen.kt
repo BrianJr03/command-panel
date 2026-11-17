@@ -128,13 +128,18 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
 
 @Composable
 fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
-    CompanionTheme(state) { SettingsContent(state, vm) }
+    val focusedBounds = remember { FocusedBounds() }
+    CompanionTheme(state) {
+        CompositionLocalProvider(LocalFocusedBounds provides focusedBounds) { SettingsContent(state, vm) }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
+    // Hoisted so the content pane can send D-pad Left back to the selected rail item.
+    val railRequesters = remember { NavItem.entries.associateWith { FocusRequester() } }
     // Re-detect Better Dual Screen Assistant whenever the companion comes to the front (e.g. back from BDSA's app).
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         vm.refreshBdsa()
@@ -156,14 +161,15 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         Modifier.background(p.bg)
     }
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
-        NavRail(nav) { nav = it }
+        NavRail(nav, railRequesters) { nav = it }
         PaddedBringIntoView {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
                 // Up past the first control scrolls to the top (section title, the active look, …); Down past the
                 // last scrolls to the end.
-                .scrollToEdgesWhenFocusLeaves(scroll)
+                // Left goes to a control on the same row, otherwise back to the selected rail item.
+                .paneDpadNavigation(scroll) { runCatching { railRequesters.getValue(nav).requestFocus() } }
                 .verticalScroll(scroll)
                 .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -190,8 +196,7 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
 }
 
 @Composable
-private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
-    val requesters = remember { NavItem.entries.associateWith { FocusRequester() } }
+private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>, onSelect: (NavItem) -> Unit) {
     LaunchedEffect(Unit) { runCatching { requesters.getValue(selected).requestFocus() } }
     val themed = LocalCompanionThemed.current
     val navShape = controlShape(13.dp)
