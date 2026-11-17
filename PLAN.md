@@ -117,9 +117,18 @@ Remaining (robustness, revisit later):
   handling and crash/exit recovery, the vendor pin-screen-mode save/restore.
 - Fan custom-speed slider, Clean Memory exclusion logic (currently a blunt root kill), the volume-key overflow rule.
 
-### 5. Stock coexistence (opt-in)
-"Replace stock assistant" setting. Suppression sequence, 5000 ms `SCREEN_OFF` unfreeze (fork feature 14), restore
-on opt-out / uninstall / crash-loop.
+### 5. Stock coexistence (opt-in) — done 2026-11-16
+`StockSuppressor` runs the ephemeral suppression (transiently disable `TccServices` → `kill -9` → wait for respawn →
+`SIGSTOP` the windowless process → re-enable on disk, never left disabled) and the clean restore; pure pid/stat
+helpers are unit-tested. `StockCoexistence` owns the opt-in `replace_stock_assistant` pref (default off), applies it
+on start, exposes `enabled` as a `StateFlow`, restores on service stop, and does the fork's 5000 ms `SCREEN_OFF`
+unfreeze/re-freeze to avoid the stock-process ANR. Wired into `AssistantService` (screen receiver + a
+`SET_REPLACE_STOCK` action on the exported dynamic receiver).
+Verified on the Thor: enabling froze the stock process (respawned, state `T`); disabling restored it (new pid,
+state `S`, package enabled, `TccServices` running). Left off, so the device is clean.
+Remaining (robustness): restore stock on *ungraceful* app death and on uninstall via a helper-side watchdog (the
+root helper survives app death but doesn't yet restore stock); crash-loop circuit breaker. The real toggle UI lands
+in the phase-6 settings screen (today it's driven by the service action).
 
 ### 6. Companion settings screen (top display)
 Stock has none (its activity is disabled). Needed to host the fork features' settings. Gamepad-navigable two-pane

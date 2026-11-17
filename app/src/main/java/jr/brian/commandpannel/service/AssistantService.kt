@@ -20,6 +20,7 @@ import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
+import jr.brian.commandpannel.system.StockCoexistence
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.privileged.RootHelper
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +50,16 @@ class AssistantService : Service() {
     private lateinit var machine: AynButtonMachine
     private lateinit var repository: SettingsRepository
     private lateinit var screenMode: ScreenModeController
+    private lateinit var coexistence: StockCoexistence
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> coexistence.onScreenOff()
+                Intent.ACTION_SCREEN_ON -> coexistence.onScreenOn()
+            }
+        }
+    }
 
     private val aynReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -62,6 +73,7 @@ class AssistantService : Service() {
                 ACTION_SHOW_OVERLAY -> overlay.show()
                 ACTION_HIDE_OVERLAY -> overlay.hide()
                 ACTION_TOGGLE_OVERLAY -> overlay.toggle()
+                ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
             }
         }
     }
@@ -71,6 +83,7 @@ class AssistantService : Service() {
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
         screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
+        coexistence = StockCoexistence(applicationContext, privileged, scope)
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()
             OverlayRoot(state = state, actions = repository)
@@ -86,10 +99,15 @@ class AssistantService : Service() {
 
         startAsForeground()
         registerAynReceiver()
+        registerReceiver(screenReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+        })
         scope.launch {
             privileged.initialize(applicationContext)
             repository.start(scope)
             screenMode.start()
+            coexistence.applyInitial()
         }
     }
 
@@ -98,12 +116,15 @@ class AssistantService : Service() {
             ACTION_SHOW_OVERLAY -> overlay.show()
             ACTION_HIDE_OVERLAY -> overlay.hide()
             ACTION_TOGGLE_OVERLAY -> overlay.toggle()
+            ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(aynReceiver) }
+        runCatching { unregisterReceiver(screenReceiver) }
+        coexistence.onStop()
         repository.stop()
         screenMode.stop()
         overlay.destroy()
@@ -119,6 +140,7 @@ class AssistantService : Service() {
             addAction(ACTION_SHOW_OVERLAY)
             addAction(ACTION_HIDE_OVERLAY)
             addAction(ACTION_TOGGLE_OVERLAY)
+            addAction(ACTION_SET_REPLACE_STOCK)
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -159,6 +181,8 @@ class AssistantService : Service() {
         const val ACTION_SHOW_OVERLAY = "jr.brian.commandpannel.action.SHOW_OVERLAY"
         const val ACTION_HIDE_OVERLAY = "jr.brian.commandpannel.action.HIDE_OVERLAY"
         const val ACTION_TOGGLE_OVERLAY = "jr.brian.commandpannel.action.TOGGLE_OVERLAY"
+        const val ACTION_SET_REPLACE_STOCK = "jr.brian.commandpannel.action.SET_REPLACE_STOCK"
+        const val EXTRA_ENABLE = "enable"
 
         fun start(context: Context) {
             val intent = Intent(context, AssistantService::class.java)
