@@ -21,6 +21,7 @@ data class OverlayUiState(
     val fanMode: Int = 1,            // 0/1/4/5/6
     val fanSpeed: Int = 25000,
     val controllerStyle: Int = 1,    // temp_abxy_layout_mode
+    val triggerMode: Int = 2,        // trigger_input_mode: 0 digital, 1 analog, 2 both
 
     val dualBrightness: Float = 0.5f,
     val topBrightness: Float = 0.5f,
@@ -49,25 +50,26 @@ data class OverlayUiState(
     val tilePage: Int = 0,
 )
 
-/** A quick-settings tile: which stock icon and the title it shows for its current value. */
+/** A quick-settings tile: its icon (stock drawable or Material vector) and the title for its current value. */
 data class QuickTile(
     val id: String,
-    val iconBase: String,     // drawable base name; the `_black` variant is used in dark themes
+    val icon: jr.brian.commandpannel.ui.components.TileIcon,
     val title: String,
     val active: Boolean = false,
 ) {
     companion object {
+        private fun stock(name: String) = jr.brian.commandpannel.ui.components.TileIcon.Stock(name)
         val STOCK_DEFAULTS = listOf(
-            QuickTile("focus_lock", "ic_screen_focus_lock_mode", "Top screen"),
-            QuickTile("performance", "ic_qs_performance", "Standard\nPerformance"),
-            QuickTile("fan", "ic_qs_fan_control", "Quiet Mode", active = true),
-            QuickTile("clear_memory", "ic_qs_clean", "Clean\nMemory"),
-            QuickTile("controller", "ic_qs_controller_style", "Standard\nStyle"),
-            QuickTile("charging_sep", "ic_qs_charging_separation", "Direct Power\nSupply"),
-            QuickTile("vibration", "ic_qs_vibrate", "Vibration", active = true),
-            QuickTile("ambient_led", "ic_qs_ambient_light", "Ambient LED", active = true),
-            QuickTile("force_landscape", "ic_landscape", "Force\nLandscape"),
-            QuickTile("theme", "ic_qs_theme_mode", "Dark Theme", active = true),
+            QuickTile("focus_lock", stock("ic_screen_focus_lock_mode"), "Top screen"),
+            QuickTile("performance", stock("ic_qs_performance"), "Standard\nPerformance"),
+            QuickTile("fan", stock("ic_qs_fan_control"), "Quiet Mode", active = true),
+            QuickTile("clear_memory", stock("ic_qs_clean"), "Clean\nMemory"),
+            QuickTile("controller", stock("ic_qs_controller_style"), "Standard\nStyle"),
+            QuickTile("charging_sep", stock("ic_qs_charging_separation"), "Direct Power\nSupply"),
+            QuickTile("vibration", stock("ic_qs_vibrate"), "Vibration", active = true),
+            QuickTile("ambient_led", stock("ic_qs_ambient_light"), "Ambient LED", active = true),
+            QuickTile("force_landscape", stock("ic_landscape"), "Force\nLandscape"),
+            QuickTile("theme", stock("ic_qs_theme_mode"), "Dark Theme", active = true),
         )
     }
 }

@@ -20,6 +20,7 @@ interface OverlayActions {
     fun setFanSpeed(value: Int)
     fun setControllerStyle(value: Int)
     fun setThemeMode(value: Int)
+    fun setTriggerMode(value: Int)
     fun toggleAmbientLight()
     fun cleanMemory()
     fun setSuppressBottomTip(suppress: Boolean)
@@ -40,6 +41,7 @@ interface OverlayActions {
         override fun setFanSpeed(value: Int) {}
         override fun setControllerStyle(value: Int) {}
         override fun setThemeMode(value: Int) {}
+        override fun setTriggerMode(value: Int) {}
         override fun toggleAmbientLight() {}
         override fun cleanMemory() {}
         override fun setSuppressBottomTip(suppress: Boolean) {}

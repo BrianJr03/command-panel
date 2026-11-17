@@ -41,6 +41,18 @@ fun TccIconButton(
     labelSize: TextUnit = 10.sp,
     iconInset: Dp = circleSize * 0.27f,
     onClick: (() -> Unit)? = null,
+) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, onClick)
+
+@Composable
+fun TccIconButton(
+    icon: TileIcon,
+    label: String,
+    circleSize: Dp,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    labelSize: TextUnit = 10.sp,
+    iconInset: Dp = circleSize * 0.27f,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = LocalTccColors.current
     val base = if (onClick != null) modifier.clickable { onClick() } else modifier
@@ -59,7 +71,7 @@ fun TccIconButton(
             contentAlignment = Alignment.Center,
         ) {
             Image(
-                painter = rememberStockPainter(iconBase),
+                painter = icon.painter(),
                 contentDescription = label,
                 colorFilter = stockIconColorFilter(if (active) Color.White else colors.secondary),
                 modifier = Modifier.padding(iconInset).size(circleSize - iconInset * 2),

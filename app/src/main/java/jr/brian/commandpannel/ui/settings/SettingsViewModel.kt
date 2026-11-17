@@ -23,6 +23,7 @@ import javax.inject.Inject
 
 enum class SettingsCategory(val title: String) {
     GENERAL("General"),
+    QUICK_TOGGLES("Quick Toggles"),
     APPEARANCE("Appearance"),
     DIAGNOSTICS("Diagnostics"),
 }
@@ -33,6 +34,7 @@ data class SettingsState(
     val hideNetSpeed: Boolean = false,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
+    val enabledTiles: Set<String> = emptySet(),
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
     val appPickerOpen: Boolean = false,
@@ -61,6 +63,8 @@ class SettingsViewModel @Inject constructor(
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
+        enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
+            .enabledKeys(prefs.getString("qs_enabled_tiles", null)).toSet(),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
     )
@@ -116,6 +120,15 @@ class SettingsViewModel @Inject constructor(
     fun setHideNetSpeed(enable: Boolean) {
         prefs.edit().putBoolean("hide_net_speed", enable).apply()
         _state.value = _state.value.copy(hideNetSpeed = enable)
+    }
+
+    fun setTileEnabled(key: String, enable: Boolean) {
+        val csv = jr.brian.commandpannel.system.QuickSettingTileId
+            .toggle(prefs.getString("qs_enabled_tiles", null), key, enable)
+        prefs.edit().putString("qs_enabled_tiles", csv).apply()
+        _state.value = _state.value.copy(
+            enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId.enabledKeys(csv).toSet()
+        )
     }
 
     fun setReplaceStock(enable: Boolean) {

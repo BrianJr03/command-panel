@@ -74,6 +74,7 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
             ) {
                 when (category) {
                     SettingsCategory.GENERAL -> General(state, vm)
+                    SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm)
                     SettingsCategory.APPEARANCE -> Appearance(state, vm)
                     SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
                 }
@@ -165,6 +166,31 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
                     .clickable { vm.pickApp(app.component) }
                     .padding(vertical = 12.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun QuickToggles(state: SettingsState, vm: SettingsViewModel) {
+    val c = LocalTccColors.current
+    Text(
+        "Choose which quick-setting tiles appear in the overlay. Stock tiles are on by default; " +
+            "Android System and Tools tiles are extras.",
+        color = c.secondary, fontSize = 13.sp,
+    )
+    jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
+        SectionHeader(cat.title)
+        Card {
+            jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(tile.label, color = c.primary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = tile.key in state.enabledTiles,
+                        onCheckedChange = { vm.setTileEnabled(tile.key, it) },
+                        colors = SwitchDefaults.colors(checkedTrackColor = c.accent),
+                    )
+                }
+            }
         }
     }
 }

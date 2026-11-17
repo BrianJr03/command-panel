@@ -30,7 +30,7 @@ import jr.brian.commandpannel.ui.components.stockIconColorFilter
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 
 /** Which quick-tile modal dialog is open over the overlay. */
-enum class OverlayDialogKind { NONE, FOCUS, PERFORMANCE, FAN, CONTROLLER, THEME }
+enum class OverlayDialogKind { NONE, FOCUS, PERFORMANCE, FAN, CONTROLLER, THEME, TRIGGER }
 
 /** Maps a modal tile id to its dialog, or null for instant-action tiles. */
 fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
@@ -39,6 +39,7 @@ fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
     "fan" -> OverlayDialogKind.FAN
     "controller" -> OverlayDialogKind.CONTROLLER
     "theme" -> OverlayDialogKind.THEME
+    "trigger_mode" -> OverlayDialogKind.TRIGGER
     else -> null
 }
 
@@ -101,13 +102,15 @@ private fun OptionRow(option: DialogOption, selected: Boolean, onClick: () -> Un
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = rememberStockPainter(option.icon),
-            contentDescription = null,
-            colorFilter = stockIconColorFilter(colors.primary),
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(Modifier.width(16.dp))
+        if (option.icon.isNotEmpty()) {
+            Image(
+                painter = rememberStockPainter(option.icon),
+                contentDescription = null,
+                colorFilter = stockIconColorFilter(colors.primary),
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+        }
         Text(option.label, color = colors.primary, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier
@@ -172,6 +175,15 @@ private fun specFor(kind: OverlayDialogKind, state: OverlayUiState, actions: Ove
             DialogOption("Dark Theme", "ic_qs_dark_theme", 4),
         ),
         state.themeMode, actions::setThemeMode,
+    )
+    OverlayDialogKind.TRIGGER -> DialogSpec(
+        "ic_qs_controller_style", "L2/R2 Trigger Mode",
+        listOf(
+            DialogOption("Analog", "", 1),
+            DialogOption("Digital", "", 0),
+            DialogOption("Both", "", 2),
+        ),
+        state.triggerMode, actions::setTriggerMode,
     )
     OverlayDialogKind.NONE -> error("no dialog")
 }

@@ -124,7 +124,7 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
                 ) {
                     items(pages.getOrElse(pageIndex) { emptyList() }, key = { it.id }) { tile ->
                         TccIconButton(
-                            iconBase = tile.iconBase,
+                            icon = tile.icon,
                             label = tile.title,
                             circleSize = 48.dp,
                         active = tile.active,

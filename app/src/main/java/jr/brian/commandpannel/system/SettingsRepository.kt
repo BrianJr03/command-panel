@@ -58,6 +58,11 @@ class SettingsRepository(
         override fun onChange(selfChange: Boolean) = refreshFromSettings()
     }
 
+    // App-private prefs the companion app changes (tile roster, quick launch, tip, theme sync, …).
+    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        refreshFromSettings()
+    }
+
     private var fastJob: Job? = null
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
     private var lastRxTime = System.currentTimeMillis()
@@ -66,6 +71,7 @@ class SettingsRepository(
         observed.forEach {
             context.contentResolver.registerContentObserver(settings.uriFor(it), false, observer)
         }
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
         refreshFromSettings()
         telemetry.start(scope)
         batteryEstimate.start(scope)
@@ -94,6 +100,7 @@ class SettingsRepository(
 
     fun stop() {
         context.contentResolver.unregisterContentObserver(observer)
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         telemetry.stop()
         batteryEstimate.stop()
         fastJob?.cancel(); fastJob = null
@@ -116,6 +123,7 @@ class SettingsRepository(
                 fanMode = settings.getInt(Keys.FAN_MODE, 1),
                 fanSpeed = settings.getInt(Keys.FAN_SPEED, 25000),
                 controllerStyle = settings.getInt(Keys.CONTROLLER_STYLE, 1),
+                triggerMode = settings.getInt("trigger_input_mode", 2),
                 is120Hz = peak >= 90f,
                 themeMode = themeMode,
                 suppressBottomTip = prefs.getBoolean("suppress_bottom_tip", false),
@@ -166,25 +174,45 @@ class SettingsRepository(
         else -> "Auto-lock"
     }
 
+    private fun enabledTileKeys(): List<String> =
+        QuickSettingTileId.enabledKeys(prefs.getString("qs_enabled_tiles", null))
+
     private fun buildTiles(mode: Int, focus: Int): List<QuickTile> {
         val perf = settings.getInt(Keys.PERFORMANCE_MODE, 0)
         val fan = settings.getInt(Keys.FAN_MODE, 1)
         val style = settings.getInt(Keys.CONTROLLER_STYLE, 1)
         val theme = settings.getInt(Keys.THEME_MODE, 4)
         val light = settings.getString(Keys.JOYSTICK_LIGHT).orEmpty().split(",").any { it.trim() == "1" }
-        return buildList {
-            if (mode == 0) add(QuickTile("focus_lock", "ic_screen_focus_lock_mode", focusTitle(focus)))
-            add(QuickTile("performance", "ic_qs_performance", perfTitle(perf)))
-            add(QuickTile("fan", "ic_qs_fan_control", fanTitle(fan), active = fan != 0))
-            add(QuickTile("clear_memory", "ic_qs_clean", "Clean\nMemory"))
-            add(QuickTile("controller", "ic_qs_controller_style", styleTitle(style)))
-            add(QuickTile("charging_sep", "ic_qs_charging_separation", "Direct Power\nSupply", active = settings.getInt(Keys.CHARGING_SEPARATION, 0) == 1))
-            add(QuickTile("vibration", "ic_qs_vibrate", "Vibration", active = settings.getInt(Keys.VIBRATE_ON, 1) == 1))
-            add(QuickTile("ambient_led", "ic_qs_ambient_light", "Ambient LED", active = light))
-            add(QuickTile("force_landscape", "ic_landscape", "Force\nLandscape", active = settings.getInt(Keys.FORCE_LANDSCAPE, 0) == 1))
-            add(QuickTile("theme", "ic_qs_theme_mode", themeTitle(theme), active = true))
+        return enabledTileKeys().mapNotNull { key ->
+            val id = QuickSettingTileId.fromKey(key) ?: return@mapNotNull null
+            // Focus Lock is hidden outside dual mode, like stock.
+            if (id == QuickSettingTileId.FOCUS_LOCK && mode != 0) return@mapNotNull null
+            val (title, active) = when (id) {
+                QuickSettingTileId.FOCUS_LOCK -> focusTitle(focus) to false
+                QuickSettingTileId.PERFORMANCE -> perfTitle(perf) to false
+                QuickSettingTileId.FAN -> fanTitle(fan) to (fan != 0)
+                QuickSettingTileId.CLEAR_MEMORY -> "Clean\nMemory" to false
+                QuickSettingTileId.CONTROLLER -> styleTitle(style) to false
+                QuickSettingTileId.CHARGING_SEP -> "Direct Power\nSupply" to (settings.getInt(Keys.CHARGING_SEPARATION, 0) == 1)
+                QuickSettingTileId.VIBRATION -> "Vibration" to (settings.getInt(Keys.VIBRATE_ON, 1) == 1)
+                QuickSettingTileId.AMBIENT_LED -> "Ambient LED" to light
+                QuickSettingTileId.FORCE_LANDSCAPE -> "Force\nLandscape" to (settings.getInt(Keys.FORCE_LANDSCAPE, 0) == 1)
+                QuickSettingTileId.THEME -> themeTitle(theme) to true
+                QuickSettingTileId.WIFI -> "Wi-Fi" to (wifiLevel() >= 0)
+                QuickSettingTileId.BLUETOOTH -> "Bluetooth" to bluetoothConnected()
+                QuickSettingTileId.DO_NOT_DISTURB -> "Do Not\nDisturb" to (settings.getInt("zen_mode", 0) != 0)
+                QuickSettingTileId.AIRPLANE -> "Airplane\nMode" to (android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1)
+                QuickSettingTileId.KEEP_SCREEN_ON -> "Keep\nScreen On" to (settings.getInt("keep_screen_on", 0) == 1)
+                QuickSettingTileId.DOUBLE_TAP_HOME -> "Double-Tap\nHOME" to (settings.getInt("prevent_press_home_accidentally", 0) == 1)
+                QuickSettingTileId.CHARGE_LIMIT_80 -> "80% Charge\nLimit" to (settings.getInt("percent_80_charge_limit", 0) == 1)
+                QuickSettingTileId.VIRTUAL_MOUSE -> "Virtual\nMouse" to (settings.getInt("global_gamepad_to_mouse_mode", 0) == 1)
+                QuickSettingTileId.TRIGGER_MODE -> triggerTitle(settings.getInt("trigger_input_mode", 2)) to false
+            }
+            QuickTile(key, id.icon, title, active)
         }
     }
+
+    private fun triggerTitle(v: Int) = when (v) { 0 -> "Trigger:\nDigital"; 1 -> "Trigger:\nAnalog"; else -> "Trigger:\nBoth" }
 
     private fun perfTitle(v: Int) = when (v) { 1 -> "Medium\nPerformance"; 2 -> "High\nPerformance"; else -> "Standard\nPerformance" }
     private fun fanTitle(v: Int) = when (v) { 0 -> "Turned Off"; 4 -> "Smart Mode"; 5 -> "Sports Mode"; 6 -> "Custom"; else -> "Quiet Mode" }
@@ -258,8 +286,24 @@ class SettingsRepository(
             "force_landscape" -> toggleIntKey(Keys.FORCE_LANDSCAPE, default = 0)
             "ambient_led" -> toggleAmbientLight()
             "clear_memory" -> cleanMemory()
-            // focus_lock, performance, fan, controller, theme → modal dialogs (handled in the overlay)
+            "wifi" -> privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
+            "bluetooth" -> privileged.shell("svc bluetooth ${if (bluetoothConnected()) "disable" else "enable"}")
+            "do_not_disturb" -> privileged.shell("cmd notification set_dnd ${if (settings.getInt("zen_mode", 0) != 0) "off" else "priority"}")
+            "airplane_mode" -> toggleAirplane()
+            "keep_screen_on" -> toggleIntKey("keep_screen_on", 0)
+            "prevent_accidental_home" -> toggleIntKey("prevent_press_home_accidentally", 0)
+            "charge_limit_80" -> toggleIntKey("percent_80_charge_limit", 0)
+            "gamepad_mouse_mode" -> toggleIntKey("global_gamepad_to_mouse_mode", 0)
+            // focus_lock, performance, fan, controller, theme, trigger_mode → modal dialogs (handled in the overlay)
         }
+        refreshFromSettings()
+    }
+
+    override fun setTriggerMode(value: Int) = settings.putInt("trigger_input_mode", value)
+
+    private fun toggleAirplane() {
+        val on = android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1
+        privileged.shell("cmd connectivity airplane-mode ${if (on) "disable" else "enable"}")
     }
 
     override fun setFocusLock(value: Int) = settings.putInt(Keys.FOCUS_LOCK, value)
