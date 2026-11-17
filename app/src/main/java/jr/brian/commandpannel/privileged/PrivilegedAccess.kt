@@ -59,4 +59,14 @@ class PrivilegedAccess @Inject constructor() {
     fun setDisplayBrightness(displayId: Int, brightness: Float, temporary: Boolean) {
         RootHelper.binder?.let { runCatching { it.setDisplayBrightness(displayId, brightness, temporary) } }
     }
+
+    /** Mirrors a physical display's layer stack onto [surface] via the root helper (Replay Buffer capture). */
+    fun startDisplayMirror(surface: android.view.Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =
+        RootHelper.binder?.let {
+            runCatching { it.startDisplayMirror(surface, layerStack, srcW, srcH, dstW, dstH) }.getOrDefault(false)
+        } ?: false
+
+    fun stopDisplayMirror() {
+        RootHelper.binder?.let { runCatching { it.stopDisplayMirror() } }
+    }
 }

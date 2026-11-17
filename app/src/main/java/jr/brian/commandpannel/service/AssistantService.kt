@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -53,6 +54,7 @@ class AssistantService : Service() {
     private lateinit var screenMode: ScreenModeController
     private lateinit var coexistence: StockCoexistence
     private lateinit var tapWaker: ExternalDisplayTapWaker
+    private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -76,6 +78,15 @@ class AssistantService : Service() {
                 ACTION_HIDE_OVERLAY -> overlay.hide()
                 ACTION_TOGGLE_OVERLAY -> overlay.toggle()
                 ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+                ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
+                    if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+                    else replay.applyEnabledState()
+                }
+                ACTION_REPLAY_SAVE -> scope.launch(Dispatchers.IO) {
+                    val result = replay.save()
+                    Log.i(TAG, "replay save: $result")
+                    sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
+                }
             }
         }
     }
@@ -88,6 +99,7 @@ class AssistantService : Service() {
         repository.onHideOverlay = { overlay.hide() }
         coexistence = StockCoexistence(applicationContext, privileged, scope)
         tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)
+        replay = jr.brian.commandpannel.system.ReplayBufferController(applicationContext, privileged)
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()
             OverlayRoot(state = state, actions = repository)
@@ -113,6 +125,7 @@ class AssistantService : Service() {
             screenMode.start()
             coexistence.applyInitial()
             tapWaker.start()
+            withContext(Dispatchers.IO) { replay.applyEnabledState() }
         }
     }
 
@@ -131,6 +144,7 @@ class AssistantService : Service() {
         runCatching { unregisterReceiver(screenReceiver) }
         coexistence.onStop()
         tapWaker.stop()
+        runCatching { replay.disarm() }
         repository.stop()
         screenMode.stop()
         overlay.destroy()
@@ -147,6 +161,8 @@ class AssistantService : Service() {
             addAction(ACTION_HIDE_OVERLAY)
             addAction(ACTION_TOGGLE_OVERLAY)
             addAction(ACTION_SET_REPLACE_STOCK)
+            addAction(ACTION_REPLAY_SET_ENABLED)
+            addAction(ACTION_REPLAY_SAVE)
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -188,6 +204,10 @@ class AssistantService : Service() {
         const val ACTION_HIDE_OVERLAY = "jr.brian.commandpannel.action.HIDE_OVERLAY"
         const val ACTION_TOGGLE_OVERLAY = "jr.brian.commandpannel.action.TOGGLE_OVERLAY"
         const val ACTION_SET_REPLACE_STOCK = "jr.brian.commandpannel.action.SET_REPLACE_STOCK"
+        const val ACTION_REPLAY_SET_ENABLED = "jr.brian.commandpannel.action.REPLAY_SET_ENABLED"
+        const val ACTION_REPLAY_SAVE = "jr.brian.commandpannel.action.REPLAY_SAVE"
+        const val ACTION_REPLAY_SAVED = "jr.brian.commandpannel.action.REPLAY_SAVED"
+        const val EXTRA_REPLAY_RESULT = "replay_result"
         const val EXTRA_ENABLE = "enable"
 
         fun start(context: Context) {

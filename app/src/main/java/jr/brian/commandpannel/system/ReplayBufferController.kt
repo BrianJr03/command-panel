@@ -1,0 +1,87 @@
+package jr.brian.commandpannel.system
+
+import android.content.Context
+import android.util.Log
+import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.ReplayBitratePreset
+import jr.brian.commandpannel.privileged.ReplayCaptureEngine
+import jr.brian.commandpannel.privileged.ReplayClipWriter
+import jr.brian.commandpannel.privileged.ReplayRingBuffer
+import jr.brian.commandpannel.privileged.ScreenRecorderEngine
+import java.io.File
+
+/**
+ * Orchestrates the Replay Buffer: arms/disarms the [ReplayCaptureEngine] from the `replay_*` prefs and saves the
+ * last-N-seconds clip (mux to the app cache, then root-copy into the user's clips folder on shared storage).
+ */
+class ReplayBufferController(
+    private val context: Context,
+    private val privileged: PrivilegedAccess,
+) {
+    private val tag = "ReplayBuffer"
+    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val engine = ReplayCaptureEngine(context, privileged)
+
+    val isArmed: Boolean get() = engine.isRunning
+
+    private fun windowSeconds(): Int =
+        ScreenRecorderEngine.normalizeReplayWindowSeconds(
+            prefs.getInt("replay_window_seconds", ScreenRecorderEngine.DEFAULT_REPLAY_WINDOW_SECONDS),
+        )
+
+    private fun preset(): ReplayBitratePreset = ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null))
+
+    private fun clipsRelativeDir(): String =
+        ScreenRecorderEngine.normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null))
+            ?: ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR
+
+    /** Arms or disarms capture to match the `replay_enabled` pref. */
+    fun applyEnabledState() {
+        if (prefs.getBoolean("replay_enabled", false)) arm() else disarm()
+    }
+
+    /** Persists the enabled pref and arms/disarms to match. */
+    fun setEnabled(enable: Boolean) {
+        prefs.edit().putBoolean("replay_enabled", enable).apply()
+        applyEnabledState()
+    }
+
+    fun arm(): Boolean = engine.start(windowSeconds(), preset())
+
+    fun disarm() = engine.stop()
+
+    fun bufferedSeconds(): Int = (engine.bufferedDurationUs() / 1_000_000L).toInt()
+
+    /** Saves the buffered clip. Returns the saved path, or `error:<code>`. */
+    fun save(): String {
+        if (!engine.isRunning) return "error:${ScreenRecorderEngine.REPLAY_ERR_NOT_ARMED}"
+        val format = engine.videoFormat ?: return "error:${ScreenRecorderEngine.REPLAY_ERR_START_FAILED}"
+        when (val slice = engine.slice()) {
+            null, is ReplayRingBuffer.Slice.Failure -> {
+                val code = (slice as? ReplayRingBuffer.Slice.Failure)?.error?.let {
+                    if (it == ReplayRingBuffer.SliceError.NO_KEYFRAME) ScreenRecorderEngine.REPLAY_ERR_NO_KEYFRAME
+                    else ScreenRecorderEngine.REPLAY_ERR_EMPTY
+                } ?: ScreenRecorderEngine.REPLAY_ERR_EMPTY
+                return "error:$code"
+            }
+            is ReplayRingBuffer.Slice.Clip -> {
+                val tmp = File(context.cacheDir, "replay_tmp.mp4")
+                if (!ReplayClipWriter.write(slice, format, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
+                val dir = clipsRelativeDir()
+                val path = ScreenRecorderEngine.buildReplayClipPath(
+                    targetMode = ScreenRecorderEngine.TARGET_TOP,
+                    baseDir = "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$dir",
+                )
+                if (!ScreenRecorderEngine.isValidReplayClipOutputPath(path)) {
+                    return "error:${ScreenRecorderEngine.REPLAY_ERR_INVALID_PATH}"
+                }
+                val parent = path.substringBeforeLast('/')
+                privileged.shell("mkdir -p '$parent' && cp '${tmp.absolutePath}' '$path' && chmod 664 '$path'")
+                privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d 'file://$path' >/dev/null 2>&1")
+                runCatching { tmp.delete() }
+                Log.i(tag, "saved replay clip -> $path")
+                return path
+            }
+        }
+    }
+}

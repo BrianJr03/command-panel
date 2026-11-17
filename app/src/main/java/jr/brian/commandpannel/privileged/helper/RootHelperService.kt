@@ -3,6 +3,7 @@ package jr.brian.commandpannel.privileged.helper
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
+import android.view.Surface
 import kotlin.system.exitProcess
 
 /**
@@ -61,4 +62,9 @@ class RootHelperService : IRootHelper.Stub() {
     }.getOrElse {
         Log.w(tag, "removeTask($taskId) failed", it); false
     }
+
+    override fun startDisplayMirror(surface: Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =
+        DisplayMirror.start(surface, layerStack, srcW, srcH, dstW, dstH)
+
+    override fun stopDisplayMirror() = DisplayMirror.stop()
 }
