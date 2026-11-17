@@ -14,9 +14,14 @@ import jr.brian.commandpannel.ui.theme.lookLabel
 import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 import jr.brian.commandpannel.ui.theme.tccLookColors
 import jr.brian.commandpannel.ui.theme.tccTextStyle
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -71,6 +76,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import kotlin.math.abs
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
@@ -179,6 +186,7 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
     CompanionTheme(state) { SettingsContent(state, vm) }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
@@ -193,6 +201,9 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     }
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav) { nav = it }
+        val focusMarginPx = with(LocalDensity.current) { FOCUS_SCROLL_MARGIN.toPx() }
+        val bringIntoViewSpec = remember(focusMarginPx) { PaddedBringIntoViewSpec(focusMarginPx) }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
@@ -214,18 +225,46 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
         }
+        }
+    }
+}
+
+/** Gap kept between a focused card (border and focus scale included) and the top/bottom edge of the scrolling pane. */
+private val FOCUS_SCROLL_MARGIN = 28.dp
+
+/**
+ * [BringIntoViewSpec] that reserves [insetPx] at both edges of the viewport. The default spec counts anything inside
+ * `[0, containerSize]` as visible and ignores content padding, so D-pad focus scrolling left the focused card's border
+ * flush against the top/bottom of the screen.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private class PaddedBringIntoViewSpec(private val insetPx: Float) : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val leadingEdge = offset - insetPx
+        val trailingEdge = offset + size - (containerSize - insetPx)
+        return when {
+            leadingEdge >= 0 && trailingEdge <= 0 -> 0f
+            // Taller than the padded window: leave it where it is rather than jitter between edges.
+            leadingEdge < 0 && trailingEdge > 0 -> 0f
+            abs(leadingEdge) < abs(trailingEdge) -> leadingEdge
+            else -> trailingEdge
+        }
     }
 }
 
 @Composable
 private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
-    val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    val requesters = remember { NavItem.entries.associateWith { FocusRequester() } }
+    LaunchedEffect(Unit) { runCatching { requesters.getValue(NavItem.GENERAL).requestFocus() } }
     val themed = LocalCompanionThemed.current
     val navShape = controlShape(13.dp)
     Column(
         // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
         modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
+            // Coming back from the content pane (D-pad Left) lands on the selected section, not the geometrically
+            // nearest rail item.
+            .focusProperties { onEnter = { requesters.getValue(selected).requestFocus() } }
+            .focusGroup()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -250,7 +289,7 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(navShape).background(bg)
                     .then(if (f.value) Modifier.border(1.5.dp, p.accent, navShape) else Modifier)
-                    .then(if (item == NavItem.GENERAL) Modifier.focusRequester(firstFocus) else Modifier)
+                    .focusRequester(requesters.getValue(item))
                     .onFocusChanged { if (it.isFocused) onSelect(item) }
                     .focusControl(f) { onSelect(item) }
                     .noRippleClickable { onSelect(item) }
