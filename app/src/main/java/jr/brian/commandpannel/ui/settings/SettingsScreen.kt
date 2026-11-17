@@ -110,6 +110,13 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         checked = state.hideNetSpeed,
         onChange = vm::setHideNetSpeed,
     )
+    SwitchCard(
+        title = "Keep Apps That Are On Screen",
+        description = "When Clear All Tasks runs, keep apps showing on either screen, their companion screens " +
+            "and the home app. Turn off to clear everything except this app, the stock assistant and the system.",
+        checked = state.keepOnScreen,
+        onChange = vm::setKeepOnScreen,
+    )
     QuickLaunchCard(state, vm)
     Card {
         Text("Overlay preview", color = LocalTccColors.current.primary, fontSize = 16.sp)

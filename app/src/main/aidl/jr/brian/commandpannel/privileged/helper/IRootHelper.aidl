@@ -25,4 +25,7 @@ interface IRootHelper {
     void attachClient(IBinder token);
 
     oneway void shutdown();
+
+    /** Removes a recent task by id via IActivityTaskManager.removeTask (v2). Returns true if removed. */
+    boolean removeTask(int taskId);
 }

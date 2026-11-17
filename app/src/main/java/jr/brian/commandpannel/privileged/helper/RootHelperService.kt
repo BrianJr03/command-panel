@@ -52,4 +52,13 @@ class RootHelperService : IRootHelper.Stub() {
         Log.i(tag, "shutdown requested")
         exitProcess(0)
     }
+
+    override fun removeTask(taskId: Int): Boolean = runCatching {
+        val atm = Class.forName("android.app.ActivityTaskManager")
+        val service = atm.getMethod("getService").invoke(null)
+        service.javaClass.getMethod("removeTask", Int::class.javaPrimitiveType)
+            .invoke(service, taskId) as Boolean
+    }.getOrElse {
+        Log.w(tag, "removeTask($taskId) failed", it); false
+    }
 }

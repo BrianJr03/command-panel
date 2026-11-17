@@ -32,6 +32,7 @@ data class SettingsState(
     val replaceStock: Boolean = false,
     val batteryEstimate: Boolean = false,
     val hideNetSpeed: Boolean = false,
+    val keepOnScreen: Boolean = true,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
     val enabledTiles: Set<String> = emptySet(),
@@ -61,6 +62,7 @@ class SettingsViewModel @Inject constructor(
         replaceStock = prefs.getBoolean("replace_stock_assistant", false),
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
+        keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
@@ -120,6 +122,11 @@ class SettingsViewModel @Inject constructor(
     fun setHideNetSpeed(enable: Boolean) {
         prefs.edit().putBoolean("hide_net_speed", enable).apply()
         _state.value = _state.value.copy(hideNetSpeed = enable)
+    }
+
+    fun setKeepOnScreen(enable: Boolean) {
+        prefs.edit().putBoolean("clear_tasks_keep_on_screen", enable).apply()
+        _state.value = _state.value.copy(keepOnScreen = enable)
     }
 
     fun setTileEnabled(key: String, enable: Boolean) {

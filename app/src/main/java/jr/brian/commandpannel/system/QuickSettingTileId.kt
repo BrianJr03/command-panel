@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mouse
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -49,7 +50,8 @@ enum class QuickSettingTileId(
     CHARGE_LIMIT_80("charge_limit_80", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.BatteryChargingFull), TileInteraction.TOGGLE),
     VIRTUAL_MOUSE("gamepad_mouse_mode", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Mouse), TileInteraction.TOGGLE),
     TRIGGER_MODE("trigger_mode", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Tune), TileInteraction.DIALOG),
-    SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG);
+    SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG),
+    CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION);
 
     /** Display name for the companion app's enable/disable list. */
     val label: String get() = when (this) {
@@ -73,6 +75,7 @@ enum class QuickSettingTileId(
         VIRTUAL_MOUSE -> "Virtual Mouse"
         TRIGGER_MODE -> "L2/R2 Trigger Mode"
         SCREENSHOT -> "Screenshot"
+        CLEAR_ALL_TASKS -> "Clear All Tasks"
     }
 
     companion object {

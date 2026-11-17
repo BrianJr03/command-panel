@@ -159,9 +159,13 @@ Done (cont.):
 - **Screenshot Tools tile** — `Screenshotter` (resolve display ids from SurfaceFlinger, `screencap` via root,
   media-scan), Top/Bottom/Both dialog. Verified: captured a valid 1920×1080 top-screen PNG.
 
+- **Clear All Tasks (10)** — ported `ClearTasksPolicy` (pure, 290 lines, with its `dumpsys` parsers) + its test;
+  helper `removeTask` (IActivityTaskManager reflection, protocol v2); repository gathers recents/activities/home via
+  root dumps, applies the policy, removes via the helper; Tools tile + "Keep Apps On Screen" toggle. Verified on
+  device: recents 15→4, kept Command Panel + home, removed background tasks, foreground survived.
+
 Backlog (remaining fork features, roughly easiest → hardest):
-- Clear All Tasks tile with keep-on-screen policy (10) — port `ClearTasksPolicy` (pure) + task listing via helper.
-- Nav bar Home/Launch reorder + Home default (1).
+- Nav bar Home/Launch reorder + Home default (1) — largely BDSA-specific; may not apply.
 - Thor RGB accent sync (6), Dark-on-TV tap-to-wake (7) — device-specific, self-contained.
 - Quick-toggle reorder (12) — rewrite the 160 upstream lines flagged in the manifest.
 - Arrange mode (3) — needs the overlay cards made addressable.

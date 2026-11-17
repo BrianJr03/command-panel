@@ -52,6 +52,10 @@ class PrivilegedAccess @Inject constructor() {
     fun getDisplayBrightness(displayId: Int): Float? =
         RootHelper.binder?.let { runCatching { it.getDisplayBrightness(displayId) }.getOrNull() }
 
+    /** Removes a recent task by id (helper only). Returns true if removed. */
+    fun removeTask(taskId: Int): Boolean =
+        RootHelper.binder?.let { runCatching { it.removeTask(taskId) }.getOrDefault(false) } ?: false
+
     fun setDisplayBrightness(displayId: Int, brightness: Float, temporary: Boolean) {
         RootHelper.binder?.let { runCatching { it.setDisplayBrightness(displayId, brightness, temporary) } }
     }

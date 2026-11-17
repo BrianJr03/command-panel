@@ -215,6 +215,7 @@ class SettingsRepository(
                 QuickSettingTileId.VIRTUAL_MOUSE -> "Virtual\nMouse" to (settings.getInt("global_gamepad_to_mouse_mode", 0) == 1)
                 QuickSettingTileId.TRIGGER_MODE -> triggerTitle(settings.getInt("trigger_input_mode", 2)) to false
                 QuickSettingTileId.SCREENSHOT -> "Screenshot" to false
+                QuickSettingTileId.CLEAR_ALL_TASKS -> "Clear All\nTasks" to false
             }
             QuickTile(key, id.icon, title, active)
         }
@@ -302,7 +303,8 @@ class SettingsRepository(
             "prevent_accidental_home" -> toggleIntKey("prevent_press_home_accidentally", 0)
             "charge_limit_80" -> toggleIntKey("percent_80_charge_limit", 0)
             "gamepad_mouse_mode" -> toggleIntKey("global_gamepad_to_mouse_mode", 0)
-            // focus_lock, performance, fan, controller, theme, trigger_mode → modal dialogs (handled in the overlay)
+            "clear_all_tasks" -> clearAllTasks()
+            // focus_lock, performance, fan, controller, theme, trigger_mode, screenshot → modal dialogs (in the overlay)
         }
         refreshFromSettings()
     }
@@ -354,6 +356,37 @@ class SettingsRepository(
     override fun cleanMemory() {
         // Full stock exclusion logic is a later refinement; the root kill is the core action.
         privileged.shell("am kill-all")
+    }
+
+    /**
+     * Clear All Tasks (fork feature): build the recents/activities snapshots from root `dumpsys`, apply the pure
+     * [jr.brian.commandpannel.privileged.ClearTasksPolicy], then remove the planned tasks via the helper. With
+     * keep-on-screen (default) the on-screen apps, their companion tasks and the home app are kept.
+     */
+    private fun clearAllTasks() {
+        onHideOverlay()
+        scope?.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(300)
+            val policy = jr.brian.commandpannel.privileged.ClearTasksPolicy
+            val recents = policy.parseRecentsDump(privileged.shell("dumpsys activity recents").orEmpty()) ?: return@launch
+            val onScreen = policy.parseActivitiesDump(privileged.shell("dumpsys activity activities").orEmpty()).orEmpty()
+            val home = policy.filterHomePackages(
+                Regex("""([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/""")
+                    .findAll(privileged.shell("cmd package resolve-activity -c android.intent.category.HOME").orEmpty())
+                    .map { it.groupValues[1] }.toList()
+            )
+            val plan = policy.selectTasksToClear(
+                recents = recents,
+                onScreenRootTasks = onScreen,
+                keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
+                excludedPackages = setOf(
+                    context.packageName, "com.odin.dualscreen.assistant",
+                    "com.android.systemui", "com.android.launcher3",
+                ),
+                homePackages = home,
+            )
+            plan.remove.forEach { privileged.removeTask(it) }
+        }
     }
 
     override fun setSuppressBottomTip(suppress: Boolean) {
