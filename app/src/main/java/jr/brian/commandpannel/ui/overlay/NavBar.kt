@@ -29,12 +29,13 @@ fun NavBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TccIconButton("ic_screen_control", "Mode", circleSize = 44.dp, active = activeTab == OverlayTab.MODE, onClick = onMode)
-            TccIconButton("ic_task_manage", "Task", circleSize = 44.dp, onClick = onTask)
+            val nav = jr.brian.commandpannel.ui.components.TccTileVariant.NAV_BAR
+            TccIconButton("ic_screen_control", "Mode", circleSize = 44.dp, active = activeTab == OverlayTab.MODE, variant = nav, index = 0, onClick = onMode)
+            TccIconButton("ic_task_manage", "Task", circleSize = 44.dp, variant = nav, index = 1, onClick = onTask)
             if (quickLaunchLabel != null) {
-                TccIconButton("ic_app_manage", "Launch", circleSize = 44.dp, onClick = onLaunch)
+                TccIconButton("ic_app_manage", "Launch", circleSize = 44.dp, variant = nav, index = 2, onClick = onLaunch)
             }
-            TccIconButton("ic_system_set", "Settings", circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS, onClick = onSettings)
+            TccIconButton("ic_system_set", "Settings", circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS, variant = nav, index = 3, onClick = onSettings)
         }
     }
 }

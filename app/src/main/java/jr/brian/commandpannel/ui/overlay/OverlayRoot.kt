@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.TccColors
 import jr.brian.commandpannel.ui.theme.TccTheme
@@ -39,7 +40,11 @@ fun OverlayRoot(
         else -> TccColors.PureBlack
     }
     TccTheme(colors) {
-        val bg = LocalTccColors.current.primaryBackground
+      androidx.compose.runtime.CompositionLocalProvider(
+          jr.brian.commandpannel.ui.theme.LocalTccLookSpec provides jr.brian.commandpannel.ui.theme.specForLook(state.look),
+      ) {
+        val spec = jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current
+        val lookColors = jr.brian.commandpannel.ui.theme.tccLookColors()
         var tab by remember { mutableStateOf(initialTab) }
         var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
         var showBottomTip by remember { mutableStateOf(false) }
@@ -66,7 +71,10 @@ fun OverlayRoot(
         }
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
         Box(Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize().background(bg)) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors),
+            ) {
                 Spacer(Modifier.height(10.dp))
                 StatusBar(state)
                 if (navAtTop) { Spacer(Modifier.height(8.dp)); navBar() }
@@ -93,5 +101,6 @@ fun OverlayRoot(
                 )
             }
         }
+      }
     }
 }

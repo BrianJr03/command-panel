@@ -242,6 +242,18 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
             RadioRow(label, state.themeMode == mode) { vm.setThemeMode(mode) }
         }
     }
+
+    SectionHeader("Overlay look")
+    Card {
+        Text(
+            "The surface style for the bottom-screen overlay. Auto uses the stock AYN look.",
+            color = LocalTccColors.current.secondary, fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        jr.brian.commandpannel.ui.theme.TccUiLook.entries.forEach { look ->
+            RadioRow(look.label, state.overlayLook == look) { vm.setLook(look) }
+        }
+    }
     SwitchCard(
         title = "Sync Stick LEDs to Theme",
         description = "Mirror the overlay theme's accent colour onto the AYN Thor's joystick LEDs.",

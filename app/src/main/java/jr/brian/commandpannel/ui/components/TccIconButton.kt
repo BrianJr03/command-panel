@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import jr.brian.commandpannel.ui.components.looks.renderer
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 
 /**
@@ -40,8 +41,10 @@ fun TccIconButton(
     active: Boolean = false,
     labelSize: TextUnit = 10.sp,
     iconInset: Dp = circleSize * 0.27f,
+    variant: TccTileVariant = TccTileVariant.QUICK_SETTING,
+    index: Int = 0,
     onClick: (() -> Unit)? = null,
-) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, onClick)
+) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, onClick)
 
 @Composable
 fun TccIconButton(
@@ -52,43 +55,62 @@ fun TccIconButton(
     active: Boolean = false,
     labelSize: TextUnit = 10.sp,
     iconInset: Dp = circleSize * 0.27f,
+    variant: TccTileVariant = TccTileVariant.QUICK_SETTING,
+    index: Int = 0,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = LocalTccColors.current
-    val base = if (onClick != null) modifier.clickable { onClick() } else modifier
+    val spec = jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current
+    val lookColors = jr.brian.commandpannel.ui.theme.tccLookColors()
+    val paint = jr.brian.commandpannel.ui.components.looks.LookPaint(spec, colors, lookColors)
+
+    val isNav = variant == TccTileVariant.NAV_BAR
+    val navRenderer = spec.traits.nav.renderer()
+    // Column-highlight nav styles draw the selection around the whole item and show a bare icon.
+    val columnHighlight = isNav && navRenderer.columnHighlight
+
+    val base0 = if (onClick != null) modifier.clickable { onClick() } else modifier
+    val base = if (columnHighlight && active) base0.then(navRenderer.highlight(paint)) else base0
+
+    val iconTint = if (columnHighlight) navRenderer.iconTint(paint, active)
+    else lookTileIconTint(spec, colors, lookColors, active, index)
+
+    val labelText = jr.brian.commandpannel.ui.theme.lookLabel(label).let {
+        if (isNav) navRenderer.label(it, active) else it
+    }
+    val labelColor = when {
+        columnHighlight -> navRenderer.textColor(paint, active)
+        isNav -> if (active) colors.primary else colors.secondary
+        else -> spec.traits.tile.renderer().labelColor(paint, active) ?: (if (active) colors.primary else colors.secondary)
+    }
+    val showIcon = !isNav || navRenderer.showIcon
+
     Column(
         modifier = base,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(circleSize)
-                .clip(CircleShape)
-                .background(
-                    if (active) activeGlow(colors.accent) else androidx.compose.ui.graphics.SolidColor(colors.fifth)
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                painter = icon.painter(),
-                contentDescription = label,
-                colorFilter = stockIconColorFilter(if (active) Color.White else colors.secondary),
-                modifier = Modifier.padding(iconInset).size(circleSize - iconInset * 2),
-            )
+        if (showIcon) {
+            Box(
+                modifier = if (columnHighlight) Modifier.size(circleSize)
+                else Modifier.size(circleSize).tccTile(spec, colors, lookColors, selected = active, index = index),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = icon.painter(),
+                    contentDescription = label,
+                    colorFilter = stockIconColorFilter(iconTint),
+                    modifier = Modifier.padding(iconInset).size(circleSize - iconInset * 2),
+                )
+            }
         }
         Text(
-            text = label,
-            color = if (active) colors.primary else colors.secondary,
+            text = labelText,
+            color = labelColor,
             fontSize = labelSize,
             textAlign = TextAlign.Center,
             maxLines = 2,
+            style = jr.brian.commandpannel.ui.theme.tccTextStyle(),
         )
     }
 }
-
-private fun activeGlow(accent: Color): Brush = Brush.radialGradient(
-    0f to accent.copy(alpha = 0.40f),
-    0.6f to accent.copy(alpha = 0.18f),
-    1f to Color.Transparent,
-)

@@ -63,7 +63,11 @@ data class TccLookSpec(
 private val PillShape = RoundedCornerShape(percent = 50)
 
 /** The stock AYN look — Command Panel's default surface; all other looks copy from it. */
-val StockLookSpec = TccLookSpec(look = TccUiLook.AUTO)
+val StockLookSpec = TccLookSpec(
+    look = TccUiLook.AUTO,
+    slider = SliderLookSpec(controlShape = RoundedCornerShape(aynDp(15f)), trackShape = RoundedCornerShape(aynDp(15f))),
+    settingsTab = SettingsTabLookSpec(fpsBadgeShape = RoundedCornerShape(aynDp(17f))),
+)
 
 val AuroraGlassLookSpec: TccLookSpec = StockLookSpec.copy(
     look = TccUiLook.AURORA_GLASS,

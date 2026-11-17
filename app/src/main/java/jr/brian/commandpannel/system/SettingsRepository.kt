@@ -143,6 +143,7 @@ class SettingsRepository(
                     audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
                 tiles = buildTiles(mode, focus),
                 layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
+                look = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
             )
         }
     }
