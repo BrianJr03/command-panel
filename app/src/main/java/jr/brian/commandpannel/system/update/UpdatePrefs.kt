@@ -2,10 +2,11 @@ package jr.brian.commandpannel.system.update
 
 import android.content.Context
 import androidx.core.content.edit
+import jr.brian.commandpannel.system.Prefs
 
 /** Update-check bookkeeping in the app's `command_panel` prefs (not backed up). */
 class UpdatePrefs(context: Context) {
-    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val prefs = Prefs.of(context)
 
     /** A version the user chose "Skip this version" for; automatic checks don't offer it again. */
     var skippedVersion: String?

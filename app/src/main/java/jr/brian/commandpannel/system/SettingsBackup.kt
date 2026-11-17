@@ -15,7 +15,6 @@ import java.util.Locale
  * Only app-private `command_panel` prefs are covered — vendor `Settings.System` values are not backed up.
  */
 object SettingsBackup {
-    private const val PREFS = "command_panel"
     private const val DIR = "/sdcard/Documents/CommandPanel/backups"
     const val FORMAT = "command-panel-backup"
     const val SCHEMA = 1
@@ -71,7 +70,7 @@ object SettingsBackup {
     }
 
     fun export(context: Context, privileged: PrivilegedAccess): String? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = Prefs.of(context)
         val version = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "?"
@@ -93,7 +92,7 @@ object SettingsBackup {
     fun import(context: Context, privileged: PrivilegedAccess, path: String): Int {
         val json = privileged.shell("cat $path") ?: return 0
         val values = decode(json) ?: return 0
-        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        val editor = Prefs.of(context).edit()
         for ((k, v) in values) when (v) {
             is Boolean -> editor.putBoolean(k, v)
             is Int -> editor.putInt(k, v)

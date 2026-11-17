@@ -11,6 +11,7 @@ import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.privileged.ThorRgbController
 import android.content.ComponentName
 import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.Prefs
 import jr.brian.commandpannel.system.QuickLaunch
 import jr.brian.commandpannel.system.QuickLaunchApp
 import jr.brian.commandpannel.system.QuickLaunchDisplay
@@ -119,7 +120,7 @@ class SettingsViewModel @Inject constructor(
     private val privileged: PrivilegedAccess,
 ) : AndroidViewModel(app) {
 
-    private val prefs = app.getSharedPreferences("command_panel", Application.MODE_PRIVATE)
+    private val prefs = Prefs.of(app)
     private val settings = SystemSettings(app.contentResolver, privileged)
 
     private val _state = MutableStateFlow(load())

@@ -47,7 +47,7 @@ class SettingsRepository(
 ) : OverlayActions {
 
     private val settings = SystemSettings(context.contentResolver, privileged)
-    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val prefs = Prefs.of(context)
     private val screenshotter = Screenshotter(context, privileged)
 
     /** Set by the service so screenshot/launch actions can dismiss the overlay first. */

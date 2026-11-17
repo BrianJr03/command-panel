@@ -42,7 +42,7 @@ object UserFontStore {
     private const val MAX_BYTES = 5L * 1024 * 1024
     private val cache = ConcurrentHashMap<String, FontFamily>()
 
-    private fun prefs(context: Context) = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = Prefs.of(context)
     private fun dir(context: Context) = File(context.filesDir, "fonts").apply { mkdirs() }
     private fun file(context: Context, id: String) = File(dir(context), "$id.ttf")
 

@@ -35,7 +35,7 @@ class ScreenModeController(
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val topology = DisplayTopology(context)
-    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val prefs = Prefs.of(context)
     private val settings = SystemSettings(context.contentResolver, privileged)
 
     private var bottomCover: View? = null

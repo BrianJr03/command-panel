@@ -26,7 +26,6 @@ enum class QuickLaunchDisplay(val displayId: Int, @StringRes val labelRes: Int) 
  * `ActivityOptions.setLaunchDisplayId`.
  */
 object QuickLaunch {
-    private const val PREFS = "command_panel"
     private const val KEY_COMPONENT = "quick_launch_component"
     private const val KEY_DISPLAY = "quick_launch_display"
 
@@ -83,5 +82,5 @@ object QuickLaunch {
         }.getOrDefault(false)
     }
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = Prefs.of(context)
 }

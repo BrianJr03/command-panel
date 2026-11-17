@@ -29,12 +29,11 @@ class StockCoexistence(
 ) {
     private companion object {
         const val TAG = "StockCoexistence"
-        const val PREF = "command_panel"
         const val KEY = "replace_stock_assistant"
         const val UNFREEZE_MS = 5000L
     }
 
-    private val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+    private val prefs = Prefs.of(context)
     private val suppressor = StockSuppressor(privileged::shell)
 
     private val _enabled = MutableStateFlow(prefs.getBoolean(KEY, false))

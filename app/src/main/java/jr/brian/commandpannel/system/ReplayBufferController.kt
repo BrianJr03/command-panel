@@ -19,7 +19,7 @@ class ReplayBufferController(
     private val privileged: PrivilegedAccess,
 ) {
     private val tag = "ReplayBuffer"
-    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val prefs = Prefs.of(context)
     private val engine = ReplayCaptureEngine(context, privileged)
 
     val isArmed: Boolean get() = engine.isRunning
