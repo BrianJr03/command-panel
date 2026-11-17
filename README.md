@@ -27,6 +27,8 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 **[→ Browse all 17 looks](assets/looks/)** &nbsp;·&nbsp; or see the [gallery image](assets/looks-gallery.png) (Cartridge, Segment LCD, Terminal, Cockpit, Comic Panel, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, Industrial, Sticker Book, Soft Console, …).
 
 > 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See **[GUIDELINE.md](GUIDELINE.md)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
+>
+> 🧩 **No code needed:** the companion's **Themes** section has a **Theme Studio**. Mix parts from any Look, or build one from scratch with Custom parts, shapes, colors and fonts. Looks are shared as `.tcplooks.json` packs through `/sdcard/TCP Themes/` or a GitHub theme repo made from **[theme-template/](theme-template/)**.
 
 ---
 

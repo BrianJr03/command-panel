@@ -196,7 +196,7 @@ fun resolveLookColors(palette: TccColorPalette, look: TccUiLook): TccLookColors 
     val bg = palette.primaryBackground
     val isPureBlack = bg.luminance() < 0.01f
     val accent = palette.accent
-    val accent2 = accent.hueShifted(150f)
+    val accent2 = palette.accent2 ?: accent.hueShifted(150f)
 
     var lineAccent = if (look == TccUiLook.TACTICAL_HUD && palette.isDark) accent.hudBoosted(bg) else accent
     if (!palette.isDark) {

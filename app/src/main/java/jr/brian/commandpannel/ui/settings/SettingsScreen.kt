@@ -65,6 +65,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
@@ -121,66 +122,8 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
     NAV_BAR(SettingsCategory.NAV_BAR, Icons.Rounded.WebAsset, R.string.settings_cat_nav_bar_desc),
     QUICK_TOGGLES(SettingsCategory.QUICK_TOGGLES, Icons.Rounded.ViewAgenda, R.string.settings_cat_quick_toggles_desc),
     APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, R.string.settings_cat_appearance_desc),
+    THEMES(SettingsCategory.THEMES, Icons.Rounded.Brush, R.string.settings_cat_themes_desc),
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, R.string.settings_cat_diagnostics_desc),
-}
-
-// ---- gamepad focus plumbing ----
-
-@Composable
-private fun focusState(): MutableState<Boolean> = remember { mutableStateOf(false) }
-
-/** Makes a node focusable, reports focus into [focused], and fires [onActivate] on A / center / enter. */
-private fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: () -> Unit): Modifier =
-    onFocusChanged { focused.value = it.isFocused }
-        .onKeyEvent { e ->
-            if (e.type == KeyEventType.KeyDown &&
-                (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.ButtonA)
-            ) { onActivate(); true } else false
-        }
-        .focusable()
-
-// ---- theming hooks ----
-// With "Companion follows overlay look" off, CompanionTheme provides the stock spec and the default palette, so
-// every hook below resolves to the companion's original style.
-
-/** The active companion colors. */
-private val p: CompanionPalette
-    @Composable get() = LocalCompanionPalette.current
-
-/** Corner shape for rows, buttons and chips: the look's control shape when themed, else [default] radius. */
-@Composable
-private fun controlShape(default: Dp): Shape =
-    if (LocalCompanionThemed.current) LocalTccLookSpec.current.slider.controlShape else RoundedCornerShape(default)
-
-@Composable
-private fun cardShape(): Shape =
-    if (LocalCompanionThemed.current) LocalTccLookSpec.current.panelCardShape else RoundedCornerShape(18.dp)
-
-/** Scale-on-focus animation; snaps for looks that opt out of motion (E-Ink). */
-@Composable
-private fun focusScale(focused: Boolean, to: Float, label: String): State<Float> =
-    if (LocalTccLookSpec.current.traits.animate) animateFloatAsState(if (focused) to else 1f, label = label)
-    else animateFloatAsState(if (focused) to else 1f, snap(), label = label)
-
-@Composable
-private fun focusColor(target: Color, label: String): State<Color> =
-    if (LocalTccLookSpec.current.traits.animate) animateColorAsState(target, label = label)
-    else animateColorAsState(target, snap(), label = label)
-
-/**
- * Card surface: the companion's bordered panel, or the active look's card renderer (glass, brutalist shadow, HUD
- * chamfer, neon tube, …) when themed. The accent focus ring is kept on every look so gamepad focus stays obvious.
- */
-@Composable
-private fun Modifier.companionCard(focused: Boolean = false, focusable: Boolean = false): Modifier {
-    val shape = cardShape()
-    if (!LocalCompanionThemed.current) {
-        val bg by focusColor(if (focused) p.surfaceHigh else p.surface, "cardBg")
-        return clip(shape).background(bg)
-            .border(if (focused) 2.dp else 1.dp, if (focused) p.accent else p.border, shape)
-    }
-    val card = tccCard(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors(), focused = focused && focusable)
-    return if (focused) card.border(2.dp, p.accent, shape) else card
 }
 
 @Composable
@@ -192,6 +135,12 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
+    // Theme Studio replaces the whole two-pane screen while it's open.
+    var studio by remember { mutableStateOf<jr.brian.commandpannel.ui.theme.CustomLook?>(null) }
+    studio?.let { look ->
+        ThemeStudioScreen(look, state, vm, onClose = { studio = null })
+        return
+    }
     val scroll = rememberScrollState()
     LaunchedEffect(nav) { scroll.scrollTo(0) }
     // Root bounds of the scrolling pane (not its content), for drag-to-reorder edge auto-scroll.
@@ -203,9 +152,7 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     }
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav) { nav = it }
-        val focusMarginPx = with(LocalDensity.current) { FOCUS_SCROLL_MARGIN.toPx() }
-        val bringIntoViewSpec = remember(focusMarginPx) { PaddedBringIntoViewSpec(focusMarginPx) }
-        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        PaddedBringIntoView {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
@@ -224,6 +171,7 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
                 SettingsCategory.NAV_BAR -> NavBarSettings(state, vm, scroll) { viewport.value }
                 SettingsCategory.APPEARANCE -> Appearance(state, vm)
+                SettingsCategory.THEMES -> Themes(state, vm) { studio = it }
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
         }
@@ -231,33 +179,10 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     }
 }
 
-/** Gap kept between a focused card (border and focus scale included) and the top/bottom edge of the scrolling pane. */
-private val FOCUS_SCROLL_MARGIN = 28.dp
-
-/**
- * [BringIntoViewSpec] that reserves [insetPx] at both edges of the viewport. The default spec counts anything inside
- * `[0, containerSize]` as visible and ignores content padding, so D-pad focus scrolling left the focused card's border
- * flush against the top/bottom of the screen.
- */
-@OptIn(ExperimentalFoundationApi::class)
-private class PaddedBringIntoViewSpec(private val insetPx: Float) : BringIntoViewSpec {
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val leadingEdge = offset - insetPx
-        val trailingEdge = offset + size - (containerSize - insetPx)
-        return when {
-            leadingEdge >= 0 && trailingEdge <= 0 -> 0f
-            // Taller than the padded window: leave it where it is rather than jitter between edges.
-            leadingEdge < 0 && trailingEdge > 0 -> 0f
-            abs(leadingEdge) < abs(trailingEdge) -> leadingEdge
-            else -> trailingEdge
-        }
-    }
-}
-
 @Composable
 private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
     val requesters = remember { NavItem.entries.associateWith { FocusRequester() } }
-    LaunchedEffect(Unit) { runCatching { requesters.getValue(NavItem.GENERAL).requestFocus() } }
+    LaunchedEffect(Unit) { runCatching { requesters.getValue(selected).requestFocus() } }
     val themed = LocalCompanionThemed.current
     val navShape = controlShape(13.dp)
     Column(
@@ -323,160 +248,6 @@ private fun AppIconBadge(shape: Shape) {
         Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.requiredSize(full))
         Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.requiredSize(full * 0.72f))
     }
-}
-
-// ---- shared building blocks ----
-
-/** A plain visual container (not a focus target); its rows are the focus targets. */
-@Composable
-private fun Card(content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().companionCard().padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) { content() }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Row(Modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(3.dp, 13.dp).clip(CircleShape).background(p.accent))
-        Spacer(Modifier.width(8.dp))
-        Text(lookLabel(text).uppercase(), color = p.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
-    }
-}
-
-@Composable
-private fun CardTitle(text: String) =
-    Text(lookLabel(text), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
-
-@Composable
-private fun CardDesc(text: String) = Text(text, color = p.textSecondary, fontSize = 13.sp)
-
-@Composable
-private fun InfoLine(text: String, tone: Color = p.textSecondary) = Text(text, color = tone, fontSize = 12.sp)
-
-/** A focusable surface that brightens + scales when focused and fires [onActivate] on A/center. */
-@Composable
-private fun FocusCard(onActivate: () -> Unit, content: @Composable () -> Unit) {
-    val f = focusState()
-    val scale by focusScale(f.value, 1.015f, "cardScale")
-    Column(
-        Modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .focusControl(f, onActivate)
-            .companionCard(focused = f.value, focusable = true)
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) { content() }
-}
-
-@Composable
-private fun SwitchCard(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    FocusCard(onActivate = { onChange(!checked) }) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                CardTitle(title)
-                CardDesc(description)
-            }
-            Spacer(Modifier.width(16.dp))
-            AccentSwitch(checked, onChange)
-        }
-    }
-}
-
-@Composable
-private fun AccentSwitch(checked: Boolean, onChange: (Boolean) -> Unit) = Switch(
-    checked = checked,
-    onCheckedChange = onChange,
-    colors = SwitchDefaults.colors(
-        checkedTrackColor = p.accent,
-        checkedThumbColor = p.onAccent,
-        uncheckedTrackColor = p.surfaceHigh,
-        uncheckedBorderColor = p.border,
-        uncheckedThumbColor = p.textTertiary,
-    ),
-)
-
-/** A focusable selectable row (brightens + scales when focused). */
-@Composable
-private fun FocusRow(
-    selected: Boolean,
-    onClick: () -> Unit,
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
-) {
-    val f = focusState()
-    val shape = controlShape(12.dp)
-    val scale by focusScale(f.value, 1.015f, "rowScale")
-    val bg by focusColor(
-        when { f.value -> p.surfaceHigh; selected -> p.accentSoft; else -> Color.Transparent },
-        "rowBg",
-    )
-    Row(
-        Modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape).background(bg)
-            .then(if (f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
-            .focusControl(f, onClick)
-            .noRippleClickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content,
-    )
-}
-
-@Composable
-private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    FocusRow(selected, onClick) {
-        Text(
-            label, color = if (selected) p.textPrimary else p.textSecondary, fontSize = 15.sp,
-            style = tccTextStyle(), modifier = Modifier.weight(1f),
-        )
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = p.accent, unselectedColor = p.textTertiary),
-        )
-    }
-}
-
-/** A focusable action button. */
-@Composable
-private fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    val f = focusState()
-    val shape = controlShape(12.dp)
-    val scale by focusScale(f.value, 1.05f, "btnScale")
-    val bg = when { !enabled -> p.surfaceHigh; f.value -> p.accentFocused; else -> p.accent }
-    Box(
-        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape).background(bg)
-            .then(if (f.value) Modifier.border(1.5.dp, p.onAccent, shape) else Modifier)
-            .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 20.dp, vertical = 11.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            lookLabel(text), color = if (enabled) p.onAccent else p.textTertiary, fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
-        )
-    }
-}
-
-/** A focusable compact pill (replay window, reorder arrows). */
-@Composable
-private fun Chip(text: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val f = focusState()
-    val shape = controlShape(10.dp)
-    val scale by focusScale(f.value, 1.08f, "chipScale")
-    val bg = when { !enabled -> p.surface; f.value -> p.accentSoft; selected -> p.accentSoft; else -> p.surfaceHigh }
-    val fg = when { !enabled -> p.textTertiary; selected || f.value -> p.accent; else -> p.textSecondary }
-    Box(
-        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape).background(bg)
-            .then(if (selected || f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
-            .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
-        contentAlignment = Alignment.Center,
-    ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = tccTextStyle()) }
 }
 
 // ---- General ----
@@ -798,13 +569,7 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         }
     }
     SectionHeader(stringResource(R.string.settings_overlay_look))
-    Card {
-        CardDesc(stringResource(R.string.settings_overlay_look_desc))
-        Spacer(Modifier.height(6.dp))
-        jr.brian.commandpannel.ui.theme.TccUiLook.entries.forEach { look ->
-            RadioRow(stringResource(look.labelRes), state.overlayLook == look) { vm.setLook(look) }
-        }
-    }
+    Card { CardDesc(stringResource(R.string.settings_overlay_look_moved)) }
     SwitchCard(
         stringResource(R.string.settings_companion_follow_look),
         stringResource(R.string.settings_companion_follow_look_desc),

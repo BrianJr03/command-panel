@@ -15,6 +15,17 @@ import jr.brian.commandpannel.system.QuickLaunch
 import jr.brian.commandpannel.system.QuickLaunchApp
 import jr.brian.commandpannel.system.QuickLaunchDisplay
 import jr.brian.commandpannel.system.SystemSettings
+import jr.brian.commandpannel.system.CustomLookStore
+import jr.brian.commandpannel.system.FontNeeds
+import jr.brian.commandpannel.system.PackInstaller
+import jr.brian.commandpannel.system.ThemeFolder
+import jr.brian.commandpannel.system.ThemeSources
+import jr.brian.commandpannel.ui.theme.LookPack
+import jr.brian.commandpannel.ui.theme.LookPackJson
+import jr.brian.commandpannel.system.UserFont
+import jr.brian.commandpannel.system.UserFontStore
+import jr.brian.commandpannel.ui.theme.CustomLook
+import jr.brian.commandpannel.ui.theme.LookRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +39,7 @@ enum class SettingsCategory(@StringRes val titleRes: Int) {
     NAV_BAR(R.string.settings_cat_nav_bar),
     QUICK_TOGGLES(R.string.settings_cat_quick_toggles),
     APPEARANCE(R.string.settings_cat_appearance),
+    THEMES(R.string.settings_cat_themes),
     DIAGNOSTICS(R.string.settings_cat_diagnostics),
 }
 
@@ -53,7 +65,27 @@ data class SettingsState(
     /** Nav bar button keys in display order. */
     val navOrder: List<String> = jr.brian.commandpannel.system.NavBarButton.entries.map { it.key },
     val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
+    /** The base look of the active selection (the look itself for built-ins). */
     val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    /** What `overlay_look` points at: a built-in look or a saved Theme Studio look. */
+    val overlayLookRef: LookRef = LookRef.BuiltIn(jr.brian.commandpannel.ui.theme.TccUiLook.AUTO),
+    /** The active Theme Studio look, or null when a built-in look is selected. */
+    val overlayCustomLook: CustomLook? = null,
+    val customLooks: List<CustomLook> = emptyList(),
+    val userFonts: List<UserFont> = emptyList(),
+    /** Result of the last Theme Studio export / import / sync, shown in the Themes section. */
+    val themeMessage: String? = null,
+    /** `false` when the `TCP Themes` folder couldn't be created (no root shell). */
+    val themeFolderReady: Boolean = true,
+    /** Packs directly in `TCP Themes/themes` (fonts already re-linked for previews). */
+    val folderPacks: List<jr.brian.commandpannel.system.FolderPack> = emptyList(),
+    val themeSources: List<jr.brian.commandpannel.system.ThemeSource> = emptyList(),
+    /** Fonts the last pack can download, waiting for the user to agree. */
+    val pendingFonts: FontNeeds? = null,
+    /** A sync or download is running. */
+    val themeBusy: Boolean = false,
+    /** Result of the last repo follow / sync, shown in the Theme repos card. */
+    val repoMessage: String? = null,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -97,7 +129,11 @@ class SettingsViewModel @Inject constructor(
         quickLaunchComponent = QuickLaunch.savedComponent(getApplication()),
         navOrder = jr.brian.commandpannel.system.NavBarButton.ordered(prefs.getString("nav_bar_order", null)).map { it.key },
         overlayLayout = jr.brian.commandpannel.system.OverlayLayout.decode(prefs.getString("overlay_layout", null)),
-        overlayLook = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
+        overlayLook = CustomLookStore.resolve(prefs).first,
+        overlayLookRef = CustomLookStore.selected(prefs),
+        overlayCustomLook = CustomLookStore.resolve(prefs).second,
+        customLooks = CustomLookStore.all(prefs),
+        userFonts = UserFontStore.all(getApplication()),
         replayEnabled = prefs.getBoolean("replay_enabled", false),
         replayWindowSeconds = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayWindowSeconds(prefs.getInt("replay_window_seconds", 30)),
@@ -139,9 +175,192 @@ class SettingsViewModel @Inject constructor(
         }, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
     }
 
-    fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) {
-        prefs.edit().putString("overlay_look", look.name).apply()
-        _state.value = _state.value.copy(overlayLook = look)
+    fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) = selectLook(LookRef.BuiltIn(look))
+
+    /** Applies a built-in or saved look to the overlay (and the companion when it follows the look). */
+    fun selectLook(ref: LookRef) {
+        CustomLookStore.select(prefs, ref)
+        refreshLooks()
+    }
+
+    /** Saves (inserts or replaces) a Theme Studio look; the overlay restyles live if it is the active one. */
+    fun saveCustomLook(look: CustomLook, apply: Boolean = false) {
+        CustomLookStore.save(prefs, look)
+        if (apply) CustomLookStore.select(prefs, look.ref)
+        refreshLooks()
+    }
+
+    fun deleteCustomLook(id: String) {
+        CustomLookStore.delete(prefs, id)
+        refreshLooks()
+    }
+
+    /** Imports a TTF/OTF picked with the system file picker; reports the outcome through [onResult]. */
+    fun importFont(uri: android.net.Uri, onResult: (Result<UserFont>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { UserFontStore.import(app, uri) }
+            _state.value = _state.value.copy(userFonts = UserFontStore.all(app))
+            onResult(result)
+        }
+    }
+
+    /** Deletes an imported font; looks that used it fall back to the default font. */
+    fun deleteFont(id: String) {
+        UserFontStore.delete(app, id)
+        _state.value = _state.value.copy(userFonts = UserFontStore.all(app))
+    }
+
+    // ---- theme packs, the TCP Themes folder and theme repos ----
+
+    /** Lists the packs in `TCP Themes/themes` (creating the folder) and checks due repos for updates. */
+    fun refreshThemeFolder(checkUpdates: Boolean = true) {
+        viewModelScope.launch {
+            val (ok, packs) = withContext(Dispatchers.IO) {
+                val ok = ThemeFolder.ensure(app, privileged)
+                // Synced repos keep copies in themes/<repo>/; those show under their repo, not as local packs.
+                ok to if (ok) ThemeFolder.listPacks(privileged).filter { it.path.substringBeforeLast('/') == ThemeFolder.THEMES }
+                    .map { fp -> fp.copy(pack = fp.pack?.let { pk -> pk.copy(looks = pk.looks.map { PackInstaller.relinked(app, it) }) }) }
+                else emptyList()
+            }
+            _state.value = _state.value.copy(themeFolderReady = ok, folderPacks = packs, themeSources = ThemeSources.all(prefs))
+            if (checkUpdates) ThemeSources.all(prefs).filter { ThemeSources.isDue(it) }.forEach { syncSource(it.id, quiet = true) }
+        }
+    }
+
+    /** Adds [looks] from a pack as new saved looks; fonts come from `TCP Themes/fonts` or are offered for download. */
+    fun addPackLooks(pack: LookPack, looks: List<CustomLook> = pack.looks) {
+        viewModelScope.launch {
+            val needs = withContext(Dispatchers.IO) {
+                PackInstaller.prepareFonts(app, privileged, pack, looks).also { PackInstaller.install(app, prefs, looks) }
+            }
+            refreshLooks()
+            reportFonts(app.resources.getQuantityString(R.plurals.msg_pack_added, looks.size, looks.size, pack.name), needs)
+        }
+    }
+
+    /** Prepares a pack look's fonts, then hands back an unsaved copy to open in Theme Studio ("start from this"). */
+    fun startFromPackLook(pack: LookPack, look: CustomLook, onReady: (CustomLook) -> Unit) {
+        viewModelScope.launch {
+            val needs = withContext(Dispatchers.IO) { PackInstaller.prepareFonts(app, privileged, pack, listOf(look)) }
+            reportFonts(null, needs)
+            onReady(PackInstaller.relinked(app, look).copy(id = java.util.UUID.randomUUID().toString(), source = null))
+        }
+    }
+
+    /** Downloads the fonts the last pack offered, then re-links saved looks that use them. */
+    fun downloadPendingFonts() {
+        val needs = _state.value.pendingFonts ?: return
+        _state.value = _state.value.copy(pendingFonts = null, themeBusy = true)
+        viewModelScope.launch {
+            val failed = withContext(Dispatchers.IO) {
+                val failed = needs.downloadable.filter { (file, src) -> PackInstaller.downloadFont(app, privileged, file, src).isFailure }.keys
+                PackInstaller.relinkSaved(app, prefs)
+                failed
+            }
+            _state.value = _state.value.copy(themeBusy = false, userFonts = UserFontStore.all(app))
+            refreshLooks()
+            _state.value = _state.value.copy(
+                themeMessage = if (failed.isEmpty()) app.resources.getQuantityString(R.plurals.msg_fonts_downloaded, needs.downloadable.size, needs.downloadable.size)
+                else app.getString(R.string.msg_fonts_download_failed, failed.joinToString()),
+            )
+        }
+    }
+
+    fun dismissPendingFonts() {
+        _state.value = _state.value.copy(pendingFonts = null)
+    }
+
+    private fun reportFonts(done: String?, needs: FontNeeds) {
+        val stillMissing = needs.missing - needs.downloadable.keys
+        val msg = when {
+            stillMissing.isNotEmpty() -> app.getString(R.string.msg_fonts_missing, stillMissing.joinToString())
+            else -> null
+        }
+        _state.value = _state.value.copy(
+            userFonts = UserFontStore.all(app),
+            pendingFonts = needs.takeIf { it.downloadable.isNotEmpty() },
+            themeMessage = listOfNotNull(done, msg).joinToString(" ").ifBlank { _state.value.themeMessage },
+        )
+    }
+
+    /** Writes [looks] as one pack in `TCP Themes/themes` (with their imported fonts in `fonts/`). */
+    fun exportLooks(looks: List<CustomLook>, packName: String) {
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) { PackInstaller.exportPack(app, privileged, packName, looks) }
+            _state.value = _state.value.copy(
+                themeMessage = path?.let { app.getString(R.string.msg_look_exported, it) } ?: app.getString(R.string.msg_look_export_failed),
+            )
+            refreshThemeFolder(checkUpdates = false)
+        }
+    }
+
+    /** Imports a pack or single look picked with the system file picker (files outside the TCP Themes folder). */
+    fun importLook(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val pack = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = app.contentResolver.openInputStream(uri)!!.use { String(it.readBytes(), Charsets.UTF_8) }
+                    LookPackJson.decode(text)
+                }.getOrNull()
+            }
+            if (pack == null || pack.looks.isEmpty()) {
+                _state.value = _state.value.copy(themeMessage = app.getString(R.string.msg_look_import_failed))
+            } else {
+                addPackLooks(pack)
+            }
+        }
+    }
+
+    /** Follows a theme repo link and syncs it right away. */
+    fun addSource(link: String) {
+        val source = ThemeSources.parse(link)
+        if (source == null) {
+            _state.value = _state.value.copy(repoMessage = app.getString(R.string.msg_source_invalid))
+            return
+        }
+        ThemeSources.save(prefs, ThemeSources.all(prefs).firstOrNull { it.id == source.id } ?: source)
+        _state.value = _state.value.copy(themeSources = ThemeSources.all(prefs))
+        syncSource(source.id)
+    }
+
+    /** Pulls [id]'s latest packs; [quiet] skips the "up to date" message (automatic daily checks). */
+    fun syncSource(id: String, quiet: Boolean = false) {
+        val source = ThemeSources.all(prefs).firstOrNull { it.id == id } ?: return
+        _state.value = _state.value.copy(themeBusy = true)
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { ThemeSources.sync(app, privileged, prefs, source) }
+            refreshLooks()
+            _state.value = _state.value.copy(themeBusy = false, themeSources = ThemeSources.all(prefs))
+            result.onSuccess { r ->
+                val msg = if (r.updatedFiles == 0 && r.removedLooks == 0) {
+                    if (quiet) null else app.getString(R.string.msg_source_up_to_date, source.name)
+                } else {
+                    app.resources.getQuantityString(R.plurals.msg_source_synced, r.lookCount, r.lookCount, source.name)
+                }
+                if (msg != null) _state.value = _state.value.copy(repoMessage = msg)
+                reportFonts(null, r.fontNeeds)
+            }.onFailure { e ->
+                // Automatic checks fail silently (offline, rate-limited); Update reports the error.
+                if (!quiet) _state.value = _state.value.copy(repoMessage = app.getString(R.string.msg_source_failed, source.name, e.message ?: ""))
+            }
+        }
+    }
+
+    /** Stops following [id] and removes the looks it installed. */
+    fun removeSource(id: String) {
+        ThemeSources.remove(prefs, id)
+        refreshLooks()
+        _state.value = _state.value.copy(themeSources = ThemeSources.all(prefs))
+    }
+
+    private fun refreshLooks() {
+        val (base, custom) = CustomLookStore.resolve(prefs)
+        _state.value = _state.value.copy(
+            overlayLook = base,
+            overlayLookRef = CustomLookStore.selected(prefs),
+            overlayCustomLook = custom,
+            customLooks = CustomLookStore.all(prefs),
+        )
     }
 
     private fun updateLayout(transform: (jr.brian.commandpannel.system.OverlayLayout) -> jr.brian.commandpannel.system.OverlayLayout) {

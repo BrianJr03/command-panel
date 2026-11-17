@@ -60,6 +60,8 @@ data class TccLookSpec(
     val settingsTab: SettingsTabLookSpec = SettingsTabLookSpec(),
     val dialog: DialogLookSpec = DialogLookSpec(),
     val traits: LookTraits = LookTraits(),
+    /** Settings for any part whose style is `CUSTOM` (Theme Studio looks only); `null` on built-in looks. */
+    val custom: CustomRenderParams? = null,
 )
 
 private val PillShape = RoundedCornerShape(percent = 50)

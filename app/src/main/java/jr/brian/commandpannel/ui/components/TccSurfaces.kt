@@ -25,8 +25,10 @@ fun TccCard(
     val colors = LocalTccColors.current
     val spec = LocalTccLookSpec.current
     val lookColors = tccLookColors()
-    // Stock keeps the exact per-card corner radius; looks use their own panel shape.
-    val shape = if (spec.look == TccUiLook.AUTO) RoundedCornerShape(cornerRadius.dp) else spec.panelCardShape
+    // Stock keeps the exact per-card corner radius; looks (and custom looks that reshape the stock cards) use their own
+    // panel shape.
+    val stockShape = spec.look == TccUiLook.AUTO && spec.panelCardShape == jr.brian.commandpannel.ui.theme.StockLookSpec.panelCardShape
+    val shape = if (stockShape) RoundedCornerShape(cornerRadius.dp) else spec.panelCardShape
     Box(
         modifier = modifier.tccCard(spec, colors, lookColors, focused = selected, shape = shape),
         content = content,
