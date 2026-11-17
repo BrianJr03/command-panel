@@ -26,6 +26,8 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 
 **[→ Browse all 17 looks](assets/looks/)** &nbsp;·&nbsp; or see the [gallery image](assets/looks-gallery.png) (Cartridge, Segment LCD, Terminal, Cockpit, Comic Panel, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, Industrial, Sticker Book, Soft Console, …).
 
+> 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See **[GUIDELINE.md](GUIDELINE.md)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
+
 ---
 
 ## Features
@@ -77,6 +79,12 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 ```
 
 Signed release builds are produced by CI (`.github/workflows/build-release.yml`) from a keystore in repo secrets; release notes come from `app/src/main/res/raw/patch_notes.md`.
+
+---
+
+## Contributing
+
+The easiest way to contribute is a **new theme (Look)** — one Look re-skins both the overlay and the companion. **[GUIDELINE.md](GUIDELINE.md)** is a full walkthrough (including a ready-to-use AI-agent prompt): the anatomy of a Look, a remix-existing-styles path vs. a new-renderer path, the screenshot workflow, and the gotchas (palette/contrast, font clipping, OFL-fonts-only, runtime stock icons). Please include before/after screenshots of both overlay tabs in your PR. Only contribute fonts/art/code you have the right to ship.
 
 ---
 
