@@ -33,6 +33,9 @@ interface OverlayActions {
     /** Opens the Command Panel companion settings app (on the top screen). */
     fun launchCompanion()
 
+    /** Persists the selected nav tab so the overlay reopens on it. */
+    fun setNavTab(tab: OverlayTab)
+
     /** Persists a new overlay card arrangement (from Arrange mode). */
     fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout)
 
@@ -59,6 +62,7 @@ interface OverlayActions {
         override fun quickLaunch() {}
         override fun openRecents() {}
         override fun launchCompanion() {}
+        override fun setNavTab(tab: OverlayTab) {}
         override fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout) {}
     }
 }

@@ -52,6 +52,8 @@ data class OverlayUiState(
     val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
     /** When set, overrides the overlay palette accent with the Thor's ambient-LED colour (fork feature, inverted). */
     val accentOverride: Int? = null,
+    /** The nav tab to open on (persisted across overlay open/close, like the stock `current_navigation_interface_name`). */
+    val navTab: OverlayTab = OverlayTab.SETTINGS,
 )
 
 /** A quick-settings tile: its icon (stock drawable or Material vector) and the title for its current value. */

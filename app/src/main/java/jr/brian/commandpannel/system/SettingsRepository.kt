@@ -145,9 +145,15 @@ class SettingsRepository(
                 tiles = buildTiles(mode, focus),
                 layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
                 look = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
+                navTab = readNavTab(),
             )
         }
     }
+
+    private fun readNavTab(): jr.brian.commandpannel.ui.overlay.OverlayTab =
+        if (prefs.getString("overlay_nav_tab", null) == jr.brian.commandpannel.ui.overlay.OverlayTab.MODE.name)
+            jr.brian.commandpannel.ui.overlay.OverlayTab.MODE
+        else jr.brian.commandpannel.ui.overlay.OverlayTab.SETTINGS
 
     private fun refreshFast() {
         val clock = SimpleDateFormat(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm", Locale.getDefault())
@@ -422,6 +428,11 @@ class SettingsRepository(
         prefs.edit().putString("overlay_layout", layout.encode()).apply()
         // Reflect immediately so the overlay re-renders and the FLIP animation can run.
         _uiState.update { it.copy(layout = layout) }
+    }
+
+    override fun setNavTab(tab: jr.brian.commandpannel.ui.overlay.OverlayTab) {
+        prefs.edit().putString("overlay_nav_tab", tab.name).apply()
+        _uiState.update { it.copy(navTab = tab) }
     }
 
     override fun launchCompanion() {
