@@ -63,9 +63,9 @@ fun RingGauge(
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, color = colors.tertiary, fontSize = 11.sp)
-            Text(value, color = colors.primary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
-            Text(unit, color = colors.tertiary, fontSize = 11.sp)
+            Text(title, color = colors.tertiary, fontSize = 9.sp)
+            Text(value, color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(unit, color = colors.tertiary, fontSize = 9.sp)
         }
     }
 }

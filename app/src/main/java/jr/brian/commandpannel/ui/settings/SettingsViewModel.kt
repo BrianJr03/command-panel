@@ -6,12 +6,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import android.content.ComponentName
 import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.QuickLaunch
+import jr.brian.commandpannel.system.QuickLaunchApp
+import jr.brian.commandpannel.system.QuickLaunchDisplay
 import jr.brian.commandpannel.system.SystemSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class SettingsCategory(val title: String) {
@@ -25,6 +31,10 @@ data class SettingsState(
     val batteryEstimate: Boolean = false,
     val hideNetSpeed: Boolean = false,
     val themeMode: Int = 4,              // tcc_theme_mode
+    val quickLaunchLabel: String? = null,
+    val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
+    val appPickerOpen: Boolean = false,
+    val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
     val diagnosticsRunning: Boolean = false,
 )
@@ -41,12 +51,46 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(load())
     val state: StateFlow<SettingsState> = _state.asStateFlow()
 
+    private val app get() = getApplication<Application>()
+
     private fun load() = SettingsState(
         replaceStock = prefs.getBoolean("replace_stock_assistant", false),
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
+        quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
+        quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
     )
+
+    fun openAppPicker() {
+        _state.value = _state.value.copy(appPickerOpen = true)
+        viewModelScope.launch {
+            val apps = withContext(Dispatchers.IO) { QuickLaunch.listApps(app) }
+            _state.value = _state.value.copy(apps = apps)
+        }
+    }
+
+    fun closeAppPicker() {
+        _state.value = _state.value.copy(appPickerOpen = false)
+    }
+
+    fun pickApp(component: ComponentName) {
+        QuickLaunch.save(app, component, _state.value.quickLaunchDisplay)
+        _state.value = _state.value.copy(
+            appPickerOpen = false,
+            quickLaunchLabel = QuickLaunch.savedLabel(app),
+        )
+    }
+
+    fun setQuickLaunchDisplay(display: QuickLaunchDisplay) {
+        QuickLaunch.savedComponent(app)?.let { QuickLaunch.save(app, it, display) }
+        _state.value = _state.value.copy(quickLaunchDisplay = display)
+    }
+
+    fun clearQuickLaunch() {
+        QuickLaunch.clear(app)
+        _state.value = _state.value.copy(quickLaunchLabel = null)
+    }
 
     fun refresh() { _state.value = load() }
 

@@ -56,7 +56,7 @@ fun OverlayRoot(
 
         Box(Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().background(bg)) {
-                Spacer(Modifier.height(15.dp))
+                Spacer(Modifier.height(10.dp))
                 StatusBar(state)
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
@@ -68,8 +68,10 @@ fun OverlayRoot(
                 }
                 NavBar(
                     activeTab = tab,
-                    modifier = Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 15.dp),
+                    modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 15.dp),
+                    quickLaunchLabel = state.quickLaunchLabel,
                     onMode = { tab = OverlayTab.MODE },
+                    onLaunch = { actions.quickLaunch() },
                     onSettings = { tab = OverlayTab.SETTINGS },
                 )
                 Spacer(Modifier.height(12.dp))

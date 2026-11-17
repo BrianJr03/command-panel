@@ -17,19 +17,24 @@ import jr.brian.commandpannel.ui.components.TccIconButton
 fun NavBar(
     activeTab: OverlayTab,
     modifier: Modifier = Modifier,
+    quickLaunchLabel: String? = null,
     onMode: () -> Unit = {},
     onTask: () -> Unit = {},
+    onLaunch: () -> Unit = {},
     onSettings: () -> Unit = {},
 ) {
     TccCard(modifier) {
         Row(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 40.dp, vertical = 5.dp),
+            modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 32.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TccIconButton("ic_screen_control", "Mode", circleSize = 50.dp, active = activeTab == OverlayTab.MODE, onClick = onMode)
-            TccIconButton("ic_task_manage", "Task", circleSize = 50.dp, onClick = onTask)
-            TccIconButton("ic_system_set", "Settings", circleSize = 50.dp, active = activeTab == OverlayTab.SETTINGS, onClick = onSettings)
+            TccIconButton("ic_screen_control", "Mode", circleSize = 44.dp, active = activeTab == OverlayTab.MODE, onClick = onMode)
+            TccIconButton("ic_task_manage", "Task", circleSize = 44.dp, onClick = onTask)
+            if (quickLaunchLabel != null) {
+                TccIconButton("ic_app_manage", "Launch", circleSize = 44.dp, onClick = onLaunch)
+            }
+            TccIconButton("ic_system_set", "Settings", circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS, onClick = onSettings)
         }
     }
 }

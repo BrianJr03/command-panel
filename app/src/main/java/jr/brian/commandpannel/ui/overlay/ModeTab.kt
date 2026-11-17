@@ -51,7 +51,7 @@ private fun ScreenModePanel(state: OverlayUiState, onRequestMode: (Int) -> Unit,
 
 @Composable
 private fun ModeButton(icon: String, label: String, active: Boolean, onClick: () -> Unit) {
-    TccIconButton(iconBase = icon, label = label, circleSize = 66.dp, active = active, onClick = onClick)
+    TccIconButton(iconBase = icon, label = label, circleSize = 48.dp, active = active, onClick = onClick)
 }
 
 @Composable

@@ -27,43 +27,43 @@ import jr.brian.commandpannel.ui.theme.LocalTccColors
 fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
     val colors = LocalTccColors.current
     Row(
-        modifier = modifier.fillMaxWidth().height(44.dp).padding(horizontal = 15.dp),
+        modifier = modifier.fillMaxWidth().height(34.dp).padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(state.clock, color = colors.primary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(state.clock, color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (state.bluetoothOn) {
                 Image(
                     painter = rememberStockPainter("ic_bluetooth"),
                     contentDescription = "Bluetooth",
                     colorFilter = stockIconColorFilter(colors.primary),
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(15.dp),
                 )
             }
             if (!state.hideNetSpeed) {
-                Text(state.netSpeed, color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(state.netSpeed, color = colors.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             if (state.wifiLevel in 0..3) {
                 Image(
                     painter = rememberStockPainter("ic_status_wifi_${state.wifiLevel}"),
                     contentDescription = "Wi-Fi",
                     colorFilter = stockIconColorFilter(colors.primary),
-                    modifier = Modifier.size(width = 20.dp, height = 16.dp),
+                    modifier = Modifier.size(width = 17.dp, height = 13.dp),
                 )
             }
             BatteryIcon(
                 percent = state.batteryPercent,
                 charging = state.charging,
                 lightning = colors.lightning,
-                modifier = Modifier.size(width = 30.dp, height = 15.dp),
+                modifier = Modifier.size(width = 26.dp, height = 13.dp),
             )
-            Text("${state.batteryPercent}%", color = colors.primary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("${state.batteryPercent}%", color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             state.batteryEstimate?.let {
-                Text("· $it", color = colors.secondary, fontSize = 13.sp)
+                Text("· $it", color = colors.secondary, fontSize = 12.sp)
             }
         }
     }

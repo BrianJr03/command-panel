@@ -23,6 +23,7 @@ interface OverlayActions {
     fun toggleAmbientLight()
     fun cleanMemory()
     fun setSuppressBottomTip(suppress: Boolean)
+    fun quickLaunch()
 
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
@@ -42,5 +43,6 @@ interface OverlayActions {
         override fun toggleAmbientLight() {}
         override fun cleanMemory() {}
         override fun setSuppressBottomTip(suppress: Boolean) {}
+        override fun quickLaunch() {}
     }
 }

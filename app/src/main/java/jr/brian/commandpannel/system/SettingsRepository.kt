@@ -118,6 +118,7 @@ class SettingsRepository(
                 is120Hz = peak >= 90f,
                 themeMode = themeMode,
                 suppressBottomTip = prefs.getBoolean("suppress_bottom_tip", false),
+                quickLaunchLabel = QuickLaunch.savedLabel(context),
                 bottomVolume = settings.getInt(Keys.SECONDARY_VOLUME, 7) / 15f,
                 dualBrightness = settings.getInt(Keys.DUAL_BRIGHTNESS, 50) / 100f,
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,
@@ -296,6 +297,10 @@ class SettingsRepository(
     override fun setSuppressBottomTip(suppress: Boolean) {
         prefs.edit().putBoolean("suppress_bottom_tip", suppress).apply()
         _uiState.update { it.copy(suppressBottomTip = suppress) }
+    }
+
+    override fun quickLaunch() {
+        QuickLaunch.launch(context)
     }
 
     private fun toggleIntKey(key: String, default: Int) {

@@ -20,6 +20,8 @@ fun rememberStockPainter(baseName: String): Painter {
     val resName = if (dark) "${baseName}_black" else baseName
     var id = context.resources.getIdentifier(resName, "drawable", context.packageName)
     if (id == 0) id = context.resources.getIdentifier(baseName, "drawable", context.packageName)
+    // Never crash on a missing drawable: fall back to a blank painter.
+    if (id == 0) return androidx.compose.ui.graphics.painter.ColorPainter(androidx.compose.ui.graphics.Color.Transparent)
     return painterResource(id)
 }
 

@@ -69,10 +69,10 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
                 Modifier.clickable { actions.toggleRefreshRate() },
             ) { FrameRatePill(state.is120Hz) }
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("${state.fps}", color = colors.primary, fontSize = 64.sp, fontWeight = FontWeight.Bold)
-                Text(" FPS", color = colors.primary, fontSize = 20.sp, modifier = Modifier.padding(bottom = 10.dp))
+                Text("${state.fps}", color = colors.primary, fontSize = 46.sp, fontWeight = FontWeight.Bold)
+                Text(" FPS", color = colors.primary, fontSize = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
             }
-            Text("CURRENT FPS", color = colors.panelText, fontSize = 14.sp)
+            Text("CURRENT FPS", color = colors.panelText, fontSize = 11.sp)
         }
     }
 }
@@ -99,7 +99,7 @@ private fun FrameRatePill(is120: Boolean) {
         Text(
             if (is120) "120 FPS MODE" else "60 FPS MODE",
             color = Color.White,
-            fontSize = 15.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
         )
     }
@@ -126,10 +126,9 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
                         TccIconButton(
                             iconBase = tile.iconBase,
                             label = tile.title,
-                            circleSize = 72.dp,
-                            active = tile.active,
-                            labelSize = 12.sp,
-                            iconInset = 16.dp,
+                            circleSize = 48.dp,
+                        active = tile.active,
+                        labelSize = 10.sp,
                             onClick = { onTile(tile.id) },
                         )
                     }
@@ -194,12 +193,12 @@ private fun InfoCard(modifier: Modifier, icon: String, iconTint: Color?, title: 
                     painter = rememberStockPainter(icon),
                     contentDescription = title,
                     colorFilter = stockIconColorFilter(iconTint ?: colors.tertiary),
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                 )
-                Spacer(Modifier.size(8.dp))
-                Text(title, color = colors.tertiary, fontSize = 15.sp)
+                Spacer(Modifier.size(6.dp))
+                Text(title, color = colors.tertiary, fontSize = 12.sp)
             }
-            Text(value, color = colors.primary, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+            Text(value, color = colors.primary, fontSize = 22.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

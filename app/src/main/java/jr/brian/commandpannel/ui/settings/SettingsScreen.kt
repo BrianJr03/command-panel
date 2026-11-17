@@ -84,6 +84,10 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun General(state: SettingsState, vm: SettingsViewModel) {
+    if (state.appPickerOpen) {
+        AppPicker(state, vm)
+        return
+    }
     SectionHeader("General")
     SwitchCard(
         title = "Replace Stock Assistant",
@@ -105,10 +109,63 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         checked = state.hideNetSpeed,
         onChange = vm::setHideNetSpeed,
     )
+    QuickLaunchCard(state, vm)
     Card {
         Text("Overlay preview", color = LocalTccColors.current.primary, fontSize = 16.sp)
         Spacer(Modifier.height(8.dp))
         Button(onClick = vm::showOverlay) { Text("Open overlay on bottom screen") }
+    }
+}
+
+@Composable
+private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
+    val c = LocalTccColors.current
+    Card {
+        Text("Quick Launch", color = c.primary, fontSize = 16.sp)
+        Text(
+            "Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.",
+            color = c.secondary, fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("App: ${state.quickLaunchLabel ?: "None"}", color = c.primary, fontSize = 15.sp)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = vm::openAppPicker) { Text("Choose app") }
+            if (state.quickLaunchLabel != null) {
+                Button(onClick = vm::clearQuickLaunch) { Text("Clear") }
+            }
+        }
+        if (state.quickLaunchLabel != null) {
+            Spacer(Modifier.height(8.dp))
+            Text("Open on:", color = c.secondary, fontSize = 13.sp)
+            jr.brian.commandpannel.system.QuickLaunchDisplay.entries.forEach { d ->
+                RadioRow(d.label, state.quickLaunchDisplay == d) { vm.setQuickLaunchDisplay(d) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
+    val c = LocalTccColors.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Choose an app", color = c.primary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Button(onClick = vm::closeAppPicker) { Text("Back") }
+    }
+    if (state.apps.isEmpty()) {
+        Text("Loading…", color = c.secondary, fontSize = 14.sp)
+    } else {
+        state.apps.forEach { app ->
+            Text(
+                app.label,
+                color = c.primary,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { vm.pickApp(app.component) }
+                    .padding(vertical = 12.dp),
+            )
+        }
     }
 }
 

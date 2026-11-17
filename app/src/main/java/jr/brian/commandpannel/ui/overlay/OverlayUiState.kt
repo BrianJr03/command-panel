@@ -44,6 +44,7 @@ data class OverlayUiState(
 
     val themeMode: Int = 4,          // tcc_theme_mode: 1 system, 3 light, 4 dark
     val suppressBottomTip: Boolean = false,
+    val quickLaunchLabel: String? = null,  // fork feature: null = no Launch nav button
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
 )

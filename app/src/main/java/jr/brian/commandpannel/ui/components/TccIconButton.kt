@@ -38,7 +38,7 @@ fun TccIconButton(
     circleSize: Dp,
     modifier: Modifier = Modifier,
     active: Boolean = false,
-    labelSize: TextUnit = 14.sp,
+    labelSize: TextUnit = 10.sp,
     iconInset: Dp = circleSize * 0.27f,
     onClick: (() -> Unit)? = null,
 ) {
@@ -47,7 +47,7 @@ fun TccIconButton(
     Column(
         modifier = base,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Box(
             modifier = Modifier
