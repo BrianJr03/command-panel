@@ -2,6 +2,7 @@ package jr.brian.commandpannel.privileged
 
 import android.content.Context
 import android.util.Log
+import jr.brian.commandpannel.privileged.helper.TaskFps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -16,6 +17,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class PrivilegedAccess @Inject constructor() {
+
+    /** One per-task FPS reading from the helper; [fps] is -1 when no standard task is on the display. */
+    data class TaskFpsSample(val fps: Float, val taskId: Int, val packageName: String?, val ageMs: Long)
 
     data class InitResult(
         val hiddenApi: Boolean,
@@ -68,5 +72,23 @@ class PrivilegedAccess @Inject constructor() {
 
     fun stopDisplayMirror() {
         RootHelper.binder?.let { runCatching { it.stopDisplayMirror() } }
+    }
+
+    /** FPS of the game task on [displayId] (helper only); null when the helper is down or the call fails. */
+    fun taskFps(displayId: Int): TaskFpsSample? =
+        RootHelper.binder?.let { h ->
+            runCatching {
+                val b = h.taskFps(displayId)
+                TaskFpsSample(
+                    fps = b.getFloat(TaskFps.KEY_FPS, -1f),
+                    taskId = b.getInt(TaskFps.KEY_TASK_ID, -1),
+                    packageName = b.getString(TaskFps.KEY_PACKAGE),
+                    ageMs = b.getLong(TaskFps.KEY_AGE_MS, -1L),
+                )
+            }.getOrNull()
+        }
+
+    fun stopTaskFps() {
+        RootHelper.binder?.let { runCatching { it.stopTaskFps() } }
     }
 }

@@ -2,6 +2,7 @@ package jr.brian.commandpannel.system
 
 import android.app.ActivityManager
 import android.content.Context
+import android.view.Display
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -30,8 +31,10 @@ data class Telemetry(
 
 /**
  * Polls the stock telemetry sources every [intervalMs] while started: sysfs nodes read directly (the probe showed
- * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS via the root
- * shell (`service call SurfaceFlinger 1013`, which the app's uid is refused but root allows).
+ * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS from two sources:
+ * the game task on the top display through the root helper's task FPS callback (frames that task actually
+ * presented), falling back to the root shell's global composite counter (`service call SurfaceFlinger 1013`, which
+ * the app's uid is refused but root allows) when no game is up or the helper is down.
  */
 class TelemetryMonitor(
     private val context: Context,
@@ -68,6 +71,7 @@ class TelemetryMonitor(
 
     fun stop() {
         job?.cancel(); job = null
+        privileged.stopTaskFps()
     }
 
     private fun read(path: String): String = runCatching { File(path).readText() }.getOrDefault("")
@@ -101,6 +105,14 @@ class TelemetryMonitor(
     }
 
     private fun sampleFps(): Int {
+        val cap = refreshRateCap()
+        // The global counter is sampled every time so its delta is ready the moment the task source drops out.
+        val globalFps = sampleGlobalFps(cap)
+        val task = privileged.taskFps(Display.DEFAULT_DISPLAY)
+        return TelemetryReader.chooseFps(task?.fps, task?.ageMs, globalFps, cap)
+    }
+
+    private fun sampleGlobalFps(cap: Int): Int {
         val out = privileged.shell("service call SurfaceFlinger 1013") ?: return _state.value.fps
         val frames = TelemetryReader.parseSurfaceFlingerFrames(out) ?: return _state.value.fps
         val now = System.nanoTime() / 1_000_000L
@@ -109,6 +121,6 @@ class TelemetryMonitor(
         lastFrames = frames
         lastFrameTime = now
         if (prev == null) return _state.value.fps
-        return TelemetryReader.fps(frames - prev, now - prevTime, refreshRateCap())
+        return TelemetryReader.fps(frames - prev, now - prevTime, cap)
     }
 }

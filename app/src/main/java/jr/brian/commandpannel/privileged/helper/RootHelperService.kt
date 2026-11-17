@@ -67,4 +67,8 @@ class RootHelperService : IRootHelper.Stub() {
         DisplayMirror.start(surface, layerStack, srcW, srcH, dstW, dstH)
 
     override fun stopDisplayMirror() = DisplayMirror.stop()
+
+    override fun taskFps(displayId: Int): Bundle = TaskFps.sample(displayId)
+
+    override fun stopTaskFps() = TaskFps.stop()
 }

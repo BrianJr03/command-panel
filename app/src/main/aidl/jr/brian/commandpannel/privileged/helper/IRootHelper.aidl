@@ -38,4 +38,13 @@ interface IRootHelper {
 
     /** Tears down the display mirror started by startDisplayMirror (v3). */
     void stopDisplayMirror();
+
+    /**
+     * Per-task FPS of the top visible standard task on [displayId] via IWindowManager.registerTaskFpsCallback (v4).
+     * Keys: "fps" (float, -1 if none), "taskId" (int), "pkg" (String), "ageMs" (long, -1 before the first report).
+     */
+    Bundle taskFps(int displayId);
+
+    /** Unregisters the task FPS callback started by taskFps (v4). */
+    void stopTaskFps();
 }

@@ -94,6 +94,14 @@ data class SettingsState(
     val bdsaDisabledByUs: String? = null,
     /** Result of the last BDSA action. */
     val bdsaMessage: String? = null,
+    /** The update / What's New dialog, or null when closed. */
+    val updateDialog: UpdatePhase? = null,
+    /** A check is running (manual button shows busy). */
+    val updateChecking: Boolean = false,
+    /** Result of the last manual check, shown in the Updates card. */
+    val updateMessage: String? = null,
+    /** When updates were last checked (ms), 0 if never. */
+    val updateLastCheck: Long = 0L,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -616,6 +624,189 @@ class SettingsViewModel @Inject constructor(
                     r.helperIdentity?.let { add(it to true) }
                 },
             )
+        }
+    }
+
+    // ---- in-app updates ----
+
+    private val updatePrefs = jr.brian.commandpannel.system.update.UpdatePrefs(app)
+    /** This build's version without the `-debug` suffix. */
+    private val currentVersion = jr.brian.commandpannel.BuildConfig.VERSION_NAME.substringBefore('-')
+    /** The APK downloaded for the open update, kept for the Android-installer fallback. */
+    private var downloadedApk: java.io.File? = null
+
+    init {
+        _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.cleanup(app) }
+            showWhatsNewIfUpdated()
+            // Automatic checks are for release builds; a debug build is a separate package a release can't update.
+            if (!jr.brian.commandpannel.BuildConfig.DEBUG && updatePrefs.isAutoCheckDue() && _state.value.updateDialog == null) {
+                checkForUpdates(manual = false)
+            }
+        }
+    }
+
+    /** Checks GitHub for a newer release. Automatic checks are silent unless there's an update that wasn't skipped. */
+    fun checkForUpdates(manual: Boolean = true) {
+        if (_state.value.updateChecking) return
+        _state.value = _state.value.copy(updateChecking = true, updateMessage = if (manual) null else _state.value.updateMessage)
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateChecker.check(currentVersion) }
+            updatePrefs.lastCheck = System.currentTimeMillis()
+            var dialog = _state.value.updateDialog
+            val message = when (result) {
+                is jr.brian.commandpannel.system.update.UpdateCheck.Available -> {
+                    if (manual || updatePrefs.skippedVersion != result.release.version) dialog = UpdatePhase.Offer(result.release)
+                    app.getString(R.string.msg_update_available, result.release.version)
+                }
+                jr.brian.commandpannel.system.update.UpdateCheck.UpToDate -> app.getString(R.string.msg_update_up_to_date, currentVersion)
+                is jr.brian.commandpannel.system.update.UpdateCheck.Failed -> app.getString(R.string.msg_update_failed, result.reason)
+            }
+            _state.value = _state.value.copy(
+                updateChecking = false,
+                updateDialog = dialog,
+                updateMessage = if (manual) message else _state.value.updateMessage,
+                updateLastCheck = updatePrefs.lastCheck,
+            )
+        }
+    }
+
+    /**
+     * Downloads the offered release and installs it: silently through the root shell (Command Panel then restarts),
+     * or with Android's installer when root isn't available. On debug builds a release without an APK installs the
+     * local test APK instead (see [previewUpdate]).
+     */
+    fun downloadAndInstall() {
+        val release = when (val d = _state.value.updateDialog) {
+            is UpdatePhase.Offer -> d.release
+            is UpdatePhase.Failed -> d.release
+            else -> return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(updateDialog = UpdatePhase.Downloading(release, 0f))
+            val testApk = jr.brian.commandpannel.system.update.UpdateInstaller.testApk(app)
+            val useTest = release.apkUrl == null && jr.brian.commandpannel.BuildConfig.DEBUG && testApk.exists()
+            val apk = withContext(Dispatchers.IO) {
+                runCatching {
+                    val file = if (useTest) testApk else jr.brian.commandpannel.system.update.UpdateInstaller.download(app, release) { p ->
+                        _state.value = _state.value.copy(updateDialog = UpdatePhase.Downloading(release, p))
+                    }
+                    jr.brian.commandpannel.system.update.UpdateInstaller.verify(app, file, if (useTest) null else release.version)
+                    file
+                }
+            }.getOrElse { e ->
+                val reason = if (release.apkUrl == null) app.getString(R.string.msg_update_no_apk) else (e.message ?: e.javaClass.simpleName)
+                _state.value = _state.value.copy(updateDialog = UpdatePhase.Failed(release, app.getString(R.string.msg_update_download_failed, reason), false))
+                return@launch
+            }
+            downloadedApk = apk
+            _state.value = _state.value.copy(updateDialog = UpdatePhase.Installing(release))
+            val started = withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.installWithRoot(app, privileged, apk) }
+            if (!started) {
+                installWithSystemInstaller()
+                return@launch
+            }
+            // A successful install replaces (and kills) this app. Still running a while later means it failed.
+            kotlinx.coroutines.delay(45_000)
+            val log = withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.installLog(privileged) }
+            val detail = log?.lines()?.lastOrNull { it.isNotBlank() } ?: app.getString(R.string.msg_update_no_log)
+            _state.value = _state.value.copy(
+                updateDialog = UpdatePhase.Failed(release, app.getString(R.string.msg_update_install_failed, detail), true),
+            )
+        }
+    }
+
+    /** Fallback: hands the downloaded APK to Android's installer (asking for the "install unknown apps" permission first). */
+    fun installWithSystemInstaller() {
+        val apk = downloadedApk ?: return
+        val release = when (val d = _state.value.updateDialog) {
+            is UpdatePhase.Failed -> d.release
+            is UpdatePhase.Installing -> d.release
+            is UpdatePhase.Offer -> d.release
+            else -> return
+        }
+        if (!jr.brian.commandpannel.system.update.UpdateInstaller.canUseSystemInstaller(app)) {
+            runCatching { app.startActivity(jr.brian.commandpannel.system.update.UpdateInstaller.installerPermissionIntent(app)) }
+            _state.value = _state.value.copy(
+                updateDialog = UpdatePhase.Failed(release, app.getString(R.string.msg_update_allow_installs), true),
+            )
+            return
+        }
+        runCatching { app.startActivity(jr.brian.commandpannel.system.update.UpdateInstaller.systemInstallerIntent(app, apk)) }
+            .onSuccess { _state.value = _state.value.copy(updateDialog = null, updateMessage = app.getString(R.string.msg_update_finish_in_installer)) }
+            .onFailure { e ->
+                _state.value = _state.value.copy(
+                    updateDialog = UpdatePhase.Failed(release, app.getString(R.string.msg_update_install_failed, e.message ?: ""), false),
+                )
+            }
+    }
+
+    fun skipUpdate() {
+        (_state.value.updateDialog as? UpdatePhase.Offer)?.let { updatePrefs.skippedVersion = it.release.version }
+        _state.value = _state.value.copy(updateDialog = null)
+    }
+
+    /** Closes the dialog ("Later" / "Close" / "Done"); a What's New dialog counts as seen. */
+    fun dismissUpdate() {
+        if (_state.value.updateDialog is UpdatePhase.WhatsNew) updatePrefs.whatsNewSeen = currentVersion
+        _state.value = _state.value.copy(updateDialog = null)
+    }
+
+    fun openReleasePage() {
+        val url = when (val d = _state.value.updateDialog) {
+            is UpdatePhase.Offer -> d.release.pageUrl
+            is UpdatePhase.Failed -> d.release.pageUrl
+            else -> null
+        }?.takeIf { it.startsWith("https://") } ?: return
+        runCatching { app.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /** Opens this version's patch notes (the Updates card's "What's new"). */
+    fun showWhatsNew() {
+        viewModelScope.launch {
+            val notes = withContext(Dispatchers.IO) { bundledNotes() } ?: return@launch
+            _state.value = _state.value.copy(updateDialog = UpdatePhase.WhatsNew(currentVersion, notes))
+        }
+    }
+
+    /**
+     * Shows the patch notes once after an update. The first install (and a downgrade) only records the version. Notes come from the
+     * bundled patch_notes.md when it's for this version, otherwise from this version's GitHub release.
+     */
+    private suspend fun showWhatsNewIfUpdated() {
+        val seen = updatePrefs.whatsNewSeen
+        if (seen == null) {
+            updatePrefs.whatsNewSeen = currentVersion
+            return
+        }
+        if (seen == currentVersion) return
+        // Only after an upgrade; a downgrade just records the version.
+        if (!jr.brian.commandpannel.system.update.UpdateChecker.isNewer(currentVersion, seen)) {
+            updatePrefs.whatsNewSeen = currentVersion
+            return
+        }
+        val notes = withContext(Dispatchers.IO) {
+            bundledNotes()?.takeIf { jr.brian.commandpannel.system.update.UpdateChecker.notesMatch(it, currentVersion) }
+                ?: jr.brian.commandpannel.system.update.UpdateChecker.releaseNotes(currentVersion)
+        }
+        if (notes.isNullOrBlank()) updatePrefs.whatsNewSeen = currentVersion
+        else _state.value = _state.value.copy(updateDialog = UpdatePhase.WhatsNew(currentVersion, notes))
+    }
+
+    private fun bundledNotes(): String? =
+        runCatching { app.resources.openRawResource(R.raw.patch_notes).bufferedReader().use { it.readText() } }.getOrNull()
+
+    /** Debug builds only: opens the update dialog with this build's notes, to try the dialog and the install path. */
+    fun previewUpdate() {
+        if (!jr.brian.commandpannel.BuildConfig.DEBUG) return
+        viewModelScope.launch {
+            val notes = withContext(Dispatchers.IO) { bundledNotes() }.orEmpty()
+            val release = jr.brian.commandpannel.system.update.ReleaseInfo(
+                version = "9.9.9", notes = notes, pageUrl = "https://github.com/BrianJr03/command-panel/releases",
+                apkUrl = null, apkName = null, apkSize = 0L,
+            )
+            _state.value = _state.value.copy(updateDialog = UpdatePhase.Offer(release))
         }
     }
 

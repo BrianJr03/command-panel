@@ -92,6 +92,9 @@ object PackInstaller {
 }
 
 /** Minimal https GET for theme repos and font downloads (no extra dependency). */
+/** A non-2xx response; [code] lets callers treat e.g. 404 as "nothing there" rather than a failure. */
+internal class HttpStatusException(val code: Int) : IllegalStateException("HTTP $code")
+
 internal object Http {
     fun getBytes(url: String, maxBytes: Int, accept: String? = null): ByteArray {
         require(url.startsWith("https://")) { "https only" }
@@ -104,7 +107,7 @@ internal object Http {
             conn.setRequestProperty("Cache-Control", "no-cache")
             accept?.let { conn.setRequestProperty("Accept", it) }
             val code = conn.responseCode
-            if (code !in 200..299) error("HTTP $code")
+            if (code !in 200..299) throw HttpStatusException(code)
             // Redirects (raw.githubusercontent, CDNs) must stay on https.
             require(conn.url.protocol == "https") { "https only" }
             conn.inputStream.use { input ->
@@ -124,4 +127,44 @@ internal object Http {
     }
 
     fun getText(url: String, maxBytes: Int, accept: String? = null): String = String(getBytes(url, maxBytes, accept), Charsets.UTF_8)
+
+    /**
+     * Streams [url] into [dest] (https only, redirects included), reporting `(bytesRead, totalOrMinus1)` as it goes.
+     * Fails past [maxBytes]; a partial file is deleted on failure. Blocking; call off the main thread.
+     */
+    fun download(url: String, dest: java.io.File, maxBytes: Long, onProgress: (Long, Long) -> Unit = { _, _ -> }) {
+        require(url.startsWith("https://")) { "https only" }
+        val conn = URL(url).openConnection() as HttpURLConnection
+        try {
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 30_000
+            conn.useCaches = false
+            conn.setRequestProperty("User-Agent", "TCP-Updater")
+            conn.setRequestProperty("Accept", "application/octet-stream")
+            val code = conn.responseCode
+            if (code !in 200..299) throw HttpStatusException(code)
+            require(conn.url.protocol == "https") { "https only" }
+            val total = conn.contentLengthLong
+            if (total > maxBytes) error("too large")
+            dest.parentFile?.mkdirs()
+            runCatching {
+                conn.inputStream.use { input ->
+                    dest.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        var read = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            read += n
+                            if (read > maxBytes) error("too large")
+                            out.write(buf, 0, n)
+                            onProgress(read, total)
+                        }
+                    }
+                }
+            }.onFailure { dest.delete(); throw it }
+        } finally {
+            conn.disconnect()
+        }
+    }
 }

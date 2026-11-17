@@ -147,6 +147,8 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     }
     // Theme Studio replaces the whole two-pane screen while it's open.
     var studio by remember { mutableStateOf<jr.brian.commandpannel.ui.theme.CustomLook?>(null) }
+    // Update / What's New dialog, over whichever screen is showing.
+    state.updateDialog?.let { UpdateDialog(it, vm) }
     studio?.let { look ->
         ThemeStudioScreen(look, state, vm, onClose = { studio = null })
         return
@@ -314,6 +316,7 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         }
         state.backupMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
+    UpdatesCard(state, vm)
     ReplayBufferCard(state, vm)
     Card {
         CardTitle(stringResource(R.string.settings_preview_title))

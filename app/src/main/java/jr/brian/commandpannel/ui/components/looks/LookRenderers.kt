@@ -330,6 +330,9 @@ interface LookNavRenderer {
     /** `false` hides nav icons (Terminal prompt nav). */
     val showIcon: Boolean get() = true
 
+    /** Nav label size multiplier; label-only navs (Terminal) scale up so the text fills the space an icon would. */
+    val labelScale: Float get() = 1f
+
     /** Nav bar card fill; `null` keeps the card default. */
     fun barFill(p: LookPaint): Color? = null
 }

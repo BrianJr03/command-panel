@@ -10,3 +10,8 @@
 # Hidden framework classes reached by reflection in the privileged layer.
 -keep class android.os.ServiceManager { *; }
 -keep class android.hardware.display.DisplayManagerGlobal { *; }
+
+# Our copy of the framework's hidden ITaskFpsCallback (TaskFps) must keep its real name: the framework class loads in
+# its place in the helper, and registerTaskFpsCallback is looked up by that parameter type.
+-keep class android.window.ITaskFpsCallback { *; }
+-keep class android.window.ITaskFpsCallback$Stub { *; }
