@@ -150,8 +150,16 @@ Done (2026-11-16):
   battery % as "· full in 47m". Ported the fork's estimator test (mode-enum test dropped; `flowFor` helper kept).
   Verified on device.
 
+Done (cont.):
+- **Quick Launch (2)** — `QuickLaunch` system, Launch nav button, settings app picker. Verified.
+- **Thor RGB accent sync (6)** — ported `ThorRgbController`, Appearance toggle. Verified (nodes writable).
+- **Customizable quick-tile roster + Android system toggles** — `QuickSettingTileId` (19→20 tiles, 3 categories,
+  stock/Material icons), enable/disable in a "Quick Toggles" settings category; new actions for Wi-Fi/BT/DND/Airplane
+  and the simple Tools toggles; L2/R2 trigger dialog. Repository reacts to app-pref changes live. Verified.
+- **Screenshot Tools tile** — `Screenshotter` (resolve display ids from SurfaceFlinger, `screencap` via root,
+  media-scan), Top/Bottom/Both dialog. Verified: captured a valid 1920×1080 top-screen PNG.
+
 Backlog (remaining fork features, roughly easiest → hardest):
-- Quick Launch nav button (2) — app picker + target display.
 - Clear All Tasks tile with keep-on-screen policy (10) — port `ClearTasksPolicy` (pure) + task listing via helper.
 - Nav bar Home/Launch reorder + Home default (1).
 - Thor RGB accent sync (6), Dark-on-TV tap-to-wake (7) — device-specific, self-contained.

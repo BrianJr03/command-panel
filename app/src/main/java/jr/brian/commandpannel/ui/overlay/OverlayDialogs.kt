@@ -30,7 +30,7 @@ import jr.brian.commandpannel.ui.components.stockIconColorFilter
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 
 /** Which quick-tile modal dialog is open over the overlay. */
-enum class OverlayDialogKind { NONE, FOCUS, PERFORMANCE, FAN, CONTROLLER, THEME, TRIGGER }
+enum class OverlayDialogKind { NONE, FOCUS, PERFORMANCE, FAN, CONTROLLER, THEME, TRIGGER, SCREENSHOT }
 
 /** Maps a modal tile id to its dialog, or null for instant-action tiles. */
 fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
@@ -40,6 +40,7 @@ fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
     "controller" -> OverlayDialogKind.CONTROLLER
     "theme" -> OverlayDialogKind.THEME
     "trigger_mode" -> OverlayDialogKind.TRIGGER
+    "screenshot" -> OverlayDialogKind.SCREENSHOT
     else -> null
 }
 
@@ -184,6 +185,15 @@ private fun specFor(kind: OverlayDialogKind, state: OverlayUiState, actions: Ove
             DialogOption("Both", "", 2),
         ),
         state.triggerMode, actions::setTriggerMode,
+    )
+    OverlayDialogKind.SCREENSHOT -> DialogSpec(
+        "ic_qs_clean", "Screenshot",
+        listOf(
+            DialogOption("Top Screen", "", 0),
+            DialogOption("Bottom Screen", "", 1),
+            DialogOption("Both Screens", "", 2),
+        ),
+        selected = -1, onSelect = actions::takeScreenshot,
     )
     OverlayDialogKind.NONE -> error("no dialog")
 }

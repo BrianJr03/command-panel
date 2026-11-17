@@ -83,6 +83,7 @@ class AssistantService : Service() {
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
         screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
+        repository.onHideOverlay = { overlay.hide() }
         coexistence = StockCoexistence(applicationContext, privileged, scope)
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()

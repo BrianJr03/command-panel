@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -42,6 +43,10 @@ class SettingsRepository(
 
     private val settings = SystemSettings(context.contentResolver, privileged)
     private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
+    private val screenshotter = Screenshotter(context, privileged)
+
+    /** Set by the service so screenshot/launch actions can dismiss the overlay first. */
+    var onHideOverlay: () -> Unit = {}
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val telemetry = TelemetryMonitor(context, privileged, refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 })
     private val batteryEstimate = BatteryEstimateMonitor(context, settings, enabled = { prefs.getBoolean("battery_estimate", false) })
@@ -64,10 +69,12 @@ class SettingsRepository(
     }
 
     private var fastJob: Job? = null
+    private var scope: CoroutineScope? = null
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
     private var lastRxTime = System.currentTimeMillis()
 
     fun start(scope: CoroutineScope) {
+        this.scope = scope
         observed.forEach {
             context.contentResolver.registerContentObserver(settings.uriFor(it), false, observer)
         }
@@ -207,6 +214,7 @@ class SettingsRepository(
                 QuickSettingTileId.CHARGE_LIMIT_80 -> "80% Charge\nLimit" to (settings.getInt("percent_80_charge_limit", 0) == 1)
                 QuickSettingTileId.VIRTUAL_MOUSE -> "Virtual\nMouse" to (settings.getInt("global_gamepad_to_mouse_mode", 0) == 1)
                 QuickSettingTileId.TRIGGER_MODE -> triggerTitle(settings.getInt("trigger_input_mode", 2)) to false
+                QuickSettingTileId.SCREENSHOT -> "Screenshot" to false
             }
             QuickTile(key, id.icon, title, active)
         }
@@ -300,6 +308,15 @@ class SettingsRepository(
     }
 
     override fun setTriggerMode(value: Int) = settings.putInt("trigger_input_mode", value)
+
+    override fun takeScreenshot(target: Int) {
+        val t = Screenshotter.Target.entries.getOrElse(target) { Screenshotter.Target.BOTH }
+        onHideOverlay()
+        scope?.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(350) // let the overlay exit animation finish before capturing
+            screenshotter.capture(t)
+        }
+    }
 
     private fun toggleAirplane() {
         val on = android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1
