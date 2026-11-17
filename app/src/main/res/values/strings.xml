@@ -181,6 +181,8 @@
 
     <!-- Companion: Quick Toggles -->
     <string name="settings_order">Order</string>
+    <string name="settings_hide_tile_labels">Hide Toggle Names</string>
+    <string name="settings_hide_tile_labels_desc">Show only the icons on the overlay\'s quick toggles. The icons grow to fill the space.</string>
     <string name="settings_tile_order_desc">Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, D-pad to move, A to drop.</string>
     <string name="settings_drag_to_reorder">Drag to reorder</string>
 

@@ -13,6 +13,7 @@ data class OverlayUiState(
     val charging: Boolean = false,
     val batteryEstimate: String? = null,   // fork feature: time-to-empty/full after the %
     val hideNetSpeed: Boolean = false,     // fork feature: hide the status-bar download speed
+    val hideTileLabels: Boolean = false,   // fork feature: quick-toggle tiles show icons only
 
     val displayMode: Int = 0,        // 0 dual, 1 top only, 2 bottom only
     val focusLockTitle: String = "Top screen",

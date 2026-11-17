@@ -402,6 +402,11 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
+    SwitchCard(
+        stringResource(R.string.settings_hide_tile_labels),
+        stringResource(R.string.settings_hide_tile_labels_desc),
+        state.hideTileLabels, vm::setHideTileLabels,
+    )
     SectionHeader(stringResource(R.string.settings_order))
     OrderCard(
         items = state.orderedEnabledTiles,

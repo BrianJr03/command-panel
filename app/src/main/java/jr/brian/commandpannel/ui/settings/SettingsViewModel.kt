@@ -49,6 +49,7 @@ data class SettingsState(
     val replaceStock: Boolean = false,
     val batteryEstimate: Boolean = false,
     val hideNetSpeed: Boolean = false,
+    val hideTileLabels: Boolean = false,
     val keepOnScreen: Boolean = true,
     val backupMessage: String? = null,
     val themeMode: Int = 4,              // tcc_theme_mode
@@ -130,6 +131,7 @@ class SettingsViewModel @Inject constructor(
         replaceStock = prefs.getBoolean("replace_stock_assistant", false),
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
+        hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
         keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
@@ -447,6 +449,11 @@ class SettingsViewModel @Inject constructor(
     fun setHideNetSpeed(enable: Boolean) {
         prefs.edit().putBoolean("hide_net_speed", enable).apply()
         _state.value = _state.value.copy(hideNetSpeed = enable)
+    }
+
+    fun setHideTileLabels(enable: Boolean) {
+        prefs.edit().putBoolean("qs_hide_labels", enable).apply()
+        _state.value = _state.value.copy(hideTileLabels = enable)
     }
 
     fun exportBackup() {

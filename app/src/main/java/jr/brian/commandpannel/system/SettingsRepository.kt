@@ -187,6 +187,7 @@ class SettingsRepository(
                 charging = charging,
                 netSpeed = formatSpeed(bps),
                 hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
+                hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
                 wifiLevel = wifiLevel(),
                 bluetoothOn = bluetoothConnected(),
             )

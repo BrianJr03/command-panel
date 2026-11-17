@@ -114,9 +114,11 @@ internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mo
                         TccIconButton(
                             icon = tile.icon,
                             label = tile.title,
-                            circleSize = 48.dp,
-                        active = tile.active,
-                        labelSize = 10.sp,
+                            // Without names the tiles grow into the freed space.
+                            circleSize = if (state.hideTileLabels) 50.dp else 48.dp,
+                            active = tile.active,
+                            labelSize = 10.sp,
+                            showLabel = !state.hideTileLabels,
                             onClick = { onTile(tile.id) },
                         )
                     }

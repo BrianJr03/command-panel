@@ -44,8 +44,9 @@ fun TccIconButton(
     iconInset: Dp = circleSize * 0.27f,
     variant: TccTileVariant = TccTileVariant.QUICK_SETTING,
     index: Int = 0,
+    showLabel: Boolean = true,
     onClick: (() -> Unit)? = null,
-) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, onClick)
+) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, showLabel, onClick)
 
 @Composable
 fun TccIconButton(
@@ -58,6 +59,8 @@ fun TccIconButton(
     iconInset: Dp = circleSize * 0.27f,
     variant: TccTileVariant = TccTileVariant.QUICK_SETTING,
     index: Int = 0,
+    /** `false` draws the icon only (the label still names it for accessibility). */
+    showLabel: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = LocalTccColors.current
@@ -111,7 +114,7 @@ fun TccIconButton(
                 )
             }
         }
-        Text(
+        if (showLabel) Text(
             text = labelText,
             color = labelColor,
             fontSize = if (isNav) labelSize * navRenderer.labelScale else labelSize,
