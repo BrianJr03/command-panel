@@ -17,10 +17,10 @@ import jr.brian.commandpannel.system.SystemSettings.Keys
  * `TccServices`): 0 = dual, 1 = top only (blank bottom), 2 = bottom only (blank top).
  *
  * For each single-screen mode it saves and later restores `screen_focus_lock` / `enable_system_key_focus_lock`,
- * sets `sys.temp.disabled.touch` through the root shell, and covers the blanked panel with a black window. Stock
- * does not change brightness, so neither do we. The bottom cover is a `TYPE_APPLICATION_OVERLAY` window the app can
- * add; the top cover needs the stock app's `TYPE_BOOT_PROGRESS` (helper window, deferred), so mode 2 currently
- * applies focus + touch only.
+ * sets `sys.temp.disabled.touch` through the root shell, and covers the blanked panel with a black
+ * `TYPE_APPLICATION_OVERLAY` window. Stock does not change brightness, so neither do we. Stock covers the top with a
+ * `TYPE_BOOT_PROGRESS` window that also hides the status bar; our overlay cover blanks the top's content but the
+ * system status bar (a higher-z window) still shows through — covering it fully would need the root helper window.
  */
 class ScreenModeController(
     private val context: Context,
@@ -33,6 +33,7 @@ class ScreenModeController(
     private val settings = SystemSettings(context.contentResolver, privileged)
 
     private var bottomCover: View? = null
+    private var topCover: View? = null
     private var tracked = -1
 
     private val observer = object : ContentObserver(main) {
@@ -71,12 +72,14 @@ class ScreenModeController(
     private fun restoreDual() {
         setTouch("0,0")
         removeBottomCover()
+        removeTopCover()
         settings.putInt(Keys.FOCUS_LOCK, prefs.getInt("saved_focus_lock", 0))
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt("saved_sys_key_lock", 0))
     }
 
     private fun blankBottom(fromDual: Boolean) {
         if (fromDual) saveFocusState()
+        removeTopCover()
         onHideOverlay()
         settings.putInt(Keys.FOCUS_LOCK, 1)
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
@@ -86,11 +89,12 @@ class ScreenModeController(
 
     private fun blankTop(fromDual: Boolean) {
         if (fromDual) saveFocusState()
+        removeBottomCover()
         onHideOverlay()
         settings.putInt(Keys.FOCUS_LOCK, 2)
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
         setTouch("1,0")
-        // Top cover (TYPE_BOOT_PROGRESS on display 0) needs the root helper window — deferred.
+        showTopCover()
     }
 
     private fun setTouch(value: String) {
@@ -99,7 +103,27 @@ class ScreenModeController(
 
     private fun showBottomCover() = main.post {
         if (bottomCover != null) return@post
-        val display = topology.bottomDisplay ?: return@post
+        bottomCover = addCover(topology.bottomDisplay)
+    }
+
+    private fun removeBottomCover() = main.post {
+        removeCover(bottomCover)
+        bottomCover = null
+    }
+
+    private fun showTopCover() = main.post {
+        if (topCover != null) return@post
+        topCover = addCover(topology.topDisplay)
+    }
+
+    private fun removeTopCover() = main.post {
+        removeCover(topCover)
+        topCover = null
+    }
+
+    /** Adds a full-screen opaque black window over [display] (TYPE_APPLICATION_OVERLAY, non-focusable/non-touchable). */
+    private fun addCover(display: android.view.Display?): View? {
+        display ?: return null
         val displayContext = context.createDisplayContext(display)
         val wm = displayContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val size = topology.realSize(display)
@@ -107,17 +131,18 @@ class ScreenModeController(
         val lp = WindowManager.LayoutParams(
             size.x, size.y,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE,
         ).apply { gravity = Gravity.CENTER; fitInsetsTypes = 0 }
-        runCatching { wm.addView(view, lp) }.onSuccess { bottomCover = view }
+        return runCatching { wm.addView(view, lp) }.map { view }.getOrNull()
     }
 
-    private fun removeBottomCover() = main.post {
-        val view = bottomCover ?: return@post
+    private fun removeCover(view: View?) {
+        view ?: return
         runCatching {
             (view.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeViewImmediate(view)
         }
-        bottomCover = null
     }
 }

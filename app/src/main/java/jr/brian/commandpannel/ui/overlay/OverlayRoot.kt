@@ -72,6 +72,7 @@ fun OverlayRoot(
                     modifier = Modifier.fillMaxSize(),
                     quickLaunchLabel = state.quickLaunchLabel,
                     onMode = { tab = OverlayTab.MODE },
+                    onTask = { actions.openRecents() },
                     onLaunch = { actions.quickLaunch() },
                     onSettings = { tab = OverlayTab.SETTINGS },
                     onApp = { actions.launchCompanion() },

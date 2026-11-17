@@ -27,6 +27,9 @@ interface OverlayActions {
     fun setSuppressBottomTip(suppress: Boolean)
     fun quickLaunch()
 
+    /** Nav-bar "Task" button: opens the system recents/overview (stock shows bottom-screen recents). */
+    fun openRecents()
+
     /** Opens the Command Panel companion settings app (on the top screen). */
     fun launchCompanion()
 
@@ -54,6 +57,7 @@ interface OverlayActions {
         override fun cleanMemory() {}
         override fun setSuppressBottomTip(suppress: Boolean) {}
         override fun quickLaunch() {}
+        override fun openRecents() {}
         override fun launchCompanion() {}
         override fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout) {}
     }

@@ -411,6 +411,13 @@ class SettingsRepository(
         QuickLaunch.launch(context)
     }
 
+    override fun openRecents() {
+        // Stock opens bottom-screen recents via IOverviewProxy txn 6, which a user app can't bind (SecurityException);
+        // KEYCODE_APP_SWITCH through the root shell opens the system recents instead. Dismiss the panel first, as stock.
+        onHideOverlay()
+        privileged.shell("input keyevent 187")
+    }
+
     override fun setOverlayLayout(layout: OverlayLayout) {
         prefs.edit().putString("overlay_layout", layout.encode()).apply()
         // Reflect immediately so the overlay re-renders and the FLIP animation can run.
