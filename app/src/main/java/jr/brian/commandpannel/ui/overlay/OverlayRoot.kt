@@ -54,10 +54,22 @@ fun OverlayRoot(
             if (mode == 1 && !state.suppressBottomTip) showBottomTip = true else actions.selectMode(mode)
         }
 
+        val navBar: @Composable () -> Unit = {
+            NavBar(
+                activeTab = tab,
+                modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 15.dp),
+                quickLaunchLabel = state.quickLaunchLabel,
+                onMode = { tab = OverlayTab.MODE },
+                onLaunch = { actions.quickLaunch() },
+                onSettings = { tab = OverlayTab.SETTINGS },
+            )
+        }
+        val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
         Box(Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().background(bg)) {
                 Spacer(Modifier.height(10.dp))
                 StatusBar(state)
+                if (navAtTop) { Spacer(Modifier.height(8.dp)); navBar() }
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
                 ) {
@@ -66,14 +78,7 @@ fun OverlayRoot(
                         OverlayTab.SETTINGS -> SettingsTab(state, actions, onTile, Modifier.fillMaxSize())
                     }
                 }
-                NavBar(
-                    activeTab = tab,
-                    modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 15.dp),
-                    quickLaunchLabel = state.quickLaunchLabel,
-                    onMode = { tab = OverlayTab.MODE },
-                    onLaunch = { actions.quickLaunch() },
-                    onSettings = { tab = OverlayTab.SETTINGS },
-                )
+                if (!navAtTop) navBar()
                 Spacer(Modifier.height(12.dp))
             }
             OverlayDialogLayer(dialog, state, actions, onDismiss = { dialog = OverlayDialogKind.NONE })

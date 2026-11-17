@@ -48,6 +48,7 @@ data class OverlayUiState(
     val quickLaunchLabel: String? = null,  // fork feature: null = no Launch nav button
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
+    val layout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
 )
 
 /** A quick-settings tile: its icon (stock drawable or Material vector) and the title for its current value. */

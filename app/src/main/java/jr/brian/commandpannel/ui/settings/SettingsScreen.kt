@@ -248,6 +248,48 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         checked = state.rgbAccentSync,
         onChange = vm::setRgbAccentSync,
     )
+
+    SectionHeader("Overlay arrangement")
+    val l = state.overlayLayout
+    SwitchCard(
+        title = "Nav bar at top",
+        description = "Place the Mode / Launch / Settings bar directly under the status bar instead of at the bottom.",
+        checked = l.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP,
+        onChange = vm::setNavBarTop,
+    )
+    SwitchCard(
+        title = "Sliders above mode panel",
+        description = "Mode tab: put the brightness/volume cards above the dual-screen mode buttons.",
+        checked = l.modeRowsSwapped,
+        onChange = { vm.toggleModeRows() },
+    )
+    SwitchCard(
+        title = "Swap brightness / volume",
+        description = "Mode tab: place the volume card on the left and brightness on the right.",
+        checked = l.modeHalfOrder.first() == jr.brian.commandpannel.system.OverlayCardId.VOLUME,
+        onChange = { vm.toggleModeHalves() },
+    )
+    SwitchCard(
+        title = "Hardware row on top",
+        description = "Settings tab: put the temp/fan/rings row above the frame-rate and quick-tile cards.",
+        checked = l.settingsRowsSwapped,
+        onChange = { vm.toggleSettingsRows() },
+    )
+    SwitchCard(
+        title = "Swap settings columns",
+        description = "Settings tab: put the wide cards (quick tiles, rings) on the left.",
+        checked = l.settingsColsSwapped,
+        onChange = { vm.toggleSettingsCols() },
+    )
+    SwitchCard(
+        title = "Swap temp / fan",
+        description = "Settings tab: place the fan tile before the temperature tile.",
+        checked = l.settingsQuarterOrder.first() == jr.brian.commandpannel.system.OverlayCardId.FAN,
+        onChange = { vm.toggleQuarters() },
+    )
+    Card {
+        Button(onClick = vm::resetLayout, enabled = !l.isDefault) { Text("Reset arrangement") }
+    }
 }
 
 @Composable

@@ -142,6 +142,7 @@ class SettingsRepository(
                 topVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() /
                     audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
                 tiles = buildTiles(mode, focus),
+                layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
             )
         }
     }

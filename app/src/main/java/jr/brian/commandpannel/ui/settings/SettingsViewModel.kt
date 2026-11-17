@@ -40,6 +40,7 @@ data class SettingsState(
     val orderedEnabledTiles: List<String> = emptyList(),
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
+    val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
     val appPickerOpen: Boolean = false,
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
@@ -73,7 +74,27 @@ class SettingsViewModel @Inject constructor(
             .enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null)),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
+        overlayLayout = jr.brian.commandpannel.system.OverlayLayout.decode(prefs.getString("overlay_layout", null)),
     )
+
+    private fun updateLayout(transform: (jr.brian.commandpannel.system.OverlayLayout) -> jr.brian.commandpannel.system.OverlayLayout) {
+        val next = transform(_state.value.overlayLayout)
+        prefs.edit().putString("overlay_layout", next.encode()).apply()
+        _state.value = _state.value.copy(overlayLayout = next)
+    }
+
+    fun setNavBarTop(top: Boolean) = updateLayout {
+        it.withNavBarPosition(
+            if (top) jr.brian.commandpannel.system.NavBarPosition.TOP
+            else jr.brian.commandpannel.system.NavBarPosition.BOTTOM
+        )
+    }
+    fun toggleModeRows() = updateLayout { it.copy(modeRowsSwapped = !it.modeRowsSwapped) }
+    fun toggleModeHalves() = updateLayout { it.copy(modeHalfOrder = it.modeHalfOrder.reversed()) }
+    fun toggleSettingsRows() = updateLayout { it.copy(settingsRowsSwapped = !it.settingsRowsSwapped) }
+    fun toggleSettingsCols() = updateLayout { it.copy(settingsColsSwapped = !it.settingsColsSwapped) }
+    fun toggleQuarters() = updateLayout { it.copy(settingsQuarterOrder = it.settingsQuarterOrder.reversed()) }
+    fun resetLayout() = updateLayout { jr.brian.commandpannel.system.OverlayLayout.DEFAULT }
 
     fun setRgbAccentSync(enable: Boolean) {
         prefs.edit().putBoolean("rgb_accent_sync", enable).apply()

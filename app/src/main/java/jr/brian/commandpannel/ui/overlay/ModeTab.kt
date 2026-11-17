@@ -25,11 +25,30 @@ fun ModeTab(
     onRequestMode: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val layout = state.layout
+    // Arrange mode: the slider row can be placed above the mode panel (rows keep their own weights), and the
+    // brightness/volume halves can be swapped.
+    val modePanel: @Composable (Modifier) -> Unit = { m -> ScreenModePanel(state, onRequestMode, m) }
+    val sliderRow: @Composable (Modifier) -> Unit = { m ->
+        Row(m, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            for (card in layout.modeHalfOrder) {
+                when (card) {
+                    jr.brian.commandpannel.system.OverlayCardId.BRIGHTNESS ->
+                        BrightnessCard(state, actions, Modifier.weight(1f).fillMaxHeight())
+                    jr.brian.commandpannel.system.OverlayCardId.VOLUME ->
+                        VolumeCard(state, actions, Modifier.weight(1f).fillMaxHeight())
+                    else -> Unit
+                }
+            }
+        }
+    }
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ScreenModePanel(state, onRequestMode, Modifier.fillMaxWidth().weight(0.46f))
-        Row(Modifier.fillMaxWidth().weight(0.54f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BrightnessCard(state, actions, Modifier.weight(1f).fillMaxHeight())
-            VolumeCard(state, actions, Modifier.weight(1f).fillMaxHeight())
+        if (layout.modeRowsSwapped) {
+            sliderRow(Modifier.fillMaxWidth().weight(0.54f))
+            modePanel(Modifier.fillMaxWidth().weight(0.46f))
+        } else {
+            modePanel(Modifier.fillMaxWidth().weight(0.46f))
+            sliderRow(Modifier.fillMaxWidth().weight(0.54f))
         }
     }
 }

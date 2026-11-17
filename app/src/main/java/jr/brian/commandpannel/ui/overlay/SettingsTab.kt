@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,12 +48,31 @@ fun SettingsTab(
     onTile: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth().weight(0.70f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FrameRatePanel(state, actions, Modifier.weight(0.40f).fillMaxHeight())
-            QuickTilesPanel(state, onTile, Modifier.weight(0.60f).fillMaxHeight())
+    val layout = state.layout
+    // Arrange mode: top row and hardware row can swap vertically (rows keep their weights), the two columns can
+    // swap horizontally (columns keep their weights), and the temp/fan quarters can swap.
+    val frameRate: @Composable (Modifier) -> Unit = { m -> FrameRatePanel(state, actions, m) }
+    val quickTiles: @Composable (Modifier) -> Unit = { m -> QuickTilesPanel(state, onTile, m) }
+    val topRow: @Composable (Modifier) -> Unit = { m ->
+        Row(m, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (layout.settingsColsSwapped) {
+                quickTiles(Modifier.weight(0.60f).fillMaxHeight())
+                frameRate(Modifier.weight(0.40f).fillMaxHeight())
+            } else {
+                frameRate(Modifier.weight(0.40f).fillMaxHeight())
+                quickTiles(Modifier.weight(0.60f).fillMaxHeight())
+            }
         }
-        HardwareRow(state, Modifier.fillMaxWidth().weight(0.30f))
+    }
+    val hardwareRow: @Composable (Modifier) -> Unit = { m -> HardwareRow(state, layout, m) }
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (layout.settingsRowsSwapped) {
+            hardwareRow(Modifier.fillMaxWidth().weight(0.30f))
+            topRow(Modifier.fillMaxWidth().weight(0.70f))
+        } else {
+            topRow(Modifier.fillMaxWidth().weight(0.70f))
+            hardwareRow(Modifier.fillMaxWidth().weight(0.30f))
+        }
     }
 }
 
@@ -152,23 +172,39 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
 }
 
 @Composable
-private fun HardwareRow(state: OverlayUiState, modifier: Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+private fun HardwareRow(state: OverlayUiState, layout: jr.brian.commandpannel.system.OverlayLayout, modifier: Modifier) {
+    val tempCard: @Composable RowScope.() -> Unit = {
         InfoCard(
-            Modifier.weight(0.2f).fillMaxHeight(),
+            Modifier.weight(1f).fillMaxHeight(),
             icon = "ic_temp",
             iconTint = TempColors.forCelsius(state.tempC),
             title = "TEMP",
             value = "${state.tempC}℃",
         )
+    }
+    val fanCard: @Composable RowScope.() -> Unit = {
         InfoCard(
-            Modifier.weight(0.2f).fillMaxHeight(),
+            Modifier.weight(1f).fillMaxHeight(),
             icon = "ic_fan_normal",
             iconTint = null,
             title = "FAN",
             value = "${state.fanPercent}%",
         )
-        TccCard(Modifier.weight(0.6f).fillMaxHeight()) {
+    }
+    // The temp+fan quarters share the narrow (0.4) column; rings fill the wide (0.6) column.
+    val quarters: @Composable (Modifier) -> Unit = { m ->
+        Row(m, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            for (card in layout.settingsQuarterOrder) {
+                when (card) {
+                    jr.brian.commandpannel.system.OverlayCardId.TEMP -> tempCard()
+                    jr.brian.commandpannel.system.OverlayCardId.FAN -> fanCard()
+                    else -> Unit
+                }
+            }
+        }
+    }
+    val rings: @Composable (Modifier) -> Unit = { m ->
+        TccCard(m) {
             Row(
                 Modifier.fillMaxSize().padding(horizontal = 15.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -179,6 +215,15 @@ private fun HardwareRow(state: OverlayUiState, modifier: Modifier) {
                 RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
                 RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
             }
+        }
+    }
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        if (layout.settingsColsSwapped) {
+            rings(Modifier.weight(0.6f).fillMaxHeight())
+            quarters(Modifier.weight(0.4f).fillMaxHeight())
+        } else {
+            quarters(Modifier.weight(0.4f).fillMaxHeight())
+            rings(Modifier.weight(0.6f).fillMaxHeight())
         }
     }
 }
