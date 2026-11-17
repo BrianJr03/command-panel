@@ -212,7 +212,9 @@ val StickerBookLookSpec: TccLookSpec = StockLookSpec.copy(
     panelCardShape = RoundedCornerShape(aynDp(14f)),
     tile = StockLookSpec.tile.copy(buttonShape = RoundedCornerShape(aynDp(12f))),
     slider = StockLookSpec.slider.copy(trackShape = PillShape),
-    settingsTab = StockLookSpec.settingsTab.copy(fpsBadgeShape = PillShape),
+    // The rounded-bold font is tall, so give the gauge column more room and trim the readout so CPU/GPU/PWR/RAM
+    // labels don't clip at the top.
+    settingsTab = StockLookSpec.settingsTab.copy(fpsBadgeShape = PillShape, ringDiameterRatio = 0.94f, ringValueScale = 0.26f, ringTitleScale = 0.12f, ringUnitScale = 0.12f),
     dialog = DialogLookSpec(dialogShape = RoundedCornerShape(aynDp(16f))),
     traits = LookTraits(
         card = CardStyle.STICKER_NOTE, tile = TileStyle.STICKER, gauge = GaugeStyle.STICKER_DONUT,
