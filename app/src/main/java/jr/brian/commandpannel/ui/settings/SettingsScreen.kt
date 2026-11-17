@@ -152,9 +152,7 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     }
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav) { nav = it }
-        val focusMarginPx = with(LocalDensity.current) { FOCUS_SCROLL_MARGIN.toPx() }
-        val bringIntoViewSpec = remember(focusMarginPx) { PaddedBringIntoViewSpec(focusMarginPx) }
-        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        PaddedBringIntoView {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
@@ -177,29 +175,6 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
         }
-        }
-    }
-}
-
-/** Gap kept between a focused card (border and focus scale included) and the top/bottom edge of the scrolling pane. */
-private val FOCUS_SCROLL_MARGIN = 28.dp
-
-/**
- * [BringIntoViewSpec] that reserves [insetPx] at both edges of the viewport. The default spec counts anything inside
- * `[0, containerSize]` as visible and ignores content padding, so D-pad focus scrolling left the focused card's border
- * flush against the top/bottom of the screen.
- */
-@OptIn(ExperimentalFoundationApi::class)
-private class PaddedBringIntoViewSpec(private val insetPx: Float) : BringIntoViewSpec {
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val leadingEdge = offset - insetPx
-        val trailingEdge = offset + size - (containerSize - insetPx)
-        return when {
-            leadingEdge >= 0 && trailingEdge <= 0 -> 0f
-            // Taller than the padded window: leave it where it is rather than jitter between edges.
-            leadingEdge < 0 && trailingEdge > 0 -> 0f
-            abs(leadingEdge) < abs(trailingEdge) -> leadingEdge
-            else -> trailingEdge
         }
     }
 }

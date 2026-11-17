@@ -92,6 +92,7 @@ internal fun ThemeStudioScreen(
     }
     val savedMsg = stringResource(R.string.theme_saved)
     val appliedMsg = stringResource(R.string.theme_applied)
+    PaddedBringIntoView {
     Column(Modifier.fillMaxSize().then(backdrop).systemBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
         // ---- top bar: back, name, save actions ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -152,6 +153,7 @@ internal fun ThemeStudioScreen(
                 }
             }
         }
+    }
     }
 }
 
@@ -328,11 +330,15 @@ internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 /** A single-line, horizontally scrolling row of chips (D-pad left/right walks it and scrolls the focused chip in). */
 @Composable
 internal fun ChipRow(content: @Composable () -> Unit) {
+    // Content padding leaves room for the focused chip's scale and ring at both ends; the padded bring-into-view spec
+    // (inherited from the studio / settings pane) keeps D-pad scrolling from parking an end chip flush at the edge.
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp, horizontal = 2.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp, horizontal = CHIP_ROW_INSET),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) { content() }
 }
+
+private val CHIP_ROW_INSET = 10.dp
 
 @Composable
 private fun lookLabelText(@StringRes res: Int): String = jr.brian.commandpannel.ui.theme.lookLabel(stringResource(res))

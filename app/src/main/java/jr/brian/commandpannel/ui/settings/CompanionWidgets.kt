@@ -325,3 +325,38 @@ internal fun Chip(text: String, selected: Boolean = false, enabled: Boolean = tr
         contentAlignment = Alignment.Center,
     ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = tccTextStyle()) }
 }
+
+/** Gap kept between a focused card (border and focus scale included) and the top/bottom edge of the scrolling pane. */
+internal val FOCUS_SCROLL_MARGIN = 28.dp
+
+/**
+ * [BringIntoViewSpec] that reserves [insetPx] at both edges of the viewport. The default spec counts anything inside
+ * `[0, containerSize]` as visible and ignores content padding, so D-pad focus scrolling left the focused card's border
+ * flush against the top/bottom of the screen.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+internal class PaddedBringIntoViewSpec(private val insetPx: Float) : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val leadingEdge = offset - insetPx
+        val trailingEdge = offset + size - (containerSize - insetPx)
+        return when {
+            leadingEdge >= 0 && trailingEdge <= 0 -> 0f
+            // Taller than the padded window: leave it where it is rather than jitter between edges.
+            leadingEdge < 0 && trailingEdge > 0 -> 0f
+            abs(leadingEdge) < abs(trailingEdge) -> leadingEdge
+            else -> trailingEdge
+        }
+    }
+}
+
+/**
+ * Provides a [PaddedBringIntoViewSpec] to every scrollable inside [content] (vertical panes and horizontal chip rows),
+ * so D-pad focus never parks the first/last item flush against the edge where its focus ring and scale get clipped.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun PaddedBringIntoView(margin: Dp = FOCUS_SCROLL_MARGIN, content: @Composable () -> Unit) {
+    val marginPx = with(LocalDensity.current) { margin.toPx() }
+    val spec = remember(marginPx) { PaddedBringIntoViewSpec(marginPx) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
+}
