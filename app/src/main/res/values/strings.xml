@@ -123,6 +123,18 @@
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>
     <string name="settings_replace_stock_desc">Suppress the built-in dual-screen assistant so Command Panel handles the AYN button. Turning this off restores the stock assistant.</string>
+    <string name="settings_replace_stock_paused">Paused: %1$s is in control. Command Panel takes over when it\'s turned off.</string>
+    <string name="bdsa_name">Better Dual Screen Assistant</string>
+    <!-- Buttons use the common short name; the banner title and text spell out the full name. -->
+    <string name="bdsa_active_title">%1$s is in control</string>
+    <string name="bdsa_active_desc">Command Panel is standing by so the two don\'t fight over the AYN button and screens. To use Command Panel, turn off Replace stock assistant in %1$s, or disable it here. Command Panel takes over automatically.</string>
+    <string name="bdsa_open">Open BDSA</string>
+    <string name="bdsa_disable">Disable BDSA</string>
+    <string name="bdsa_disable_confirm">Press again to disable BDSA</string>
+    <string name="bdsa_check_again">Check again</string>
+    <string name="bdsa_inactive_desc">%1$s is installed but not active, so Command Panel is in control.</string>
+    <string name="bdsa_disabled_by_us_desc">%1$s is disabled (Command Panel turned it off), so Command Panel is in control.</string>
+    <string name="bdsa_reenable">Re-enable BDSA</string>
     <string name="settings_battery_estimate">Battery Estimate</string>
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>
@@ -442,6 +454,10 @@
         <item quantity="other">Synced %2$s (%1$d looks).</item>
     </plurals>
     <string name="msg_source_failed">Couldn\'t sync %1$s: %2$s</string>
+    <string name="msg_bdsa_disabled">Disabled. It restores the stock assistant on its way out, and Command Panel takes over.</string>
+    <string name="msg_bdsa_disable_failed">Couldn\'t disable it (needs the root shell).</string>
+    <string name="msg_bdsa_enabled">Re-enabled. Command Panel stands by while it\'s in control.</string>
+    <string name="msg_bdsa_enable_failed">Couldn\'t re-enable it (needs the root shell).</string>
     <string name="msg_font_unreadable">Couldn\'t open the font file</string>
     <string name="msg_font_too_large">Font is larger than 5 MB</string>
     <string name="msg_font_invalid">Not a valid TTF or OTF font</string>

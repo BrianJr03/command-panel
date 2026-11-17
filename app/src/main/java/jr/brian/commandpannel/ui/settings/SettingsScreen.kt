@@ -135,6 +135,11 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
+    // Re-detect Better Dual Screen Assistant whenever the companion comes to the front (e.g. back from BDSA's app).
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        vm.refreshBdsa()
+        onPauseOrDispose { }
+    }
     // Theme Studio replaces the whole two-pane screen while it's open.
     var studio by remember { mutableStateOf<jr.brian.commandpannel.ui.theme.CustomLook?>(null) }
     studio?.let { look ->
@@ -166,6 +171,8 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
             )
             Text(stringResource(nav.subtitleRes), color = p.textSecondary, fontSize = 14.sp)
             Spacer(Modifier.height(6.dp))
+            // Can't be missed: while BDSA controls the hardware, every section opens with the standby banner.
+            if (state.bdsa.active) BdsaStandbyBanner(state, vm)
             when (nav.category) {
                 SettingsCategory.GENERAL -> General(state, vm)
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
@@ -254,9 +261,11 @@ private fun AppIconBadge(shape: Shape) {
 
 @Composable
 private fun General(state: SettingsState, vm: SettingsViewModel) {
+    BdsaInactiveNote(state, vm)
     SwitchCard(
         stringResource(R.string.settings_replace_stock),
-        stringResource(R.string.settings_replace_stock_desc),
+        if (state.bdsa.active) stringResource(R.string.settings_replace_stock_paused, stringResource(R.string.bdsa_name))
+        else stringResource(R.string.settings_replace_stock_desc),
         state.replaceStock, vm::setReplaceStock,
     )
     SwitchCard(

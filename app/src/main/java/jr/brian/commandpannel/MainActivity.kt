@@ -42,7 +42,10 @@ class MainActivity : ComponentActivity() {
         AssistantService.start(this)
         // Opening the companion also brings up the overlay on the bottom screen to preview changes.
         runCatching {
-            startService(Intent(this, AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY))
+            startService(
+                Intent(this, AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY)
+                    .putExtra(AssistantService.EXTRA_AUTO, true),
+            )
         }
         setContent {
             val vm: SettingsViewModel = hiltViewModel()

@@ -16,6 +16,8 @@ import jr.brian.commandpannel.system.QuickLaunchApp
 import jr.brian.commandpannel.system.QuickLaunchDisplay
 import jr.brian.commandpannel.system.SystemSettings
 import jr.brian.commandpannel.system.CustomLookStore
+import jr.brian.commandpannel.system.BdsaDetector
+import jr.brian.commandpannel.system.BdsaStatus
 import jr.brian.commandpannel.system.FontNeeds
 import jr.brian.commandpannel.system.PackInstaller
 import jr.brian.commandpannel.system.ThemeFolder
@@ -86,6 +88,12 @@ data class SettingsState(
     val themeBusy: Boolean = false,
     /** Result of the last repo follow / sync, shown in the Theme repos card. */
     val repoMessage: String? = null,
+    /** Better Dual Screen Assistant presence; while it's active, Command Panel stands by. */
+    val bdsa: BdsaStatus = BdsaStatus.None,
+    /** The BDSA package Command Panel disabled (offers "Re-enable"), or null. */
+    val bdsaDisabledByUs: String? = null,
+    /** Result of the last BDSA action. */
+    val bdsaMessage: String? = null,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -496,6 +504,82 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    // ---- Better Dual Screen Assistant coexistence ----
+
+    private val bdsa = BdsaDetector(app, privileged)
+
+    // BDSA installed / removed / enabled / disabled while the companion is open (also by Command Panel's own buttons).
+    private val bdsaPackageReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) {
+            if (i.data?.schemeSpecificPart in BdsaDetector.PACKAGES) refreshBdsa(keepMessage = true)
+        }
+    }
+
+    init {
+        app.registerReceiver(bdsaPackageReceiver, android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        })
+    }
+
+    override fun onCleared() {
+        runCatching { app.unregisterReceiver(bdsaPackageReceiver) }
+        super.onCleared()
+    }
+
+    /**
+     * Re-detects BDSA (companion resume, "Check again") and tells the service to re-check too. [keepMessage] keeps the
+     * result of the action that triggered it; otherwise a message about the previous state is dropped once it changes.
+     */
+    fun refreshBdsa(keepMessage: Boolean = false) {
+        viewModelScope.launch {
+            val status = withContext(Dispatchers.IO) { bdsa.detect(force = true) }
+            // A BDSA we disabled that's been re-enabled or removed some other way no longer needs the offer.
+            val ours = prefs.getString(KEY_BDSA_DISABLED, null)?.takeIf { status.packageName == it && !status.active }
+            if (ours == null) prefs.edit().remove(KEY_BDSA_DISABLED).apply()
+            // A message about the previous state ("Re-enabled…") is stale once the state changes.
+            val message = _state.value.bdsaMessage.takeIf { keepMessage || _state.value.bdsa.presence == status.presence }
+            _state.value = _state.value.copy(bdsa = status, bdsaDisabledByUs = ours, bdsaMessage = message)
+            recheckService()
+        }
+    }
+
+    fun openBdsa() {
+        val pkg = _state.value.bdsa.packageName ?: return
+        app.packageManager.getLaunchIntentForPackage(pkg)?.let {
+            runCatching { app.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
+    }
+
+    /** Disables BDSA via root; its helper restores the stock assistant and screens, then Command Panel takes over. */
+    fun disableBdsa() {
+        val pkg = _state.value.bdsa.packageName ?: return
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { bdsa.disable(pkg) }
+            if (ok) prefs.edit().putString(KEY_BDSA_DISABLED, pkg).apply()
+            _state.value = _state.value.copy(bdsaMessage = app.getString(if (ok) R.string.msg_bdsa_disabled else R.string.msg_bdsa_disable_failed))
+            refreshBdsa(keepMessage = true)
+        }
+    }
+
+    fun reenableBdsa() {
+        val pkg = _state.value.bdsaDisabledByUs ?: return
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { bdsa.enable(pkg) }
+            if (ok) prefs.edit().remove(KEY_BDSA_DISABLED).apply()
+            _state.value = _state.value.copy(bdsaMessage = app.getString(if (ok) R.string.msg_bdsa_enabled else R.string.msg_bdsa_enable_failed))
+            refreshBdsa(keepMessage = true)
+        }
+    }
+
+    private fun recheckService() {
+        runCatching {
+            app.startService(Intent(app, AssistantService::class.java).setAction(AssistantService.ACTION_RECHECK_COEXISTENCE))
+        }
+    }
+
     fun setReplaceStock(enable: Boolean) {
         AssistantService.start(getApplication())
         getApplication<Application>().startService(
@@ -533,5 +617,10 @@ class SettingsViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    private companion object {
+        /** The BDSA package Command Panel disabled, so the companion can offer to re-enable it. Not backed up. */
+        const val KEY_BDSA_DISABLED = "bdsa_disabled_by_command_panel"
     }
 }

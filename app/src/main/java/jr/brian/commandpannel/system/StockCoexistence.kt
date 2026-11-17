@@ -42,14 +42,28 @@ class StockCoexistence(
 
     private var refreezeJob: Job? = null
 
-    /** Apply the stored preference at startup. */
+    /**
+     * True while another stock replacement (Better Dual Screen Assistant) controls the stock process. On standby this
+     * never suppresses, restores, freezes or unfreezes it: the other app owns that state, and touching it would undo
+     * the other app's work (and the other app would just redo it).
+     */
+    @Volatile
+    var standby: Boolean = false
+        set(value) {
+            field = value
+            if (value) refreezeJob?.cancel()
+        }
+
+    /** Apply the stored preference at startup (and when leaving standby). */
     fun applyInitial() {
-        if (_enabled.value) scope.launch(Dispatchers.IO) { suppressor.suppress() }
+        if (_enabled.value && !standby) scope.launch(Dispatchers.IO) { suppressor.suppress() }
     }
 
     fun setEnabled(enable: Boolean) {
         prefs.edit().putBoolean(KEY, enable).apply()
         _enabled.value = enable
+        // On standby the choice is kept and applied once the other replacement stands down.
+        if (standby) return
         scope.launch(Dispatchers.IO) {
             val ok = if (enable) suppressor.suppress() else suppressor.restore()
             Log.i(TAG, "setEnabled($enable) -> ${if (enable) "suppressed" else "restored"}=$ok")
@@ -58,14 +72,14 @@ class StockCoexistence(
 
     /** Restore stock when the app is stopping, so the AYN button is never left dead. */
     fun onStop() {
-        if (_enabled.value) {
+        if (_enabled.value && !standby) {
             // Best-effort synchronous restore on teardown.
             runCatching { suppressor.restore() }
         }
     }
 
     fun onScreenOff() {
-        if (!_enabled.value) return
+        if (!_enabled.value || standby) return
         refreezeJob?.cancel()
         refreezeJob = scope.launch(Dispatchers.IO) {
             suppressor.continueProcess()

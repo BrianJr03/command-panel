@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import jr.brian.commandpannel.overlay.ExternalDisplayTapWaker
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.system.BdsaDetector
 import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.system.StockCoexistence
@@ -55,12 +56,27 @@ class AssistantService : Service() {
     private lateinit var coexistence: StockCoexistence
     private lateinit var tapWaker: ExternalDisplayTapWaker
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
+    private lateinit var bdsa: BdsaDetector
+
+    /**
+     * True while Better Dual Screen Assistant claims the hardware. Command Panel then stands by: it ignores the AYN
+     * button, leaves the stock process alone, and stops driving screen modes, so the two never fight. Its own UI (the
+     * companion and an explicitly requested overlay preview) keeps working.
+     */
+    @Volatile private var standby = false
+    /** Whether the hardware-facing parts (screen modes, tap waker) are running; flips with [standby]. */
+    private var hardwareRunning = false
+    /** Set once the startup standby decision is made; re-checks before that are ignored. */
+    private var standbyDecided = false
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> coexistence.onScreenOff()
-                Intent.ACTION_SCREEN_ON -> coexistence.onScreenOn()
+                Intent.ACTION_SCREEN_ON -> {
+                    coexistence.onScreenOn()
+                    recheckStandby(force = false)
+                }
             }
         }
     }
@@ -71,13 +87,16 @@ class AssistantService : Service() {
                 ACTION_TCC_BUTTON -> {
                     val down = intent.getBooleanExtra(EXTRA_KEY_DOWN, true)
                     val long = intent.getBooleanExtra(EXTRA_KEY_LONG, true)
-                    Log.d(TAG, "AYN button down=$down long=$long")
-                    machine.onEvent(down, long)
+                    Log.d(TAG, "AYN button down=$down long=$long standby=$standby")
+                    // On standby the other replacement answers the button; a cheap (cached) re-check picks up its
+                    // being turned off.
+                    if (standby) recheckStandby(force = false) else machine.onEvent(down, long)
                 }
-                ACTION_SHOW_OVERLAY -> overlay.show()
+                ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
                 ACTION_HIDE_OVERLAY -> overlay.hide()
                 ACTION_TOGGLE_OVERLAY -> overlay.toggle()
                 ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+                ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
@@ -100,6 +119,7 @@ class AssistantService : Service() {
         coexistence = StockCoexistence(applicationContext, privileged, scope)
         tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)
         replay = jr.brian.commandpannel.system.ReplayBufferController(applicationContext, privileged)
+        bdsa = BdsaDetector(applicationContext, privileged)
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()
             OverlayRoot(state = state, actions = repository)
@@ -119,22 +139,31 @@ class AssistantService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
         })
+        registerReceiver(packageReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        })
         scope.launch {
             privileged.initialize(applicationContext)
             repository.start(scope)
-            screenMode.start()
-            coexistence.applyInitial()
-            tapWaker.start()
+            // Decide standby before touching the stock process or screen modes, so Command Panel never acts, even
+            // briefly, while Better Dual Screen Assistant is in control (e.g. at boot).
+            applyStandby(withContext(Dispatchers.IO) { bdsa.detect(force = true) }.active)
             withContext(Dispatchers.IO) { replay.applyEnabledState() }
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_SHOW_OVERLAY -> overlay.show()
+            // The companion's automatic preview on launch is skipped on standby, so it doesn't cover the other app's
+            // overlay; an explicit show (preview button) still works.
+            ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
             ACTION_HIDE_OVERLAY -> overlay.hide()
             ACTION_TOGGLE_OVERLAY -> overlay.toggle()
             ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+            ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
         }
         return START_STICKY
     }
@@ -142,17 +171,57 @@ class AssistantService : Service() {
     override fun onDestroy() {
         runCatching { unregisterReceiver(aynReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
+        runCatching { unregisterReceiver(packageReceiver) }
         coexistence.onStop()
-        tapWaker.stop()
+        if (hardwareRunning) tapWaker.stop()
         runCatching { replay.disarm() }
         repository.stop()
-        screenMode.stop()
+        if (hardwareRunning) screenMode.stop()
         overlay.destroy()
         scope.cancel()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** Re-checks for Better Dual Screen Assistant ([force] skips the detector's short cache) and applies the result. */
+    private fun recheckStandby(force: Boolean) {
+        scope.launch {
+            val active = withContext(Dispatchers.IO) { bdsa.detect(force) }.active
+            if (standbyDecided && active != standby) applyStandby(active)
+        }
+    }
+
+    /**
+     * Enters or leaves standby. Entering stops screen-mode handling and the tap waker and hides the overlay, without
+     * restoring or unfreezing stock (the other app owns it). Leaving starts them again and re-applies "Replace stock
+     * assistant"; the other app already restored stock when it stood down, so there is nothing to hand over.
+     */
+    private fun applyStandby(active: Boolean) {
+        standbyDecided = true
+        standby = active
+        coexistence.standby = active
+        Log.i(TAG, "standby=$active")
+        if (active) {
+            overlay.hide()
+            if (hardwareRunning) {
+                screenMode.stop()
+                tapWaker.stop()
+                hardwareRunning = false
+            }
+        } else if (!hardwareRunning) {
+            screenMode.start()
+            tapWaker.start()
+            hardwareRunning = true
+            coexistence.applyInitial()
+        }
+    }
+
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            if (intent.data?.schemeSpecificPart in BdsaDetector.PACKAGES) recheckStandby(force = true)
+        }
+    }
 
     private fun registerAynReceiver() {
         val filter = IntentFilter().apply {
@@ -161,6 +230,7 @@ class AssistantService : Service() {
             addAction(ACTION_HIDE_OVERLAY)
             addAction(ACTION_TOGGLE_OVERLAY)
             addAction(ACTION_SET_REPLACE_STOCK)
+            addAction(ACTION_RECHECK_COEXISTENCE)
             addAction(ACTION_REPLAY_SET_ENABLED)
             addAction(ACTION_REPLAY_SAVE)
         }
@@ -209,6 +279,10 @@ class AssistantService : Service() {
         const val ACTION_REPLAY_SAVED = "jr.brian.commandpannel.action.REPLAY_SAVED"
         const val EXTRA_REPLAY_RESULT = "replay_result"
         const val EXTRA_ENABLE = "enable"
+        /** Re-run Better Dual Screen Assistant detection now (sent by the companion after it changes BDSA). */
+        const val ACTION_RECHECK_COEXISTENCE = "jr.brian.commandpannel.action.RECHECK_COEXISTENCE"
+        /** On [ACTION_SHOW_OVERLAY]: an automatic show (companion launch) that standby may skip. */
+        const val EXTRA_AUTO = "auto"
 
         fun start(context: Context) {
             val intent = Intent(context, AssistantService::class.java)

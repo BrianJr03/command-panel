@@ -28,6 +28,9 @@
     <!-- Load the stock assistant's drawables at runtime (StockResources) instead of bundling AYN's icon art. -->
     <queries>
         <package android:name="com.odin.dualscreen.assistant" />
+        <!-- Better Dual Screen Assistant: detected so Command Panel stands by instead of fighting over the button. -->
+        <package android:name="com.stormpanda.betterdualscreenassistant" />
+        <package android:name="com.stormpanda.betterdualscreenassistant.debug" />
     </queries>
 
     <application
