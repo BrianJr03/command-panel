@@ -1,23 +1,79 @@
 package jr.brian.commandpannel.privileged.helper
 
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.Parcel
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
+import jr.brian.commandpannel.privileged.StockSuppressor
 import kotlin.system.exitProcess
 
 /**
  * [IRootHelper] implementation running inside the root helper process. Display brightness uses the hidden
  * `DisplayManagerGlobal` / `IDisplayManager` methods, reached reflectively (exemptions are set in main()).
+ *
+ * When the app's client token dies the helper does not exit at once: it waits [HelperProtocol.GRACE_MS] for the app
+ * to come back and reattach (a crash restart). If the package is uninstalled, or the grace runs out, it restores the
+ * stock assistant when recovery is armed (so a frozen stock process never leaves the AYN button dead) and exits.
  */
-class RootHelperService : IRootHelper.Stub() {
+class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
     private val tag = "RootHelperService"
+    private val main = Handler(Looper.getMainLooper())
 
     @Volatile
     private var clientToken: IBinder? = null
+    @Volatile
+    private var stockRecoveryArmed = false
+    private var orphanedAtMs = 0L
+
     private val deathRecipient = IBinder.DeathRecipient {
-        Log.i(tag, "client died; helper exiting")
-        exitProcess(0)
+        Log.i(tag, "client died; waiting ${HelperProtocol.GRACE_MS} ms for it to come back")
+        main.post {
+            clientToken = null
+            orphanedAtMs = SystemClock.elapsedRealtime()
+            main.removeCallbacks(graceTick)
+            main.post(graceTick)
+        }
+    }
+
+    private val graceTick = object : Runnable {
+        override fun run() {
+            val step = ClientGrace.next(
+                reattached = clientToken != null,
+                packageInstalled = isPackageInstalled(),
+                elapsedMs = SystemClock.elapsedRealtime() - orphanedAtMs,
+                graceMs = HelperProtocol.GRACE_MS,
+                armed = stockRecoveryArmed,
+            )
+            when {
+                clientToken != null -> Unit
+                step == ClientGrace.Step.WAIT -> main.postDelayed(this, GRACE_TICK_MS)
+                else -> {
+                    if (step == ClientGrace.Step.RECOVER_AND_EXIT) recoverStock()
+                    Log.i(tag, "client gone; helper exiting")
+                    TaskFps.stop()
+                    DisplayMirror.stop()
+                    exitProcess(0)
+                }
+            }
+        }
+    }
+
+    private fun isPackageInstalled(): Boolean {
+        val (exit, out, _) = RootHelperMain.runShell("pm path $appPackage", 5_000)
+        // A timeout (-1) is not proof of an uninstall; only a clean "not found" is.
+        return exit == -1 || out.contains("package:")
+    }
+
+    private fun recoverStock() {
+        Log.i(tag, "restoring the stock assistant")
+        val restored = runCatching {
+            StockSuppressor { RootHelperMain.runShell(it, 5_000).second }.restore()
+        }.getOrElse { Log.w(tag, "stock restore failed", it); false }
+        Log.i(tag, "stock restored=$restored")
     }
 
     override fun protocolVersion(): Int = HelperProtocol.VERSION
@@ -28,6 +84,7 @@ class RootHelperService : IRootHelper.Stub() {
         putString("context", runCatching {
             java.io.File("/proc/self/attr/current").readText().trim().trim('\u0000')
         }.getOrDefault(""))
+        putString("apk", System.getProperty("java.class.path").orEmpty())
     }
 
     override fun exec(command: String, timeoutMs: Int): Bundle {
@@ -45,8 +102,13 @@ class RootHelperService : IRootHelper.Stub() {
         DisplayBrightness.set(displayId, brightness, temporary)
 
     override fun attachClient(token: IBinder) {
-        clientToken = token
-        runCatching { token.linkToDeath(deathRecipient, 0) }
+        val linked = runCatching { token.linkToDeath(deathRecipient, 0) }.isSuccess
+        if (!linked) return
+        main.post {
+            clientToken?.takeIf { it !== token }?.let { old -> runCatching { old.unlinkToDeath(deathRecipient, 0) } }
+            clientToken = token
+            main.removeCallbacks(graceTick)
+        }
     }
 
     override fun shutdown() {
@@ -71,4 +133,40 @@ class RootHelperService : IRootHelper.Stub() {
     override fun taskFps(displayId: Int): Bundle = TaskFps.sample(displayId)
 
     override fun stopTaskFps() = TaskFps.stop()
+
+    override fun setStockRecoveryArmed(armed: Boolean) {
+        stockRecoveryArmed = armed
+    }
+
+    override fun surfaceFlingerFrameCount(): Long {
+        val sf = surfaceFlinger ?: return -1L
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            // Exactly what `service call SurfaceFlinger 1013` sends: the binder's own descriptor, no arguments.
+            data.writeInterfaceToken(sf.interfaceDescriptor.orEmpty())
+            if (!sf.transact(SF_FRAME_COUNTER, data, reply, 0)) return -1L
+            reply.readInt().toLong() and 0xffffffffL
+        } catch (t: Throwable) {
+            Log.w(tag, "SurfaceFlinger $SF_FRAME_COUNTER failed", t)
+            -1L
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    @Volatile
+    private var sfBinder: IBinder? = null
+
+    private val surfaceFlinger: IBinder?
+        get() = sfBinder?.takeIf { it.isBinderAlive } ?: runCatching {
+            Class.forName("android.os.ServiceManager").getMethod("getService", String::class.java)
+                .invoke(null, "SurfaceFlinger") as? IBinder
+        }.getOrNull().also { sfBinder = it }
+
+    private companion object {
+        const val GRACE_TICK_MS = 1_000L
+        const val SF_FRAME_COUNTER = 1013
+    }
 }

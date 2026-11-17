@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
  */
 class StockCoexistence(
     context: Context,
-    privileged: PrivilegedAccess,
+    private val privileged: PrivilegedAccess,
     private val scope: CoroutineScope,
 ) {
     private companion object {
@@ -35,7 +35,7 @@ class StockCoexistence(
     }
 
     private val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-    private val suppressor = StockSuppressor(privileged)
+    private val suppressor = StockSuppressor(privileged::shell)
 
     private val _enabled = MutableStateFlow(prefs.getBoolean(KEY, false))
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
@@ -51,12 +51,16 @@ class StockCoexistence(
     var standby: Boolean = false
         set(value) {
             field = value
-            if (value) refreezeJob?.cancel()
+            if (value) {
+                refreezeJob?.cancel()
+                // The other app owns the stock process now; the helper must not "recover" it behind its back.
+                privileged.setStockRecoveryArmed(false)
+            }
         }
 
     /** Apply the stored preference at startup (and when leaving standby). */
     fun applyInitial() {
-        if (_enabled.value && !standby) scope.launch(Dispatchers.IO) { suppressor.suppress() }
+        if (_enabled.value && !standby) scope.launch(Dispatchers.IO) { suppressAndArm() }
     }
 
     fun setEnabled(enable: Boolean) {
@@ -65,7 +69,7 @@ class StockCoexistence(
         // On standby the choice is kept and applied once the other replacement stands down.
         if (standby) return
         scope.launch(Dispatchers.IO) {
-            val ok = if (enable) suppressor.suppress() else suppressor.restore()
+            val ok = if (enable) suppressAndArm() else restoreAndDisarm()
             Log.i(TAG, "setEnabled($enable) -> ${if (enable) "suppressed" else "restored"}=$ok")
         }
     }
@@ -74,8 +78,19 @@ class StockCoexistence(
     fun onStop() {
         if (_enabled.value && !standby) {
             // Best-effort synchronous restore on teardown.
-            runCatching { suppressor.restore() }
+            runCatching { restoreAndDisarm() }
         }
+    }
+
+    /** Arms the helper's stock recovery first, so there is no window where stock is frozen but not covered. */
+    private fun suppressAndArm(): Boolean {
+        privileged.setStockRecoveryArmed(true)
+        return suppressor.suppress()
+    }
+
+    private fun restoreAndDisarm(): Boolean {
+        privileged.setStockRecoveryArmed(false)
+        return suppressor.restore()
     }
 
     fun onScreenOff() {

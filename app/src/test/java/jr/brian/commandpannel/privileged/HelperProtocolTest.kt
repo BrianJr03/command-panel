@@ -28,4 +28,10 @@ class HelperProtocolTest {
     fun protocolVersionIsPositive() {
         assertTrue(HelperProtocol.VERSION >= 1)
     }
+
+    @Test
+    fun reconnectBackoffDoublesUpToTheCap() {
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L), (0..6).map(HelperProtocol::backoffMs))
+        assertEquals(30_000L, HelperProtocol.backoffMs(40)) // no shift overflow
+    }
 }

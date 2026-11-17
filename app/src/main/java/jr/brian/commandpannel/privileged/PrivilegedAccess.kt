@@ -91,4 +91,12 @@ class PrivilegedAccess @Inject constructor() {
     fun stopTaskFps() {
         RootHelper.binder?.let { runCatching { it.stopTaskFps() } }
     }
+
+    /**
+     * Arms or disarms the helper's stock recovery: when armed and this app goes away for good (uninstall,
+     * force-stop, a crash it doesn't come back from), the helper restores the stock assistant before exiting.
+     */
+    fun setStockRecoveryArmed(armed: Boolean) {
+        RootHelper.stockRecoveryArmed = armed
+    }
 }

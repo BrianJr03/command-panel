@@ -15,7 +15,8 @@ import java.util.concurrent.TimeUnit
  *
  * It runs as the uid `PServerBinder` gives it (root on this firmware), builds the [IRootHelper] stub, and publishes
  * it under a per-app name in `ServiceManager`, where the app picks it up with `getService`. It then waits on a
- * Looper; it exits when the app's client token dies or on `shutdown()`.
+ * Looper; it exits on `shutdown()`, or once the app's client token has died and no new client attached within the
+ * grace period (see [RootHelperService]).
  *
  * This file is plain `main(args)` with no Android context — only framework internals reached via reflection — so it
  * is safe to run outside an app process.
@@ -32,7 +33,7 @@ object RootHelperMain {
         Looper.prepareMainLooper()
         HiddenApi.exempt()
 
-        val binder = RootHelperService()
+        val binder = RootHelperService(appPackage)
         if (!publishBinder(appPackage, binder)) {
             Log.e(TAG, "failed to publish binder; exiting")
             return

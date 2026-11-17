@@ -10,7 +10,7 @@ import android.view.Surface;
 interface IRootHelper {
     int protocolVersion();
 
-    /** "uid", "pid" (ints) and "context" (SELinux label) of the helper process. */
+    /** "uid", "pid" (ints), "context" (SELinux label) and "apk" (the APK it runs from, v5) of the helper process. */
     Bundle identity();
 
     /** Runs a shell command as root. Result keys: "exit" (int, -1 on timeout), "out", "err". */
@@ -22,7 +22,10 @@ interface IRootHelper {
     /** temporary = true while a slider is being dragged; false commits the value. */
     void setDisplayBrightness(int displayId, float brightness, boolean temporary);
 
-    /** Ties the helper's lifetime to the app: the helper exits as soon as this token's process dies. */
+    /**
+     * Ties the helper's lifetime to the app. When this token's process dies the helper waits HelperProtocol.GRACE_MS
+     * for a new client, then (or at once if the app was uninstalled) restores stock if armed and exits (v5).
+     */
     void attachClient(IBinder token);
 
     oneway void shutdown();
@@ -47,4 +50,10 @@ interface IRootHelper {
 
     /** Unregisters the task FPS callback started by taskFps (v4). */
     void stopTaskFps();
+
+    /** Whether the helper restores the stock assistant once the app is gone for good (v5). */
+    void setStockRecoveryArmed(boolean armed);
+
+    /** SurfaceFlinger's global composite counter (txn 1013) over binder, no shell (v5). -1 on failure. */
+    long surfaceFlingerFrameCount();
 }
