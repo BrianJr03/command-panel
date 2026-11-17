@@ -124,11 +124,18 @@ internal fun focusState(): MutableState<Boolean> = remember { mutableStateOf(fal
 internal fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: () -> Unit): Modifier = composed {
     // Reports this control's on-screen bounds to [LocalFocusedBounds] when it gains focus (pane D-pad handling).
     val tracker = LocalFocusedBounds.current
+    val inPane = LocalInContentPane.current
     val bounds = remember { arrayOfNulls<androidx.compose.ui.geometry.Rect>(1) }
+    val requester = remember { FocusRequester() }
     onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+        .focusRequester(requester)
         .onFocusChanged {
             focused.value = it.isFocused
-            if (it.isFocused) tracker?.rect = bounds[0]
+            if (it.isFocused) {
+                tracker?.rect = bounds[0]
+                // Remembered so D-pad Right from the rail can return here.
+                if (inPane) tracker?.lastInPane = requester
+            }
         }
         .onKeyEvent { e ->
             if (e.type == KeyEventType.KeyDown &&
@@ -141,7 +148,18 @@ internal fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: (
 /** Bounds of the most recently focused companion control, so a pane can tell where a D-pad move landed. */
 internal class FocusedBounds {
     var rect: androidx.compose.ui.geometry.Rect? = null
+    /** The control that last had focus inside the content pane (cleared when the section changes). */
+    var lastInPane: FocusRequester? = null
+
+    /** Moves focus back to [lastInPane]; false when there's none or it has left the composition. */
+    fun returnToPane(): Boolean {
+        val r = lastInPane ?: return false
+        return runCatching { r.requestFocus() }.isSuccess
+    }
 }
+
+/** True for content inside the settings pane, so its controls (not the rail's) are remembered for D-pad Right. */
+internal val LocalInContentPane = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 internal val LocalFocusedBounds = androidx.compose.runtime.staticCompositionLocalOf<FocusedBounds?> { null }
 
@@ -515,11 +533,19 @@ internal fun Modifier.paneDpadNavigation(scroll: androidx.compose.foundation.Scr
         if (e.type == KeyEventType.KeyDown) {
             if (direction == androidx.compose.ui.focus.FocusDirection.Left) {
                 val before = tracker?.rect
+                val leaving = tracker?.lastInPane
+                val scrollBefore = scroll.value
                 val moved = focusManager.moveFocus(direction)
                 val after = tracker?.rect
                 val sameRow = moved && before != null && after != null && after != before &&
                     after.top < before.bottom && after.bottom > before.top
-                if (!sameRow) onLeaveLeft()
+                if (!sameRow) {
+                    // The probe move may have landed on (and scrolled to) a control on another row; undo both, so
+                    // Right from the rail returns to the control actually left and the pane doesn't jump.
+                    tracker?.lastInPane = leaving
+                    scope.launch { scroll.scrollTo(scrollBefore) }
+                    onLeaveLeft()
+                }
             } else if (!focusManager.moveFocus(direction)) {
                 scope.launch { scroll.animateScrollTo(if (direction == androidx.compose.ui.focus.FocusDirection.Up) 0 else scroll.maxValue) }
             }

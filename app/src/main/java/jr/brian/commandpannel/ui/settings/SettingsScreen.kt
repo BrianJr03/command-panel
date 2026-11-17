@@ -152,7 +152,12 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         return
     }
     val scroll = rememberScrollState()
-    LaunchedEffect(nav) { scroll.scrollTo(0) }
+    val focusedBounds = LocalFocusedBounds.current
+    LaunchedEffect(nav) {
+        scroll.scrollTo(0)
+        // A new section: the previously focused control is gone, so Right from the rail picks the nearest one.
+        focusedBounds?.lastInPane = null
+    }
     // Root bounds of the scrolling pane (not its content), for drag-to-reorder edge auto-scroll.
     val viewport = remember { mutableStateOf(Rect.Zero) }
     val backdrop = if (LocalCompanionThemed.current) {
@@ -163,6 +168,8 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav, railRequesters) { nav = it }
         PaddedBringIntoView {
+        // Marks the pane's controls, so the one you leave is remembered for D-pad Right from the rail.
+        CompositionLocalProvider(LocalInContentPane provides true) {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
@@ -192,11 +199,13 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
             }
         }
         }
+        }
     }
 }
 
 @Composable
 private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>, onSelect: (NavItem) -> Unit) {
+    val focusedBounds = LocalFocusedBounds.current
     LaunchedEffect(Unit) { runCatching { requesters.getValue(selected).requestFocus() } }
     val themed = LocalCompanionThemed.current
     val navShape = controlShape(13.dp)
@@ -207,6 +216,10 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
             // nearest rail item.
             .focusProperties { onEnter = { requesters.getValue(selected).requestFocus() } }
             .focusGroup()
+            // D-pad Right returns to the control you left in the content pane, not just the nearest one.
+            .onKeyEvent { e ->
+                e.key == Key.DirectionRight && e.type == KeyEventType.KeyDown && focusedBounds?.returnToPane() == true
+            }
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
