@@ -212,7 +212,8 @@ fun TccColors.withPinned(pinned: PinnedColors?): TccColors {
     val textBase = if (dark == isDark) this else if (dark) TccColors.PureBlack else TccColors.Light
     val background = bg ?: primaryBackground
     val panel = pinned.panel
-        ?: if (bg != null) lerp(background, textBase.primary, if (dark) 0.08f else 0.04f) else panelBackground
+        // Compose lerps in Oklab, where ~20% toward white lifts pure black to about the stock #161616 panel.
+        ?: if (bg != null) lerp(background, textBase.primary, if (dark) 0.20f else 0.05f) else panelBackground
     return textBase.copy(
         primaryBackground = background,
         panelBackground = panel,

@@ -77,7 +77,8 @@ internal fun ThemeStudioScreen(
 ) {
     var draft by remember(initial.id) { mutableStateOf(initial) }
     var message by remember { mutableStateOf<String?>(null) }
-    var previewTab by remember { mutableStateOf(OverlayTab.SETTINGS) }
+    var category by remember { mutableStateOf(StudioCategory.PARTS) }
+    var preview by remember { mutableStateOf(PreviewKind.SETTINGS) }
     var previewMode by remember { mutableStateOf(if (state.themeMode == 3) 3 else 4) }
     val saved = state.customLooks.any { it.id == draft.id }
     val firstFocus = remember { FocusRequester() }
@@ -113,15 +114,39 @@ internal fun ThemeStudioScreen(
                 Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                PartsControls(draft, firstFocus) { draft = it }
-                FontControls(draft, state, vm, onMessage = { message = it }) { draft = it }
+                // Category bar: each category swaps the controls below; the preview always shows the whole look.
+                ChipRow {
+                    StudioCategory.entries.forEachIndexed { i, c ->
+                        Box(if (i == 0) Modifier.focusRequester(firstFocus) else Modifier) {
+                            OptionChip(stringResource(c.titleRes), category == c) { category = c }
+                        }
+                    }
+                }
+                val base = draft.baseSpec()
+                val update: (CustomLook) -> Unit = { draft = it }
+                when (category) {
+                    StudioCategory.PARTS -> PartsControls(draft, update)
+                    StudioCategory.FONTS -> FontControls(draft, state, vm, onMessage = { message = it }, onChange = update)
+                    StudioCategory.SHAPES -> ShapeControls(draft, update)
+                    StudioCategory.COLORS -> ColorControls(draft, update)
+                    StudioCategory.TEXT -> TextControls(draft, base, update)
+                    StudioCategory.EFFECTS -> EffectControls(draft, base, update)
+                    StudioCategory.FIT -> FitControls(draft, base, update)
+                }
             }
             // ---- pinned live preview ----
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OverlayLookPreview(state, draft.baseLook, draft, width = PREVIEW_WIDTH, tab = previewTab, themeMode = previewMode)
+                when (preview) {
+                    PreviewKind.CARDS -> CardsLookPreview(state, draft, width = PREVIEW_WIDTH, themeMode = previewMode)
+                    else -> OverlayLookPreview(
+                        state, draft.baseLook, draft, width = PREVIEW_WIDTH, themeMode = previewMode,
+                        tab = if (preview == PreviewKind.MODE) OverlayTab.MODE else OverlayTab.SETTINGS,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OptionChip(stringResource(R.string.theme_preview_settings), previewTab == OverlayTab.SETTINGS) { previewTab = OverlayTab.SETTINGS }
-                    OptionChip(stringResource(R.string.theme_preview_mode), previewTab == OverlayTab.MODE) { previewTab = OverlayTab.MODE }
+                    PreviewKind.entries.forEach { k ->
+                        OptionChip(stringResource(k.titleRes), preview == k) { preview = k }
+                    }
                     OptionChip(stringResource(R.string.theme_preview_dark), previewMode == 4) { previewMode = 4 }
                     OptionChip(stringResource(R.string.theme_preview_light), previewMode == 3) { previewMode = 3 }
                 }
@@ -131,6 +156,23 @@ internal fun ThemeStudioScreen(
 }
 
 private val PREVIEW_WIDTH = 360.dp
+
+private enum class StudioCategory(@StringRes val titleRes: Int) {
+    PARTS(R.string.theme_cat_parts),
+    FONTS(R.string.theme_cat_fonts),
+    SHAPES(R.string.theme_cat_shapes),
+    COLORS(R.string.theme_cat_colors),
+    TEXT(R.string.theme_cat_text),
+    EFFECTS(R.string.theme_cat_effects),
+    FIT(R.string.theme_cat_fit),
+}
+
+/** What the pinned preview shows: an overlay tab, or every card at each of its sizes. */
+private enum class PreviewKind(@StringRes val titleRes: Int) {
+    SETTINGS(R.string.theme_preview_settings),
+    MODE(R.string.theme_preview_mode),
+    CARDS(R.string.theme_preview_cards),
+}
 
 @Composable
 private fun NameField(name: String, modifier: Modifier, onChange: (String) -> Unit) {
@@ -171,19 +213,16 @@ private val PARTS: List<Part<*>> = listOf(
 )
 
 @Composable
-private fun PartsControls(draft: CustomLook, firstFocus: FocusRequester, onChange: (CustomLook) -> Unit) {
-    SectionHeader(stringResource(R.string.theme_start_from))
+private fun PartsControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
     Card {
+        ControlLabel(R.string.theme_start_from)
         CardDesc(stringResource(R.string.theme_start_from_desc))
         ChipRow {
-            TccUiLook.entries.forEachIndexed { i, look ->
-                Box(if (i == 0) Modifier.focusRequester(firstFocus) else Modifier) {
-                    OptionChip(stringResource(look.labelRes), draft.baseLook == look) { onChange(draft.copy(baseLook = look)) }
-                }
+            TccUiLook.entries.forEach { look ->
+                OptionChip(stringResource(look.labelRes), draft.baseLook == look) { onChange(draft.copy(baseLook = look)) }
             }
         }
     }
-    SectionHeader(stringResource(R.string.theme_parts))
     Card {
         CardDesc(stringResource(R.string.theme_parts_desc))
         val traits = draft.toSpec().traits
@@ -221,7 +260,6 @@ private fun FontControls(
                 .onFailure { e -> onMessage(context.getString((e as? FontImportException)?.messageRes ?: R.string.msg_font_invalid)) }
         }
     }
-    SectionHeader(stringResource(R.string.theme_fonts))
     Card {
         CardDesc(stringResource(R.string.theme_fonts_desc))
         FontRow(R.string.theme_font_labels, draft.labelFont, state) { onChange(draft.copy(labelFont = it)) }
@@ -267,7 +305,7 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
  * current choice stays readable while the D-pad moves across a row.
  */
 @Composable
-private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val f = focusState()
     val shape = controlShape(10.dp)
     val scale by focusScale(f.value, 1.08f, "optionScale")
@@ -289,7 +327,7 @@ private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 
 /** A single-line, horizontally scrolling row of chips (D-pad left/right walks it and scrolls the focused chip in). */
 @Composable
-private fun ChipRow(content: @Composable () -> Unit) {
+internal fun ChipRow(content: @Composable () -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp, horizontal = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

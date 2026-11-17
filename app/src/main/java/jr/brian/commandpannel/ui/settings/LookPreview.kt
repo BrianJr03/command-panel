@@ -16,7 +16,26 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import jr.brian.commandpannel.system.UserFontStore
+import jr.brian.commandpannel.ui.components.tccLookBackdrop
+import jr.brian.commandpannel.ui.overlay.FrameRatePanel
+import jr.brian.commandpannel.ui.overlay.OverlayActions
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
+import jr.brian.commandpannel.ui.overlay.RingsCard
+import jr.brian.commandpannel.ui.overlay.TempFanCard
+import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
+import jr.brian.commandpannel.ui.theme.TccTheme
+import jr.brian.commandpannel.ui.theme.resolvePalette
+import jr.brian.commandpannel.ui.theme.tccLookColors
+import jr.brian.commandpannel.ui.theme.toSpec
+import jr.brian.commandpannel.ui.theme.withPinned
 import jr.brian.commandpannel.ui.overlay.OverlayTab
 import jr.brian.commandpannel.ui.overlay.OverlayUiState
 import jr.brian.commandpannel.ui.theme.CustomLook
@@ -80,5 +99,38 @@ internal fun OverlayLookPreview(
                 layout = state.overlayLayout,
             ),
         )
+    }
+}
+
+/**
+ * The hardware cards in the alternate forms they take when moved to other grid slots, under [look]: the rings as a 2×2
+ * block and a full-width strip, TEMP/FAN as two columns, and a small FPS counter. (The overlay tab preview already
+ * shows the default forms.) Slots use the real grid sizes (half width ≈ 254 dp), so clipping here is real clipping.
+ */
+@Composable
+internal fun CardsLookPreview(state: SettingsState, look: CustomLook, width: Dp, themeMode: Int, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val colors = resolvePalette(themeMode, nightActive = themeMode != 3, state.accentOverride).withPinned(look.colors)
+    val spec = androidx.compose.runtime.remember(look) { look.toSpec(UserFontStore.resolver(context)) }
+    ScaledPreview(width, modifier = modifier) {
+        TccTheme(colors) {
+            CompositionLocalProvider(LocalTccLookSpec provides spec) {
+                val s = OverlayUiState(themeMode = themeMode)
+                Column(
+                    Modifier.fillMaxSize().tccLookBackdrop(spec, colors, tccLookColors()).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth().height(230.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RingsCard(s, Modifier.weight(1f).fillMaxHeight())
+                        TempFanCard(s, Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(Modifier.fillMaxWidth().height(100.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FrameRatePanel(s, OverlayActions.None, Modifier.weight(1f).fillMaxHeight())
+                        RingsCard(s, Modifier.weight(1f).fillMaxHeight())
+                    }
+                    RingsCard(s, Modifier.fillMaxWidth().weight(1f))
+                }
+            }
+        }
     }
 }

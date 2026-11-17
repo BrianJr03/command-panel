@@ -97,4 +97,11 @@ class CustomLookTest {
         val palette = TccColors.PureBlack.withPinned(PinnedColors(accent2 = Color(0xFFFF0066)))
         assertEquals(Color(0xFFFF0066), resolveLookColors(palette, TccUiLook.AUTO).accent2)
     }
+
+    @Test
+    fun `pinned black background keeps cards distinguishable`() {
+        val palette = TccColors.Light.withPinned(PinnedColors(background = Color.Black))
+        assertTrue(palette.isDark)
+        assertTrue(palette.panelBackground.contrastRatio(palette.primaryBackground) >= 1.15f)
+    }
 }
