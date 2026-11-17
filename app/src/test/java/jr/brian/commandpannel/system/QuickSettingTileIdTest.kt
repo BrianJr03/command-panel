@@ -27,22 +27,26 @@ class QuickSettingTileIdTest {
     }
 
     @Test
-    fun moveEnabledReordersWithinEnabledTiles() {
+    fun reorderEnabledAppliesDraggedOrder() {
         val enabled = "focus_lock,performance,fan"
-        // move "fan" up past "performance"
-        val order1 = QuickSettingTileId.moveEnabled(null, enabled, "fan", up = true)
-        assertEquals(listOf("focus_lock", "fan", "performance"), QuickSettingTileId.enabledKeys(enabled, order1))
-        // move it back down
-        val order2 = QuickSettingTileId.moveEnabled(order1, enabled, "fan", up = false)
-        assertEquals(listOf("focus_lock", "performance", "fan"), QuickSettingTileId.enabledKeys(enabled, order2))
+        val order = QuickSettingTileId.reorderEnabled(null, enabled, listOf("fan", "focus_lock", "performance"))
+        assertEquals(listOf("fan", "focus_lock", "performance"), QuickSettingTileId.enabledKeys(enabled, order))
     }
 
     @Test
-    fun moveEnabledSkipsDisabledTilesInOrder() {
-        // only focus_lock and fan enabled (performance disabled); moving fan up swaps it past focus_lock
+    fun reorderEnabledKeepsDisabledTilesInTheirSlots() {
+        // performance is disabled and sits between the two enabled tiles; it must not move.
         val enabled = "focus_lock,fan"
-        val order = QuickSettingTileId.moveEnabled(null, enabled, "fan", up = true)
-        assertEquals(listOf("fan", "focus_lock"), QuickSettingTileId.enabledKeys(enabled, order))
+        val order = QuickSettingTileId.reorderEnabled(null, enabled, listOf("fan", "focus_lock"))
+        assertEquals(listOf("fan", "performance", "focus_lock"), QuickSettingTileId.orderedKeys(order).take(3))
+    }
+
+    @Test
+    fun reorderEnabledIgnoresNonPermutations() {
+        val enabled = "focus_lock,fan"
+        val before = QuickSettingTileId.orderedKeys(null).joinToString(",")
+        assertEquals(before, QuickSettingTileId.reorderEnabled(null, enabled, listOf("fan")))
+        assertEquals(before, QuickSettingTileId.reorderEnabled(null, enabled, listOf("fan", "wifi")))
     }
 
     @Test

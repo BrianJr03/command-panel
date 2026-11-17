@@ -24,13 +24,13 @@ android {
             // Installs next to a release build.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            resValue("string", "app_name", "Command Panel Debug")
+            resValue("string", "app_name", "TCP Debug")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            resValue("string", "app_name", "Command Panel")
+            resValue("string", "app_name", "TCP")
         }
     }
 

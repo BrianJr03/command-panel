@@ -435,11 +435,6 @@ class SettingsRepository(
      * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED colour becomes the
      * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
      */
-    private fun readAccentOverride(): Int? {
-        if (!prefs.getBoolean("rgb_accent_sync", false)) return null
-        val snapshot = jr.brian.commandpannel.privileged.ThorRgbController.readSystemSnapshot(context)
-        val argb = snapshot.leftArgb
-        if (argb == 0) return null
-        return argb or 0xFF000000.toInt()
-    }
+    private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController
+        .accentOverride(context, prefs.getBoolean("rgb_accent_sync", false))
 }

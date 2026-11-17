@@ -13,6 +13,8 @@ class SettingsBackupTest {
             "replace_stock_assistant" to true,
             "qs_enabled_tiles" to "focus_lock,wifi",
             "quick_launch_display" to 4,
+            "overlay_look" to "AURORA_GLASS",
+            "companion_follow_look" to true,
             "ignored_key" to "should not survive",   // not in the allow-list
         )
         val json = SettingsBackup.encode(prefs, "1.0")
@@ -20,6 +22,8 @@ class SettingsBackupTest {
         assertEquals(true, decoded["replace_stock_assistant"])
         assertEquals("focus_lock,wifi", decoded["qs_enabled_tiles"])
         assertEquals(4, decoded["quick_launch_display"])
+        assertEquals("AURORA_GLASS", decoded["overlay_look"])
+        assertEquals(true, decoded["companion_follow_look"])
         assertTrue("ignored_key" !in decoded)
     }
 

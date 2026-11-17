@@ -46,6 +46,17 @@ object ThorRgbController {
         return Snapshot(colors.first, colors.second, pct)
     }
 
+    /**
+     * The ambient-LED colour as an opaque ARGB accent when the `rgb_accent_sync` pref is on, else `null`. Shared by
+     * the overlay and the companion so both theme from the same colour.
+     */
+    fun accentOverride(context: Context, syncEnabled: Boolean): Int? {
+        if (!syncEnabled) return null
+        val argb = readSystemSnapshot(context).leftArgb
+        if (argb == 0) return null
+        return argb or 0xFF000000.toInt()
+    }
+
     fun formatPickerColor(leftArgb: Int, rightArgb: Int): String =
         "${argbToHex(leftArgb)},${argbToHex(rightArgb)}"
 

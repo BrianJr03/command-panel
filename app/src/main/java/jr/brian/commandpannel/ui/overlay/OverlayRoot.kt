@@ -27,7 +27,7 @@ import jr.brian.commandpannel.ui.overlay.arrange.arrangeContentArea
 import jr.brian.commandpannel.ui.overlay.arrange.longPressToArrange
 import jr.brian.commandpannel.ui.overlay.arrange.rememberArrangeController
 import jr.brian.commandpannel.ui.theme.LocalTccColors
-import jr.brian.commandpannel.ui.theme.TccColors
+import jr.brian.commandpannel.ui.theme.resolvePalette
 import jr.brian.commandpannel.ui.theme.TccTheme
 
 /**
@@ -42,13 +42,8 @@ fun OverlayRoot(
 ) {
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
-    val basePalette = when (state.themeMode) {
-        3 -> TccColors.Light
-        1 -> if (nightActive) TccColors.PureBlack else TccColors.Light
-        else -> TccColors.PureBlack
-    }
     // When the LED→accent sync is on, the Thor's ambient-LED colour becomes the overlay accent.
-    val colors = state.accentOverride?.let { basePalette.copy(accent = androidx.compose.ui.graphics.Color(it)) } ?: basePalette
+    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride)
     TccTheme(colors) {
       androidx.compose.runtime.CompositionLocalProvider(
           jr.brian.commandpannel.ui.theme.LocalTccLookSpec provides jr.brian.commandpannel.ui.theme.specForLook(state.look),

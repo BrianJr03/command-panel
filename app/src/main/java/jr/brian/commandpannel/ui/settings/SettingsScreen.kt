@@ -2,10 +2,42 @@ package jr.brian.commandpannel.ui.settings
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import jr.brian.commandpannel.ui.components.noRippleClickable
+import jr.brian.commandpannel.ui.components.tccCard
+import jr.brian.commandpannel.ui.components.tccLookBackdrop
+import jr.brian.commandpannel.ui.theme.LocalTccColors
+import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
+import jr.brian.commandpannel.ui.theme.lookLabel
+import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
+import jr.brian.commandpannel.ui.theme.tccLookColors
+import jr.brian.commandpannel.ui.theme.tccTextStyle
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.zIndex
+import jr.brian.commandpannel.R
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +56,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Tune
@@ -38,6 +70,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +82,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -58,30 +92,17 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
  * Companion settings screen on the top display. A modern, fully gamepad-navigable two-pane console: an icon nav rail
  * on the left (D-pad up/down moves between sections and auto-switches them) and the selected category's cards on the
- * right (D-pad traverses the items, A activates). Focused items brighten and scale up. Uses its own [Palette],
- * decoupled from the overlay theme, so it always reads as a polished dark UI.
+ * right (D-pad traverses the items, A activates). Focused items brighten and scale up. By default it uses its own
+ * [CompanionPalette.Default] dark style; with "Companion follows overlay look" on, [CompanionTheme] swaps in the
+ * overlay's look, theme mode and accent, and the cards / backdrop / type below route through the look renderers.
  */
-
-private object Palette {
-    val Bg = Color(0xFF0D0E12)
-    val Rail = Color(0xFF0A0B0E)
-    val Surface = Color(0xFF16181F)
-    val SurfaceHigh = Color(0xFF20232C)
-    val Border = Color(0xFF262A34)
-    val Accent = Color(0xFF7C6FFF)
-    val AccentSoft = Color(0x1F7C6FFF)
-    val TextPrimary = Color(0xFFF1F2F6)
-    val TextSecondary = Color(0xFF9AA1B2)
-    val TextTertiary = Color(0xFF666D7E)
-    val Danger = Color(0xFFF26069)
-    val Success = Color(0xFF53D483)
-}
 
 private enum class NavItem(val category: SettingsCategory, val icon: ImageVector, val subtitle: String) {
     GENERAL(SettingsCategory.GENERAL, Icons.Rounded.Tune, "Core behaviour and companion features"),
@@ -105,24 +126,85 @@ private fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: ()
         }
         .focusable()
 
+// ---- theming hooks ----
+// With "Companion follows overlay look" off, CompanionTheme provides the stock spec and the default palette, so
+// every hook below resolves to the companion's original style.
+
+/** The active companion colours. */
+private val p: CompanionPalette
+    @Composable get() = LocalCompanionPalette.current
+
+/** Corner shape for rows, buttons and chips: the look's control shape when themed, else [default] radius. */
+@Composable
+private fun controlShape(default: Dp): Shape =
+    if (LocalCompanionThemed.current) LocalTccLookSpec.current.slider.controlShape else RoundedCornerShape(default)
+
+@Composable
+private fun cardShape(): Shape =
+    if (LocalCompanionThemed.current) LocalTccLookSpec.current.panelCardShape else RoundedCornerShape(18.dp)
+
+/** Scale-on-focus animation; snaps for looks that opt out of motion (E-Ink). */
+@Composable
+private fun focusScale(focused: Boolean, to: Float, label: String): State<Float> =
+    if (LocalTccLookSpec.current.traits.animate) animateFloatAsState(if (focused) to else 1f, label = label)
+    else animateFloatAsState(if (focused) to else 1f, snap(), label = label)
+
+@Composable
+private fun focusColor(target: Color, label: String): State<Color> =
+    if (LocalTccLookSpec.current.traits.animate) animateColorAsState(target, label = label)
+    else animateColorAsState(target, snap(), label = label)
+
+/**
+ * Card surface: the companion's bordered panel, or the active look's card renderer (glass, brutalist shadow, HUD
+ * chamfer, neon tube, …) when themed. The accent focus ring is kept on every look so gamepad focus stays obvious.
+ */
+@Composable
+private fun Modifier.companionCard(focused: Boolean = false, focusable: Boolean = false): Modifier {
+    val shape = cardShape()
+    if (!LocalCompanionThemed.current) {
+        val bg by focusColor(if (focused) p.surfaceHigh else p.surface, "cardBg")
+        return clip(shape).background(bg)
+            .border(if (focused) 2.dp else 1.dp, if (focused) p.accent else p.border, shape)
+    }
+    val card = tccCard(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors(), focused = focused && focusable)
+    return if (focused) card.border(2.dp, p.accent, shape) else card
+}
+
 @Composable
 fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
+    CompanionTheme(state) { SettingsContent(state, vm) }
+}
+
+@Composable
+private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
     val scroll = rememberScrollState()
     LaunchedEffect(nav) { scroll.scrollTo(0) }
-    Row(Modifier.fillMaxSize().background(Palette.Bg).systemBarsPadding()) {
+    // Root bounds of the scrolling pane (not its content), for drag-to-reorder edge auto-scroll.
+    val viewport = remember { mutableStateOf(Rect.Zero) }
+    val backdrop = if (LocalCompanionThemed.current) {
+        Modifier.tccLookBackdrop(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors())
+    } else {
+        Modifier.background(p.bg)
+    }
+    Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav) { nav = it }
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll)
+            modifier = Modifier.weight(1f).fillMaxHeight()
+                .onGloballyPositioned { viewport.value = it.boundsInRoot() }
+                .verticalScroll(scroll)
                 .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(nav.category.title, color = Palette.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text(nav.subtitle, color = Palette.TextSecondary, fontSize = 14.sp)
+            Text(
+                lookLabel(nav.category.title), color = p.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                style = tccDisplayTextStyle(),
+            )
+            Text(nav.subtitle, color = p.textSecondary, fontSize = 14.sp)
             Spacer(Modifier.height(6.dp))
             when (nav.category) {
                 SettingsCategory.GENERAL -> General(state, vm)
-                SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm)
+                SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
                 SettingsCategory.APPEARANCE -> Appearance(state, vm)
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
@@ -134,34 +216,35 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
 private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    val themed = LocalCompanionThemed.current
+    val navShape = controlShape(13.dp)
     Column(
-        modifier = Modifier.width(248.dp).fillMaxHeight().background(Palette.Rail).padding(16.dp),
+        // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
+        modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(Modifier.padding(start = 6.dp, top = 8.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Palette.Accent),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+            AppIconBadge(if (themed) LocalTccLookSpec.current.tile.buttonShape else RoundedCornerShape(11.dp))
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Command Panel", color = Palette.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("Settings", color = Palette.TextTertiary, fontSize = 11.sp)
+                Text("TCP", color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
+                Text(lookLabel("Thor Command Panel"), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
             }
         }
         NavItem.entries.forEach { item ->
             val on = item == selected
             val f = focusState()
-            val scale by animateFloatAsState(if (f.value) 1.04f else 1f, label = "navScale")
-            val bg by animateColorAsState(
-                when { f.value -> Palette.SurfaceHigh; on -> Palette.AccentSoft; else -> Color.Transparent },
-                label = "navBg",
+            val scale by focusScale(f.value, 1.04f, "navScale")
+            val bg by focusColor(
+                when { f.value -> p.surfaceHigh; on -> p.accentSoft; else -> Color.Transparent },
+                "navBg",
             )
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .clip(RoundedCornerShape(13.dp)).background(bg)
-                    .then(if (f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(13.dp)) else Modifier)
+                    .clip(navShape).background(bg)
+                    .then(if (f.value) Modifier.border(1.5.dp, p.accent, navShape) else Modifier)
                     .then(if (item == NavItem.GENERAL) Modifier.focusRequester(firstFocus) else Modifier)
                     .onFocusChanged { if (it.isFocused) onSelect(item) }
                     .focusControl(f) { onSelect(item) }
@@ -169,16 +252,30 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(item.icon, null, tint = if (on || f.value) Palette.Accent else Palette.TextSecondary, modifier = Modifier.size(20.dp))
+                Icon(item.icon, null, tint = if (on || f.value) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(13.dp))
                 Text(
-                    item.category.title,
-                    color = if (on || f.value) Palette.TextPrimary else Palette.TextSecondary,
+                    lookLabel(item.category.title),
+                    color = if (on || f.value) p.textPrimary else p.textSecondary,
                     fontSize = 15.sp,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    style = tccTextStyle(),
                 )
             }
         }
+    }
+}
+
+/**
+ * The launcher icon (its adaptive background + foreground layers) clipped to [shape]. The background is drawn at the
+ * adaptive 108/72 ratio so it fills the badge; the foreground is drawn smaller so its tiles get breathing room.
+ */
+@Composable
+private fun AppIconBadge(shape: Shape) {
+    Box(Modifier.size(38.dp).clip(shape), contentAlignment = Alignment.Center) {
+        val full = 38.dp * 108f / 72f
+        Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.requiredSize(full))
+        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.requiredSize(full * 0.72f))
     }
 }
 
@@ -188,8 +285,7 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Palette.Surface)
-            .border(1.dp, Palette.Border, RoundedCornerShape(18.dp)).padding(18.dp),
+        Modifier.fillMaxWidth().companionCard().padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) { content() }
 }
@@ -197,33 +293,32 @@ private fun Card(content: @Composable () -> Unit) {
 @Composable
 private fun SectionHeader(text: String) {
     Row(Modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(3.dp, 13.dp).clip(CircleShape).background(Palette.Accent))
+        Box(Modifier.size(3.dp, 13.dp).clip(CircleShape).background(p.accent))
         Spacer(Modifier.width(8.dp))
-        Text(text.uppercase(), color = Palette.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(lookLabel(text).uppercase(), color = p.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
     }
 }
 
 @Composable
-private fun CardTitle(text: String) = Text(text, color = Palette.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+private fun CardTitle(text: String) =
+    Text(lookLabel(text), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
 
 @Composable
-private fun CardDesc(text: String) = Text(text, color = Palette.TextSecondary, fontSize = 13.sp)
+private fun CardDesc(text: String) = Text(text, color = p.textSecondary, fontSize = 13.sp)
 
 @Composable
-private fun InfoLine(text: String, tone: Color = Palette.TextSecondary) = Text(text, color = tone, fontSize = 12.sp)
+private fun InfoLine(text: String, tone: Color = p.textSecondary) = Text(text, color = tone, fontSize = 12.sp)
 
 /** A focusable surface that brightens + scales when focused and fires [onActivate] on A/center. */
 @Composable
 private fun FocusCard(onActivate: () -> Unit, content: @Composable () -> Unit) {
     val f = focusState()
-    val scale by animateFloatAsState(if (f.value) 1.015f else 1f, label = "cardScale")
-    val bg by animateColorAsState(if (f.value) Palette.SurfaceHigh else Palette.Surface, label = "cardBg")
+    val scale by focusScale(f.value, 1.015f, "cardScale")
     Column(
         Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .focusControl(f, onActivate)
-            .clip(RoundedCornerShape(18.dp)).background(bg)
-            .border(if (f.value) 2.dp else 1.dp, if (f.value) Palette.Accent else Palette.Border, RoundedCornerShape(18.dp))
+            .companionCard(focused = f.value, focusable = true)
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) { content() }
@@ -248,11 +343,11 @@ private fun AccentSwitch(checked: Boolean, onChange: (Boolean) -> Unit) = Switch
     checked = checked,
     onCheckedChange = onChange,
     colors = SwitchDefaults.colors(
-        checkedTrackColor = Palette.Accent,
-        checkedThumbColor = Color.White,
-        uncheckedTrackColor = Palette.SurfaceHigh,
-        uncheckedBorderColor = Palette.Border,
-        uncheckedThumbColor = Palette.TextTertiary,
+        checkedTrackColor = p.accent,
+        checkedThumbColor = p.onAccent,
+        uncheckedTrackColor = p.surfaceHigh,
+        uncheckedBorderColor = p.border,
+        uncheckedThumbColor = p.textTertiary,
     ),
 )
 
@@ -264,16 +359,17 @@ private fun FocusRow(
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     val f = focusState()
-    val scale by animateFloatAsState(if (f.value) 1.015f else 1f, label = "rowScale")
-    val bg by animateColorAsState(
-        when { f.value -> Palette.SurfaceHigh; selected -> Palette.AccentSoft; else -> Color.Transparent },
-        label = "rowBg",
+    val shape = controlShape(12.dp)
+    val scale by focusScale(f.value, 1.015f, "rowScale")
+    val bg by focusColor(
+        when { f.value -> p.surfaceHigh; selected -> p.accentSoft; else -> Color.Transparent },
+        "rowBg",
     )
     Row(
         Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(12.dp)).background(bg)
-            .then(if (f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(12.dp)) else Modifier)
+            .clip(shape).background(bg)
+            .then(if (f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
             .focusControl(f, onClick)
             .noRippleClickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 11.dp),
@@ -285,11 +381,14 @@ private fun FocusRow(
 @Composable
 private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     FocusRow(selected, onClick) {
-        Text(label, color = if (selected) Palette.TextPrimary else Palette.TextSecondary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(
+            label, color = if (selected) p.textPrimary else p.textSecondary, fontSize = 15.sp,
+            style = tccTextStyle(), modifier = Modifier.weight(1f),
+        )
         RadioButton(
             selected = selected,
             onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = Palette.Accent, unselectedColor = Palette.TextTertiary),
+            colors = RadioButtonDefaults.colors(selectedColor = p.accent, unselectedColor = p.textTertiary),
         )
     }
 }
@@ -298,33 +397,40 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     val f = focusState()
-    val scale by animateFloatAsState(if (f.value) 1.05f else 1f, label = "btnScale")
-    val bg = when { !enabled -> Palette.SurfaceHigh; f.value -> Color(0xFF9488FF); else -> Palette.Accent }
+    val shape = controlShape(12.dp)
+    val scale by focusScale(f.value, 1.05f, "btnScale")
+    val bg = when { !enabled -> p.surfaceHigh; f.value -> p.accentFocused; else -> p.accent }
     Box(
         Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(12.dp)).background(bg)
-            .then(if (f.value) Modifier.border(1.5.dp, Color.White, RoundedCornerShape(12.dp)) else Modifier)
+            .clip(shape).background(bg)
+            .then(if (f.value) Modifier.border(1.5.dp, p.onAccent, shape) else Modifier)
             .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
             .padding(horizontal = 20.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = if (enabled) Color.White else Palette.TextTertiary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+    ) {
+        Text(
+            lookLabel(text), color = if (enabled) p.onAccent else p.textTertiary, fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+        )
+    }
 }
 
 /** A focusable compact pill (replay window, reorder arrows). */
 @Composable
 private fun Chip(text: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val f = focusState()
-    val scale by animateFloatAsState(if (f.value) 1.08f else 1f, label = "chipScale")
-    val bg = when { !enabled -> Palette.Surface; f.value -> Palette.AccentSoft; selected -> Palette.AccentSoft; else -> Palette.SurfaceHigh }
-    val fg = when { !enabled -> Palette.TextTertiary; selected || f.value -> Palette.Accent; else -> Palette.TextSecondary }
+    val shape = controlShape(10.dp)
+    val scale by focusScale(f.value, 1.08f, "chipScale")
+    val bg = when { !enabled -> p.surface; f.value -> p.accentSoft; selected -> p.accentSoft; else -> p.surfaceHigh }
+    val fg = when { !enabled -> p.textTertiary; selected || f.value -> p.accent; else -> p.textSecondary }
     Box(
         Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(10.dp)).background(bg)
-            .then(if (selected || f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(10.dp)) else Modifier)
+            .clip(shape).background(bg)
+            .then(if (selected || f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
             .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+    ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = tccTextStyle()) }
 }
 
 // ---- General ----
@@ -411,7 +517,7 @@ private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
         CardTitle("Quick Launch")
         CardDesc("Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.")
         Spacer(Modifier.height(10.dp))
-        Text("App: ${state.quickLaunchLabel ?: "None"}", color = Palette.TextPrimary, fontSize = 15.sp)
+        Text("App: ${state.quickLaunchLabel ?: "None"}", color = p.textPrimary, fontSize = 15.sp)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AccentButton("Choose app", onClick = vm::openAppPicker)
@@ -430,7 +536,7 @@ private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Choose an app", color = Palette.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text("Choose an app", color = p.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         AccentButton("Back", onClick = vm::closeAppPicker)
     }
     Spacer(Modifier.height(6.dp))
@@ -448,31 +554,129 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
 // ---- Quick Toggles ----
 
 @Composable
-private fun QuickToggles(state: SettingsState, vm: SettingsViewModel) {
+private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
     SectionHeader("Order")
-    Card {
-        state.orderedEnabledTiles.forEachIndexed { index, key ->
-            val tile = jr.brian.commandpannel.system.QuickSettingTileId.fromKey(key) ?: return@forEachIndexed
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${index + 1}", color = Palette.TextTertiary, fontSize = 13.sp, modifier = Modifier.width(26.dp))
-                Text(tile.label, color = Palette.TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                Chip("▲", enabled = index > 0) { vm.moveTile(key, up = true) }
-                Spacer(Modifier.width(8.dp))
-                Chip("▼", enabled = index < state.orderedEnabledTiles.lastIndex) { vm.moveTile(key, up = false) }
-            }
-        }
-    }
+    TileOrderCard(state, vm, scroll, viewport)
     jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
         SectionHeader(cat.title)
         Card {
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
                 val checked = tile.key in state.enabledTiles
                 FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
-                    Text(tile.label, color = Palette.TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(tile.label, color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
                 }
             }
         }
+    }
+}
+
+/** Drag-and-drop order of the enabled tiles (touch: handle or long-press; gamepad: A to pick up, D-pad, A to drop). */
+@Composable
+private fun TileOrderCard(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
+    val scope = rememberCoroutineScope()
+    val reorder = remember(scroll) { TileReorderState(state.orderedEnabledTiles, scope, scroll, viewport) }
+    reorder.onCommit = vm::reorderTiles
+    LaunchedEffect(state.orderedEnabledTiles) { reorder.sync(state.orderedEnabledTiles) }
+    Card {
+        CardDesc("Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, D-pad to move, A to drop.")
+        Spacer(Modifier.height(6.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(ORDER_ROW_SPACING)) {
+            reorder.items.forEachIndexed { index, k -> key(k) { TileOrderRow(index, k, reorder) } }
+        }
+    }
+}
+
+private val ORDER_ROW_SPACING = 4.dp
+
+@Composable
+private fun TileOrderRow(index: Int, key: String, reorder: TileReorderState) {
+    val tile = jr.brian.commandpannel.system.QuickSettingTileId.fromKey(key) ?: return
+    val f = focusState()
+    val lifted = reorder.isLifted(key)
+    val grabbed = reorder.grabbed == key
+    val shape = controlShape(12.dp)
+    val scale by focusScale(lifted || f.value, if (lifted) 1.03f else 1.015f, "orderScale")
+    val bg by focusColor(if (lifted || f.value) p.surfaceHigh else Color.Transparent, "orderBg")
+    val spacingPx = with(LocalDensity.current) { ORDER_ROW_SPACING.toPx() }
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val bring = remember { BringIntoViewRequester() }
+    val rowCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    // Losing focus while picked up (e.g. touch elsewhere) drops the tile where it is.
+    LaunchedEffect(f.value) { if (!f.value && reorder.grabbed == key) reorder.drop() }
+
+    fun begin(coords: LayoutCoordinates?, local: Offset) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        reorder.startDrag(key, coords?.localToRoot(local)?.y ?: 0f)
+    }
+
+    Row(
+        Modifier.fillMaxWidth()
+            .onSizeChanged { reorder.slotPx = it.height + spacingPx }
+            .zIndex(if (lifted) 1f else 0f)
+            .graphicsLayer {
+                translationY = reorder.translationOf(key)
+                scaleX = scale; scaleY = scale
+                shadowElevation = if (lifted) 10.dp.toPx() else 0f
+                this.shape = shape
+            }
+            .onGloballyPositioned { rowCoords[0] = it }
+            .bringIntoViewRequester(bring)
+            .clip(shape).background(bg)
+            .then(
+                when {
+                    grabbed -> Modifier.border(2.dp, p.accent, shape)
+                    f.value -> Modifier.border(1.5.dp, p.accent, shape)
+                    else -> Modifier
+                },
+            )
+            .onKeyEvent { e ->
+                if (!grabbed || e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key) {
+                    Key.DirectionUp, Key.DirectionDown -> {
+                        reorder.moveGrabbed(up = e.key == Key.DirectionUp)
+                        scope.launch { bring.bringIntoView() }
+                        true
+                    }
+                    Key.Back, Key.ButtonB, Key.Escape -> { reorder.drop(); true }
+                    else -> false
+                }
+            }
+            .focusControl(f) { if (grabbed) reorder.drop() else reorder.grab(key) }
+            .pointerInput(key) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { begin(rowCoords[0], it) },
+                    onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
+                    onDragEnd = reorder::endDrag,
+                    onDragCancel = reorder::endDrag,
+                )
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${index + 1}", color = p.textTertiary, fontSize = 13.sp, style = tccTextStyle(), modifier = Modifier.width(26.dp))
+        Text(
+            lookLabel(tile.label), color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle(),
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Rounded.DragHandle,
+            contentDescription = "Drag to reorder",
+            tint = if (lifted || f.value) p.accent else p.textTertiary,
+            modifier = Modifier.size(36.dp)
+                .onGloballyPositioned { handleCoords[0] = it }
+                .pointerInput(key) {
+                    detectDragGestures(
+                        onDragStart = { begin(handleCoords[0], it) },
+                        onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
+                        onDragEnd = reorder::endDrag,
+                        onDragCancel = reorder::endDrag,
+                    )
+                }
+                .padding(6.dp),
+        )
     }
 }
 
@@ -496,6 +700,11 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         }
     }
     SwitchCard(
+        "Companion follows overlay look",
+        "Apply the overlay's look, theme and accent to this settings screen. Off keeps the default companion style.",
+        state.companionFollowLook, vm::setCompanionFollowLook,
+    )
+    SwitchCard(
         "Accent from Ambient LED",
         "Use the colour you set for the Thor's Ambient LED as the overlay's accent — so the overlay theme follows " +
             "your joystick LED colour.",
@@ -515,13 +724,13 @@ private fun Diagnostics(state: SettingsState, vm: SettingsViewModel) {
         if (state.diagnostics.isNotEmpty()) Spacer(Modifier.height(12.dp))
         state.diagnostics.forEach { (text, ok) ->
             val (mark, tone) = when (ok) {
-                true -> "PASS" to Palette.Success
-                false -> "FAIL" to Palette.Danger
-                else -> "INFO" to Palette.TextTertiary
+                true -> "PASS" to p.success
+                false -> "FAIL" to p.danger
+                else -> "INFO" to p.textTertiary
             }
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(mark, color = tone, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.width(48.dp))
-                Text(text, color = Palette.TextPrimary, fontSize = 13.sp)
+                Text(text, color = p.textPrimary, fontSize = 13.sp)
             }
         }
     }

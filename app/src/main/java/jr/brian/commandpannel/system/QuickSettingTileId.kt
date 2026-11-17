@@ -106,17 +106,18 @@ enum class QuickSettingTileId(
             return entries.map { it.key }.filter { it in current }.joinToString(",")
         }
 
-        /** Moves [key] one slot earlier/later among the enabled tiles; returns the new full-order csv. */
-        fun moveEnabled(orderCsv: String?, enabledCsv: String?, key: String, up: Boolean): String {
-            val order = orderedKeys(orderCsv).toMutableList()
+        /**
+         * Applies a new order of the enabled tiles (from drag-and-drop); disabled tiles keep their slots in the full
+         * order. Returns the new full-order csv, or the current one if [enabledOrder] isn't a permutation of the
+         * enabled tiles.
+         */
+        fun reorderEnabled(orderCsv: String?, enabledCsv: String?, enabledOrder: List<String>): String {
+            val order = orderedKeys(orderCsv)
             val enabled = enabledKeys(enabledCsv, orderCsv)
-            val pos = enabled.indexOf(key)
-            val target = pos + if (up) -1 else 1
-            if (pos < 0 || target !in enabled.indices) return order.joinToString(",")
-            val i = order.indexOf(key)
-            val j = order.indexOf(enabled[target])
-            order[i] = order[j].also { order[j] = order[i] }
-            return order.joinToString(",")
+            if (enabledOrder.size != enabled.size || enabledOrder.toSet() != enabled.toSet()) return order.joinToString(",")
+            val next = enabledOrder.iterator()
+            val enabledSet = enabled.toSet()
+            return order.map { if (it in enabledSet) next.next() else it }.joinToString(",")
         }
     }
 }

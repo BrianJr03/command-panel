@@ -1,10 +1,10 @@
-Command Panel — Third-Party Notices
-===================================
+TCP (Thor Command Panel) — Third-Party Notices
+==============================================
 
-Command Panel bundles the unmodified (Latin/digit-subset) third-party font files
+TCP bundles the unmodified (Latin/digit-subset) third-party font files
 listed below. Each is distributed under the SIL Open Font License, Version 1.1,
 whose full text follows. The fonts are licensed independently of, and are not
-covered by, Command Panel's own licence.
+covered by, TCP's own licence.
 
 1. Barlow Condensed SemiBold / Bold / ExtraBold (Latin subset — res/font/tcc_condensed_*.ttf)
    Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)

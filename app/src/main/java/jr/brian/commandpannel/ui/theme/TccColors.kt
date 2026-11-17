@@ -97,6 +97,19 @@ object TempColors {
     }
 }
 
+/**
+ * Picks the palette from `tcc_theme_mode` (1 = follow system night, 3 = light, else pure black), then swaps in the
+ * ambient-LED [accentOverride] when the LED→accent sync is on. Shared by the overlay and the companion.
+ */
+fun resolvePalette(themeMode: Int, nightActive: Boolean, accentOverride: Int?): TccColors {
+    val base = when (themeMode) {
+        3 -> TccColors.Light
+        1 -> if (nightActive) TccColors.PureBlack else TccColors.Light
+        else -> TccColors.PureBlack
+    }
+    return accentOverride?.let { base.copy(accent = Color(it)) } ?: base
+}
+
 val LocalTccColors: ProvidableCompositionLocal<TccColors> = staticCompositionLocalOf { TccColors.PureBlack }
 
 @Composable

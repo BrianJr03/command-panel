@@ -36,6 +36,10 @@ data class SettingsState(
     val backupMessage: String? = null,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
+    /** Ambient-LED accent (opaque ARGB) when [rgbAccentSync] is on; themes the companion when it follows the look. */
+    val accentOverride: Int? = null,
+    /** When on, the companion screen uses the overlay's look, theme mode and accent instead of its default style. */
+    val companionFollowLook: Boolean = false,
     val enabledTiles: Set<String> = emptySet(),
     val orderedEnabledTiles: List<String> = emptyList(),
     val quickLaunchLabel: String? = null,
@@ -73,6 +77,8 @@ class SettingsViewModel @Inject constructor(
         keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
+        accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
+        companionFollowLook = prefs.getBoolean("companion_follow_look", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
             .enabledKeys(prefs.getString("qs_enabled_tiles", null)).toSet(),
         orderedEnabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
@@ -150,7 +156,13 @@ class SettingsViewModel @Inject constructor(
     fun setRgbAccentSync(enable: Boolean) {
         prefs.edit().putBoolean("rgb_accent_sync", enable).apply()
         // The overlay repository reads the LED colour on the next refresh (its pref listener fires here).
-        _state.value = _state.value.copy(rgbAccentSync = enable)
+        _state.value = _state.value.copy(rgbAccentSync = enable, accentOverride = ThorRgbController.accentOverride(app, enable))
+    }
+
+    /** Toggles whether the companion screen follows the overlay look (off keeps the default companion style). */
+    fun setCompanionFollowLook(enable: Boolean) {
+        prefs.edit().putBoolean("companion_follow_look", enable).apply()
+        _state.value = _state.value.copy(companionFollowLook = enable)
     }
 
     fun openAppPicker() {
@@ -232,12 +244,16 @@ class SettingsViewModel @Inject constructor(
         _state.value = load()
     }
 
-    fun moveTile(key: String, up: Boolean) {
-        val order = jr.brian.commandpannel.system.QuickSettingTileId.moveEnabled(
-            prefs.getString("qs_tile_order", null), prefs.getString("qs_enabled_tiles", null), key, up
+    /** Saves a drag-and-drop order of the enabled quick tiles. */
+    fun reorderTiles(enabledOrder: List<String>) {
+        val enabledCsv = prefs.getString("qs_enabled_tiles", null)
+        val order = jr.brian.commandpannel.system.QuickSettingTileId.reorderEnabled(
+            prefs.getString("qs_tile_order", null), enabledCsv, enabledOrder
         )
         prefs.edit().putString("qs_tile_order", order).apply()
-        _state.value = load()
+        _state.value = _state.value.copy(
+            orderedEnabledTiles = jr.brian.commandpannel.system.QuickSettingTileId.enabledKeys(enabledCsv, order),
+        )
     }
 
     fun setReplaceStock(enable: Boolean) {
