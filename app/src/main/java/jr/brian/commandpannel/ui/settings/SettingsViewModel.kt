@@ -42,6 +42,10 @@ data class SettingsState(
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
     val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
     val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    val replayEnabled: Boolean = false,
+    val replayWindowSeconds: Int = 30,
+    val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
+    val replayMessage: String? = null,
     val appPickerOpen: Boolean = false,
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
@@ -77,7 +81,46 @@ class SettingsViewModel @Inject constructor(
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
         overlayLayout = jr.brian.commandpannel.system.OverlayLayout.decode(prefs.getString("overlay_layout", null)),
         overlayLook = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
+        replayEnabled = prefs.getBoolean("replay_enabled", false),
+        replayWindowSeconds = jr.brian.commandpannel.privileged.ScreenRecorderEngine
+            .normalizeReplayWindowSeconds(prefs.getInt("replay_window_seconds", 30)),
+        replayPreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null)),
     )
+
+    fun setReplayEnabled(enable: Boolean) {
+        prefs.edit().putBoolean("replay_enabled", enable).apply()
+        AssistantService.start(app)
+        app.sendBroadcast(
+            Intent(AssistantService.ACTION_REPLAY_SET_ENABLED).setPackage(app.packageName)
+                .putExtra(AssistantService.EXTRA_ENABLE, enable),
+        )
+        _state.value = _state.value.copy(replayEnabled = enable, replayMessage = if (enable) "Replay buffer arming…" else "Replay buffer off")
+    }
+
+    fun setReplayWindowSeconds(seconds: Int) {
+        prefs.edit().putInt("replay_window_seconds", seconds).apply()
+        _state.value = _state.value.copy(replayWindowSeconds = seconds, replayMessage = "Takes effect next time the buffer arms")
+    }
+
+    fun setReplayPreset(preset: jr.brian.commandpannel.privileged.ReplayBitratePreset) {
+        prefs.edit().putString("replay_bitrate", preset.key).apply()
+        _state.value = _state.value.copy(replayPreset = preset, replayMessage = "Takes effect next time the buffer arms")
+    }
+
+    fun saveReplayClip() {
+        app.sendBroadcast(Intent(AssistantService.ACTION_REPLAY_SAVE).setPackage(app.packageName))
+        _state.value = _state.value.copy(replayMessage = "Saving clip…")
+        // Surface the result the service broadcasts back.
+        val filter = android.content.IntentFilter(AssistantService.ACTION_REPLAY_SAVED)
+        app.registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: Intent) {
+                val result = i.getStringExtra(AssistantService.EXTRA_REPLAY_RESULT).orEmpty()
+                val msg = if (result.startsWith("error:")) "Save failed (${result.removePrefix("error:")})" else "Saved to $result"
+                _state.value = _state.value.copy(replayMessage = msg)
+                runCatching { c.unregisterReceiver(this) }
+            }
+        }, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+    }
 
     fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) {
         prefs.edit().putString("overlay_look", look.name).apply()

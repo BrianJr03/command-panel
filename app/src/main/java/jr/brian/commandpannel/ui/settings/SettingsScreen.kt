@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,7 +48,9 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
     TccTheme(colors) {
         val c = LocalTccColors.current
         var category by remember { mutableStateOf(SettingsCategory.GENERAL) }
-        Row(Modifier.fillMaxSize().background(c.primaryBackground)) {
+        Row(
+            Modifier.fillMaxSize().background(c.primaryBackground).systemBarsPadding(),
+        ) {
             Column(
                 modifier = Modifier.width(200.dp).fillMaxHeight().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -134,10 +137,46 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
             Text(it, color = c.secondary, fontSize = 12.sp)
         }
     }
+    ReplayBufferCard(state, vm)
     Card {
         Text("Overlay preview", color = LocalTccColors.current.primary, fontSize = 16.sp)
         Spacer(Modifier.height(8.dp))
         Button(onClick = vm::showOverlay) { Text("Open overlay on bottom screen") }
+    }
+}
+
+@Composable
+private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
+    val c = LocalTccColors.current
+    SwitchCard(
+        title = "Replay Buffer",
+        description = "Continuously keep the last few seconds of the top screen in memory so you can save a clip " +
+            "after something happens. Uses root screen capture (no cast prompt).",
+        checked = state.replayEnabled,
+        onChange = vm::setReplayEnabled,
+    )
+    Card {
+        Text("Save last", color = c.primary, fontSize = 15.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(15, 30, 60, 90).forEach { secs ->
+                val on = state.replayWindowSeconds == secs
+                TextButton(onClick = { vm.setReplayWindowSeconds(secs) }) {
+                    Text("${secs}s", color = if (on) c.accent else c.secondary)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Quality", color = c.primary, fontSize = 15.sp)
+        jr.brian.commandpannel.privileged.ReplayBitratePreset.entries.forEach { preset ->
+            RadioRow(preset.label, state.replayPreset == preset) { vm.setReplayPreset(preset) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = vm::saveReplayClip, enabled = state.replayEnabled) { Text("Save clip now") }
+        state.replayMessage?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = c.secondary, fontSize = 12.sp)
+        }
     }
 }
 
