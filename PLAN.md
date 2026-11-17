@@ -169,7 +169,10 @@ Done (cont.):
   valid JSON, "Restored 6 settings".
 
 Backlog (remaining fork features, roughly easiest → hardest):
-- Dark-on-TV tap-to-wake (7) — self-contained but needs an external DisplayPort display to verify.
+- **Dark-on-TV tap-to-wake (7)** — done: ported ExternalDisplayTapWaker (adapted to SystemSettings/root), wired
+  into the service; 1x1 FLAG_WATCH_OUTSIDE_TOUCH windows per display arm only when close_screen_when_output_video=1
+  and DisplayPort is connected, tap writes the setting to 0 to wake. Verified wiring (arms/disarms, no crash, DP
+  node read); the tap->wake path needs an external display to fully exercise.
 - Quick-toggle drag-reorder (12) — rewrite the 160 upstream lines flagged in the manifest; drag-drop UI.
 - Arrange mode (3) — needs the overlay cards made addressable.
 - Look system + 16 looks (8) — large; renderers + fonts + license notices.

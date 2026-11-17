@@ -16,6 +16,7 @@ import android.util.Log
 import jr.brian.commandpannel.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import jr.brian.commandpannel.overlay.ExternalDisplayTapWaker
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.ScreenModeController
@@ -51,6 +52,7 @@ class AssistantService : Service() {
     private lateinit var repository: SettingsRepository
     private lateinit var screenMode: ScreenModeController
     private lateinit var coexistence: StockCoexistence
+    private lateinit var tapWaker: ExternalDisplayTapWaker
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -85,6 +87,7 @@ class AssistantService : Service() {
         screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
         repository.onHideOverlay = { overlay.hide() }
         coexistence = StockCoexistence(applicationContext, privileged, scope)
+        tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()
             OverlayRoot(state = state, actions = repository)
@@ -109,6 +112,7 @@ class AssistantService : Service() {
             repository.start(scope)
             screenMode.start()
             coexistence.applyInitial()
+            tapWaker.start()
         }
     }
 
@@ -126,6 +130,7 @@ class AssistantService : Service() {
         runCatching { unregisterReceiver(aynReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
         coexistence.onStop()
+        tapWaker.stop()
         repository.stop()
         screenMode.stop()
         overlay.destroy()
