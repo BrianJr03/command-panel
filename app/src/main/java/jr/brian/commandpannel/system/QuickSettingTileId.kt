@@ -82,17 +82,39 @@ enum class QuickSettingTileId(
         fun fromKey(key: String): QuickSettingTileId? = entries.firstOrNull { it.key == key }
         val defaultEnabledKeys: List<String> get() = entries.filter { it.defaultEnabled }.map { it.key }
 
-        /** Persisted enabled set (csv) → ordered enabled keys, defaulting to the stock tiles. */
-        fun enabledKeys(csv: String?): List<String> {
-            val set = csv?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: defaultEnabledKeys.toSet()
-            return entries.map { it.key }.filter { it in set }
+        /** All keys in the saved display order (unknown/new keys appended in roster order). */
+        fun orderedKeys(orderCsv: String?): List<String> {
+            val saved = orderCsv?.split(",")?.filter { fromKey(it) != null } ?: emptyList()
+            return saved + entries.map { it.key }.filter { it !in saved }
+        }
+
+        private fun enabledSet(enabledCsv: String?): Set<String> =
+            enabledCsv?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: defaultEnabledKeys.toSet()
+
+        /** Enabled tiles in the saved display order. */
+        fun enabledKeys(enabledCsv: String?, orderCsv: String? = null): List<String> {
+            val set = enabledSet(enabledCsv)
+            return orderedKeys(orderCsv).filter { it in set }
         }
 
         /** Apply an enable/disable to the csv, keeping roster order and at least one tile enabled. */
         fun toggle(csv: String?, key: String, enable: Boolean): String {
-            val current = enabledKeys(csv).toMutableSet()
+            val current = enabledSet(csv).toMutableSet()
             if (enable) current.add(key) else if (current.size > 1) current.remove(key)
             return entries.map { it.key }.filter { it in current }.joinToString(",")
+        }
+
+        /** Moves [key] one slot earlier/later among the enabled tiles; returns the new full-order csv. */
+        fun moveEnabled(orderCsv: String?, enabledCsv: String?, key: String, up: Boolean): String {
+            val order = orderedKeys(orderCsv).toMutableList()
+            val enabled = enabledKeys(enabledCsv, orderCsv)
+            val pos = enabled.indexOf(key)
+            val target = pos + if (up) -1 else 1
+            if (pos < 0 || target !in enabled.indices) return order.joinToString(",")
+            val i = order.indexOf(key)
+            val j = order.indexOf(enabled[target])
+            order[i] = order[j].also { order[j] = order[i] }
+            return order.joinToString(",")
         }
     }
 }

@@ -182,7 +182,7 @@ class SettingsRepository(
     }
 
     private fun enabledTileKeys(): List<String> =
-        QuickSettingTileId.enabledKeys(prefs.getString("qs_enabled_tiles", null))
+        QuickSettingTileId.enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null))
 
     private fun buildTiles(mode: Int, focus: Int): List<QuickTile> {
         val perf = settings.getInt(Keys.PERFORMANCE_MODE, 0)

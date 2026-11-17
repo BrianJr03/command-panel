@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -196,10 +197,24 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
 private fun QuickToggles(state: SettingsState, vm: SettingsViewModel) {
     val c = LocalTccColors.current
     Text(
-        "Choose which quick-setting tiles appear in the overlay. Stock tiles are on by default; " +
+        "Choose which quick-setting tiles appear in the overlay and in what order. Stock tiles are on by default; " +
             "Android System and Tools tiles are extras.",
         color = c.secondary, fontSize = 13.sp,
     )
+    SectionHeader("Order")
+    Card {
+        state.orderedEnabledTiles.forEachIndexed { index, key ->
+            val tile = jr.brian.commandpannel.system.QuickSettingTileId.fromKey(key) ?: return@forEachIndexed
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${index + 1}. ${tile.label}", color = c.primary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                TextButton(enabled = index > 0, onClick = { vm.moveTile(key, up = true) }) { Text("▲") }
+                TextButton(
+                    enabled = index < state.orderedEnabledTiles.lastIndex,
+                    onClick = { vm.moveTile(key, up = false) },
+                ) { Text("▼") }
+            }
+        }
+    }
     jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
         SectionHeader(cat.title)
         Card {

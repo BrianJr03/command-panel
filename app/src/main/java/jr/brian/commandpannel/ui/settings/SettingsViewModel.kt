@@ -37,6 +37,7 @@ data class SettingsState(
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
     val enabledTiles: Set<String> = emptySet(),
+    val orderedEnabledTiles: List<String> = emptyList(),
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
     val appPickerOpen: Boolean = false,
@@ -68,6 +69,8 @@ class SettingsViewModel @Inject constructor(
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
             .enabledKeys(prefs.getString("qs_enabled_tiles", null)).toSet(),
+        orderedEnabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
+            .enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null)),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
     )
@@ -159,9 +162,15 @@ class SettingsViewModel @Inject constructor(
         val csv = jr.brian.commandpannel.system.QuickSettingTileId
             .toggle(prefs.getString("qs_enabled_tiles", null), key, enable)
         prefs.edit().putString("qs_enabled_tiles", csv).apply()
-        _state.value = _state.value.copy(
-            enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId.enabledKeys(csv).toSet()
+        _state.value = load()
+    }
+
+    fun moveTile(key: String, up: Boolean) {
+        val order = jr.brian.commandpannel.system.QuickSettingTileId.moveEnabled(
+            prefs.getString("qs_tile_order", null), prefs.getString("qs_enabled_tiles", null), key, up
         )
+        prefs.edit().putString("qs_tile_order", order).apply()
+        _state.value = load()
     }
 
     fun setReplaceStock(enable: Boolean) {

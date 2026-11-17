@@ -27,6 +27,25 @@ class QuickSettingTileIdTest {
     }
 
     @Test
+    fun moveEnabledReordersWithinEnabledTiles() {
+        val enabled = "focus_lock,performance,fan"
+        // move "fan" up past "performance"
+        val order1 = QuickSettingTileId.moveEnabled(null, enabled, "fan", up = true)
+        assertEquals(listOf("focus_lock", "fan", "performance"), QuickSettingTileId.enabledKeys(enabled, order1))
+        // move it back down
+        val order2 = QuickSettingTileId.moveEnabled(order1, enabled, "fan", up = false)
+        assertEquals(listOf("focus_lock", "performance", "fan"), QuickSettingTileId.enabledKeys(enabled, order2))
+    }
+
+    @Test
+    fun moveEnabledSkipsDisabledTilesInOrder() {
+        // only focus_lock and fan enabled (performance disabled); moving fan up swaps it past focus_lock
+        val enabled = "focus_lock,fan"
+        val order = QuickSettingTileId.moveEnabled(null, enabled, "fan", up = true)
+        assertEquals(listOf("fan", "focus_lock"), QuickSettingTileId.enabledKeys(enabled, order))
+    }
+
+    @Test
     fun toggleKeepsAtLeastOneEnabled() {
         var csv = QuickSettingTileId.entries.map { it.key }.joinToString(",")
         QuickSettingTileId.entries.forEach { csv = QuickSettingTileId.toggle(csv, it.key, enable = false) }
