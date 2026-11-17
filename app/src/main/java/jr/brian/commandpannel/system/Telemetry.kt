@@ -31,11 +31,11 @@ data class Telemetry(
 
 /**
  * Polls the stock telemetry sources every [intervalMs] while started: sysfs nodes read directly (the probe showed
- * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS from two sources:
- * the game task on the top display through the root helper's task FPS callback (frames that task actually
- * presented), falling back to SurfaceFlinger's global composite counter when no game is up. That counter is
- * transaction 1013, which the app's uid is refused but root allows; it is read over the helper binder, or with
- * `service call` through the root shell when the helper is down.
+ * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS from
+ * SurfaceFlinger's global composite counter (transaction 1013, which the app's uid is refused but root allows) via
+ * `service call` through the root shell, as stock does. With [NEW_FPS_SOURCES] on, FPS instead comes from the game
+ * task on the top display through the root helper's task FPS callback (frames that task actually presented),
+ * falling back to the global counter read over the helper binder when no game is up.
  */
 class TelemetryMonitor(
     private val context: Context,
@@ -43,14 +43,21 @@ class TelemetryMonitor(
     private val refreshRateCap: () -> Int,
     private val intervalMs: Long = 1500L,
 ) {
-    private companion object {
-        const val TEMP = "/sys/devices/virtual/thermal/thermal_zone48/temp"
-        const val CPU_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq"
-        const val CPU_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq"
-        const val GPU_CUR = "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"
-        const val GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"
-        const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
-        const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
+    companion object {
+        /**
+         * Off: FPS is the stock method only (`service call SurfaceFlinger 1013` through the root shell). On: the
+         * per-task game FPS from the root helper, with the global counter read over the helper binder as fallback.
+         * Kept off until the new sources are verified on device.
+         */
+        const val NEW_FPS_SOURCES = false
+
+        private const val TEMP = "/sys/devices/virtual/thermal/thermal_zone48/temp"
+        private const val CPU_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq"
+        private const val CPU_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq"
+        private const val GPU_CUR = "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"
+        private const val GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"
+        private const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
+        private const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
     }
 
     private val _state = MutableStateFlow(Telemetry())
@@ -72,7 +79,7 @@ class TelemetryMonitor(
 
     fun stop() {
         job?.cancel(); job = null
-        privileged.stopTaskFps()
+        if (NEW_FPS_SOURCES) privileged.stopTaskFps()
     }
 
     private fun read(path: String): String = runCatching { File(path).readText() }.getOrDefault("")
@@ -109,13 +116,14 @@ class TelemetryMonitor(
         val cap = refreshRateCap()
         // The global counter is sampled every time so its delta is ready the moment the task source drops out.
         val globalFps = sampleGlobalFps(cap)
+        if (!NEW_FPS_SOURCES) return globalFps
         val task = privileged.taskFps(Display.DEFAULT_DISPLAY)
         return TelemetryReader.chooseFps(task?.fps, task?.ageMs, globalFps, cap)
     }
 
     private fun sampleGlobalFps(cap: Int): Int {
         // The helper's direct binder transaction is sub-millisecond; the shell fallback forks `sh` + `service`.
-        val frames = privileged.surfaceFlingerFrameCount()
+        val frames = (if (NEW_FPS_SOURCES) privileged.surfaceFlingerFrameCount() else null)
             ?: privileged.shell("service call SurfaceFlinger 1013")?.let(TelemetryReader::parseSurfaceFlingerFrames)
             ?: return _state.value.fps
         val now = System.nanoTime() / 1_000_000L
