@@ -88,6 +88,7 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
 - 🔋 **Battery time estimate** and an option to **hide the network-speed** readout.
 - 💾 **Settings backup & restore.**
+- ⬆️ **In-app updates** — checks GitHub for new releases, shows the patch notes, and installs the update in one press (silently with root, otherwise through Android's installer). Skip a version if you like; What's New shows once after updating.
 - 🎮 **Full gamepad navigation** across the whole UI.
 - 🧷 **Quality-of-life:** the overlay reopens on your last tab, a pinned top nav bar, and a launcher icon of its own.
 
