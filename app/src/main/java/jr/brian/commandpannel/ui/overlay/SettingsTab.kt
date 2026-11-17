@@ -28,10 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import jr.brian.commandpannel.system.OverlayCardGroup
 import jr.brian.commandpannel.system.OverlayCardId
-import jr.brian.commandpannel.ui.overlay.arrange.ArrangeController
-import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
-import jr.brian.commandpannel.ui.overlay.arrange.arrangeLayer
 import jr.brian.commandpannel.ui.components.RingGauge
 import jr.brian.commandpannel.ui.components.TccCard
 import jr.brian.commandpannel.ui.components.TccIconButton
@@ -53,36 +51,14 @@ fun SettingsTab(
     arrange: jr.brian.commandpannel.ui.overlay.arrange.ArrangeController,
     modifier: Modifier = Modifier,
 ) {
-    val layout = state.layout
-    // Each card is wrapped in an ArrangeableCard so it can be dragged in Arrange mode.
-    val frameRate: @Composable (Modifier) -> Unit = { m ->
-        ArrangeableCard(OverlayCardId.FRAME_RATE, arrange, m) { FrameRatePanel(state, actions, Modifier.fillMaxSize()) }
-    }
-    val quickTiles: @Composable (Modifier) -> Unit = { m ->
-        ArrangeableCard(OverlayCardId.QUICK_TILES, arrange, m) { QuickTilesPanel(state, onTile, Modifier.fillMaxSize()) }
-    }
-    val topRow: @Composable (Modifier) -> Unit = { m ->
-        Row(
-            m.arrangeLayer(arrange, listOf(OverlayCardId.FRAME_RATE, OverlayCardId.QUICK_TILES)),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (layout.settingsColsSwapped) {
-                quickTiles(Modifier.weight(0.60f).fillMaxHeight())
-                frameRate(Modifier.weight(0.40f).fillMaxHeight())
-            } else {
-                frameRate(Modifier.weight(0.40f).fillMaxHeight())
-                quickTiles(Modifier.weight(0.60f).fillMaxHeight())
-            }
-        }
-    }
-    val hardwareRow: @Composable (Modifier) -> Unit = { m -> HardwareRow(state, layout, arrange, m) }
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (layout.settingsRowsSwapped) {
-            hardwareRow(Modifier.fillMaxWidth().weight(0.30f))
-            topRow(Modifier.fillMaxWidth().weight(0.70f))
-        } else {
-            topRow(Modifier.fillMaxWidth().weight(0.70f))
-            hardwareRow(Modifier.fillMaxWidth().weight(0.30f))
+    OverlayGrid(OverlayCardGroup.SETTINGS_TAB, state.layout.settingsCells, arrange, modifier) { card, m ->
+        when (card) {
+            OverlayCardId.FRAME_RATE -> FrameRatePanel(state, actions, m)
+            OverlayCardId.QUICK_TILES -> QuickTilesPanel(state, onTile, m)
+            OverlayCardId.RINGS -> RingsCard(state, m)
+            OverlayCardId.TEMP -> InfoCard(m, icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
+            OverlayCardId.FAN -> InfoCard(m, icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+            else -> Unit
         }
     }
 }
@@ -176,57 +152,17 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
 }
 
 @Composable
-private fun HardwareRow(
-    state: OverlayUiState,
-    layout: jr.brian.commandpannel.system.OverlayLayout,
-    arrange: ArrangeController,
-    modifier: Modifier,
-) {
-    val tempCard: @Composable RowScope.() -> Unit = {
-        ArrangeableCard(OverlayCardId.TEMP, arrange, Modifier.weight(1f).fillMaxHeight()) {
-            InfoCard(Modifier.fillMaxSize(), icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
-        }
-    }
-    val fanCard: @Composable RowScope.() -> Unit = {
-        ArrangeableCard(OverlayCardId.FAN, arrange, Modifier.weight(1f).fillMaxHeight()) {
-            InfoCard(Modifier.fillMaxSize(), icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
-        }
-    }
-    // The temp+fan quarters share the narrow (0.4) column; rings fill the wide (0.6) column.
-    val quarters: @Composable (Modifier) -> Unit = { m ->
-        Row(m.arrangeLayer(arrange, listOf(OverlayCardId.TEMP, OverlayCardId.FAN)), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            for (card in layout.settingsQuarterOrder) {
-                when (card) {
-                    OverlayCardId.TEMP -> tempCard()
-                    OverlayCardId.FAN -> fanCard()
-                    else -> Unit
-                }
-            }
-        }
-    }
-    val rings: @Composable (Modifier) -> Unit = { m ->
-        ArrangeableCard(OverlayCardId.RINGS, arrange, m) {
-        TccCard(Modifier.fillMaxSize()) {
-            Row(
-                Modifier.fillMaxSize().padding(horizontal = 15.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
-            }
-        }
-        }
-    }
-    Row(modifier.arrangeLayer(arrange, listOf(OverlayCardId.TEMP, OverlayCardId.FAN, OverlayCardId.RINGS)), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        if (layout.settingsColsSwapped) {
-            rings(Modifier.weight(0.6f).fillMaxHeight())
-            quarters(Modifier.weight(0.4f).fillMaxHeight())
-        } else {
-            quarters(Modifier.weight(0.4f).fillMaxHeight())
-            rings(Modifier.weight(0.6f).fillMaxHeight())
+private fun RingsCard(state: OverlayUiState, modifier: Modifier) {
+    TccCard(modifier) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 15.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", Modifier.weight(1f).fillMaxHeight())
+            RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", Modifier.weight(1f).fillMaxHeight())
+            RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
+            RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
         }
     }
 }

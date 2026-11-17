@@ -11,17 +11,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import jr.brian.commandpannel.system.OverlayCardGroup
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.ui.components.TccCard
 import jr.brian.commandpannel.ui.components.TccIconButton
 import jr.brian.commandpannel.ui.components.TccSliderRow
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeController
-import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
-import jr.brian.commandpannel.ui.overlay.arrange.arrangeLayer
 
 /**
- * Stock Mode tab: a screen-mode panel on top, then a brightness card and a volume card side by side. Each card is
- * wrapped in an [ArrangeableCard] so it can be dragged in Arrange mode (long-press the overlay).
+ * Stock Mode tab, laid out by the data-driven [OverlayGrid]: a screen-mode panel and brightness/volume cards the user
+ * can rearrange in Arrange mode (long-press the overlay).
  */
 @Composable
 fun ModeTab(
@@ -31,30 +30,12 @@ fun ModeTab(
     arrange: ArrangeController,
     modifier: Modifier = Modifier,
 ) {
-    val layout = state.layout
-    val modePanel: @Composable (Modifier) -> Unit = { m ->
-        ArrangeableCard(OverlayCardId.MODE_BUTTONS, arrange, m) { ScreenModePanel(state, onRequestMode, Modifier.fillMaxSize()) }
-    }
-    val sliderRow: @Composable (Modifier) -> Unit = { m ->
-        Row(m.arrangeLayer(arrange, listOf(OverlayCardId.BRIGHTNESS, OverlayCardId.VOLUME)), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            for (card in layout.modeHalfOrder) {
-                ArrangeableCard(card, arrange, Modifier.weight(1f).fillMaxHeight()) {
-                    when (card) {
-                        OverlayCardId.BRIGHTNESS -> BrightnessCard(state, actions, Modifier.fillMaxSize())
-                        OverlayCardId.VOLUME -> VolumeCard(state, actions, Modifier.fillMaxSize())
-                        else -> Unit
-                    }
-                }
-            }
-        }
-    }
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (layout.modeRowsSwapped) {
-            sliderRow(Modifier.fillMaxWidth().weight(0.54f))
-            modePanel(Modifier.fillMaxWidth().weight(0.46f))
-        } else {
-            modePanel(Modifier.fillMaxWidth().weight(0.46f))
-            sliderRow(Modifier.fillMaxWidth().weight(0.54f))
+    OverlayGrid(OverlayCardGroup.MODE_TAB, state.layout.modeCells, arrange, modifier) { card, m ->
+        when (card) {
+            OverlayCardId.MODE_BUTTONS -> ScreenModePanel(state, onRequestMode, m)
+            OverlayCardId.BRIGHTNESS -> BrightnessCard(state, actions, m)
+            OverlayCardId.VOLUME -> VolumeCard(state, actions, m)
+            else -> Unit
         }
     }
 }

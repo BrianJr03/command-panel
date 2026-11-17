@@ -136,6 +136,8 @@ class SettingsRepository(
                 themeMode = themeMode,
                 suppressBottomTip = prefs.getBoolean("suppress_bottom_tip", false),
                 quickLaunchLabel = QuickLaunch.savedLabel(context),
+                quickLaunchApp = if (prefs.getBoolean("quick_launch_show_app", true)) QuickLaunch.savedComponent(context) else null,
+                navOrder = NavBarButton.ordered(prefs.getString("nav_bar_order", null)),
                 bottomVolume = settings.getInt(Keys.SECONDARY_VOLUME, 7) / 15f,
                 dualBrightness = settings.getInt(Keys.DUAL_BRIGHTNESS, 50) / 100f,
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,

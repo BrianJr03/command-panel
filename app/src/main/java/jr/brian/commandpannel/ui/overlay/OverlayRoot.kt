@@ -72,6 +72,8 @@ fun OverlayRoot(
                     activeTab = tab,
                     modifier = Modifier.fillMaxSize(),
                     quickLaunchLabel = state.quickLaunchLabel,
+                    quickLaunchApp = state.quickLaunchApp,
+                    order = state.navOrder,
                     onMode = { selectTab(OverlayTab.MODE) },
                     onTask = { actions.openRecents() },
                     onLaunch = { actions.quickLaunch() },
@@ -80,8 +82,8 @@ fun OverlayRoot(
                 )
             }
         }
-        // The nav bar always sits at the top of the overlay, never along the bottom edge.
-        val navAtTop = true
+        // Nav bar sits at the top or bottom per the user's arrangement (drag it in Arrange mode); default top.
+        val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
         Box(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize()

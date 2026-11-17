@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -103,7 +105,8 @@ fun TccIconButton(
                 Image(
                     painter = icon.painter(),
                     contentDescription = label,
-                    colorFilter = stockIconColorFilter(iconTint),
+                    // App launcher icons keep their own colours.
+                    colorFilter = if (icon is TileIcon.App) null else stockIconColorFilter(iconTint),
                     modifier = imageModifier,
                 )
             }
@@ -113,8 +116,11 @@ fun TccIconButton(
             color = labelColor,
             fontSize = labelSize,
             textAlign = TextAlign.Center,
-            maxLines = 2,
+            // Nav labels stay on one line and are width-capped so a long app name can't push the other buttons.
+            maxLines = if (isNav) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
             style = jr.brian.commandpannel.ui.theme.tccTextStyle(),
+            modifier = if (isNav) Modifier.widthIn(max = circleSize * 2f) else Modifier,
         )
     }
 }

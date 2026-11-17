@@ -37,6 +37,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.zIndex
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.components.TileIcon
+import jr.brian.commandpannel.ui.components.painter
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +63,7 @@ import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewAgenda
+import androidx.compose.material.icons.rounded.WebAsset
 import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -106,6 +109,7 @@ import androidx.compose.ui.unit.sp
 
 private enum class NavItem(val category: SettingsCategory, val icon: ImageVector, val subtitle: String) {
     GENERAL(SettingsCategory.GENERAL, Icons.Rounded.Tune, "Core behaviour and companion features"),
+    NAV_BAR(SettingsCategory.NAV_BAR, Icons.Rounded.WebAsset, "Arrange the overlay nav bar and its Quick Launch button"),
     QUICK_TOGGLES(SettingsCategory.QUICK_TOGGLES, Icons.Rounded.ViewAgenda, "Pick and order the overlay's quick tiles"),
     APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, "Theme and look of the bottom-screen overlay"),
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, "Check the privileged access layer"),
@@ -205,6 +209,7 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
             when (nav.category) {
                 SettingsCategory.GENERAL -> General(state, vm)
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
+                SettingsCategory.NAV_BAR -> NavBarSettings(state, vm, scroll) { viewport.value }
                 SettingsCategory.APPEARANCE -> Appearance(state, vm)
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
@@ -437,10 +442,6 @@ private fun Chip(text: String, selected: Boolean = false, enabled: Boolean = tru
 
 @Composable
 private fun General(state: SettingsState, vm: SettingsViewModel) {
-    if (state.appPickerOpen) {
-        AppPicker(state, vm)
-        return
-    }
     SwitchCard(
         "Replace Stock Assistant",
         "Suppress the built-in dual-screen assistant so Command Panel handles the AYN button. Turning this off " +
@@ -464,7 +465,6 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
             "Turn off to clear everything except this app, the stock assistant and the system.",
         state.keepOnScreen, vm::setKeepOnScreen,
     )
-    QuickLaunchCard(state, vm)
     Card {
         CardTitle("Backup & Restore")
         CardDesc("Export the companion settings to a JSON file, or restore the most recent backup.")
@@ -517,7 +517,13 @@ private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
         CardTitle("Quick Launch")
         CardDesc("Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.")
         Spacer(Modifier.height(10.dp))
-        Text("App: ${state.quickLaunchLabel ?: "None"}", color = p.textPrimary, fontSize = 15.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            state.quickLaunchComponent?.takeIf { state.quickLaunchLabel != null }?.let { cn ->
+                Image(TileIcon.App(cn).painter(), null, Modifier.size(32.dp))
+                Spacer(Modifier.width(12.dp))
+            }
+            Text(state.quickLaunchLabel ?: "No app chosen", color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
+        }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AccentButton("Choose app", onClick = vm::openAppPicker)
@@ -556,7 +562,15 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
     SectionHeader("Order")
-    TileOrderCard(state, vm, scroll, viewport)
+    OrderCard(
+        items = state.orderedEnabledTiles,
+        description = "Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, " +
+            "D-pad to move, A to drop.",
+        label = { jr.brian.commandpannel.system.QuickSettingTileId.fromKey(it)?.label ?: it },
+        onCommit = vm::reorderTiles,
+        scroll = scroll,
+        viewport = viewport,
+    )
     jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
         SectionHeader(cat.title)
         Card {
@@ -571,18 +585,29 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
     }
 }
 
-/** Drag-and-drop order of the enabled tiles (touch: handle or long-press; gamepad: A to pick up, D-pad, A to drop). */
+/**
+ * A drag-and-drop order list (touch: handle or long-press; gamepad: A to pick up, D-pad, A to drop). [items] are
+ * keys; [label] names each row and [note] adds an optional second line. [onCommit] receives the new order.
+ */
 @Composable
-private fun TileOrderCard(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
+private fun OrderCard(
+    items: List<String>,
+    description: String,
+    label: (String) -> String,
+    note: (String) -> String? = { null },
+    onCommit: (List<String>) -> Unit,
+    scroll: ScrollState,
+    viewport: () -> Rect,
+) {
     val scope = rememberCoroutineScope()
-    val reorder = remember(scroll) { TileReorderState(state.orderedEnabledTiles, scope, scroll, viewport) }
-    reorder.onCommit = vm::reorderTiles
-    LaunchedEffect(state.orderedEnabledTiles) { reorder.sync(state.orderedEnabledTiles) }
+    val reorder = remember(scroll) { ReorderListState(items, scope, scroll, viewport) }
+    reorder.onCommit = onCommit
+    LaunchedEffect(items) { reorder.sync(items) }
     Card {
-        CardDesc("Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, D-pad to move, A to drop.")
+        CardDesc(description)
         Spacer(Modifier.height(6.dp))
         Column(verticalArrangement = Arrangement.spacedBy(ORDER_ROW_SPACING)) {
-            reorder.items.forEachIndexed { index, k -> key(k) { TileOrderRow(index, k, reorder) } }
+            reorder.items.forEachIndexed { index, k -> key(k) { OrderRow(index, k, label(k), note(k), reorder) } }
         }
     }
 }
@@ -590,8 +615,7 @@ private fun TileOrderCard(state: SettingsState, vm: SettingsViewModel, scroll: S
 private val ORDER_ROW_SPACING = 4.dp
 
 @Composable
-private fun TileOrderRow(index: Int, key: String, reorder: TileReorderState) {
-    val tile = jr.brian.commandpannel.system.QuickSettingTileId.fromKey(key) ?: return
+private fun OrderRow(index: Int, key: String, label: String, note: String?, reorder: ReorderListState) {
     val f = focusState()
     val lifted = reorder.isLifted(key)
     val grabbed = reorder.grabbed == key
@@ -657,10 +681,10 @@ private fun TileOrderRow(index: Int, key: String, reorder: TileReorderState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("${index + 1}", color = p.textTertiary, fontSize = 13.sp, style = tccTextStyle(), modifier = Modifier.width(26.dp))
-        Text(
-            lookLabel(tile.label), color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle(),
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(lookLabel(label), color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
+            if (note != null) Text(note, color = p.textTertiary, fontSize = 12.sp)
+        }
         Icon(
             Icons.Rounded.DragHandle,
             contentDescription = "Drag to reorder",
@@ -678,6 +702,51 @@ private fun TileOrderRow(index: Int, key: String, reorder: TileReorderState) {
                 .padding(6.dp),
         )
     }
+}
+
+// ---- Nav Bar ----
+
+@Composable
+private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
+    if (state.appPickerOpen) {
+        AppPicker(state, vm)
+        return
+    }
+    SectionHeader("Button order")
+    OrderCard(
+        items = state.navOrder,
+        description = "Drag a button by its handle, or long-press it, to set its place in the overlay nav bar. " +
+            "With a controller: A to pick up, D-pad to move, A to drop.",
+        label = { key ->
+            val button = jr.brian.commandpannel.system.NavBarButton.fromKey(key)
+            if (button == jr.brian.commandpannel.system.NavBarButton.LAUNCH && state.quickLaunchLabel != null && state.quickLaunchShowApp) {
+                state.quickLaunchLabel
+            } else {
+                button?.label ?: key
+            }
+        },
+        note = { key ->
+            when (jr.brian.commandpannel.system.NavBarButton.fromKey(key)) {
+                jr.brian.commandpannel.system.NavBarButton.MODE -> "Screen mode tab"
+                jr.brian.commandpannel.system.NavBarButton.TASK -> "Recent apps"
+                jr.brian.commandpannel.system.NavBarButton.LAUNCH ->
+                    if (state.quickLaunchLabel == null) "Quick Launch · hidden until an app is chosen" else "Quick Launch"
+                jr.brian.commandpannel.system.NavBarButton.SETTINGS -> "Settings tab"
+                jr.brian.commandpannel.system.NavBarButton.APP -> "Opens this companion"
+                null -> null
+            }
+        },
+        onCommit = vm::reorderNavBar,
+        scroll = scroll,
+        viewport = viewport,
+    )
+    SectionHeader("Quick Launch")
+    QuickLaunchCard(state, vm)
+    SwitchCard(
+        "Show app on the Launch button",
+        "Use the chosen app's icon and name on the nav bar instead of the Launch glyph and label.",
+        state.quickLaunchShowApp, vm::setQuickLaunchShowApp,
+    )
 }
 
 // ---- Appearance ----

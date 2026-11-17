@@ -23,6 +23,7 @@ import javax.inject.Inject
 
 enum class SettingsCategory(val title: String) {
     GENERAL("General"),
+    NAV_BAR("Nav Bar"),
     QUICK_TOGGLES("Quick Toggles"),
     APPEARANCE("Appearance"),
     DIAGNOSTICS("Diagnostics"),
@@ -44,6 +45,11 @@ data class SettingsState(
     val orderedEnabledTiles: List<String> = emptyList(),
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
+    /** Show the Quick Launch app's icon and name on its nav button instead of the stock glyph and "Launch". */
+    val quickLaunchShowApp: Boolean = true,
+    val quickLaunchComponent: ComponentName? = null,
+    /** Nav bar button keys in display order. */
+    val navOrder: List<String> = jr.brian.commandpannel.system.NavBarButton.entries.map { it.key },
     val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
     val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
     val replayEnabled: Boolean = false,
@@ -85,6 +91,9 @@ class SettingsViewModel @Inject constructor(
             .enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null)),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
+        quickLaunchShowApp = prefs.getBoolean("quick_launch_show_app", true),
+        quickLaunchComponent = QuickLaunch.savedComponent(getApplication()),
+        navOrder = jr.brian.commandpannel.system.NavBarButton.ordered(prefs.getString("nav_bar_order", null)).map { it.key },
         overlayLayout = jr.brian.commandpannel.system.OverlayLayout.decode(prefs.getString("overlay_layout", null)),
         overlayLook = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
         replayEnabled = prefs.getBoolean("replay_enabled", false),
@@ -145,11 +154,6 @@ class SettingsViewModel @Inject constructor(
             else jr.brian.commandpannel.system.NavBarPosition.BOTTOM
         )
     }
-    fun toggleModeRows() = updateLayout { it.copy(modeRowsSwapped = !it.modeRowsSwapped) }
-    fun toggleModeHalves() = updateLayout { it.copy(modeHalfOrder = it.modeHalfOrder.reversed()) }
-    fun toggleSettingsRows() = updateLayout { it.copy(settingsRowsSwapped = !it.settingsRowsSwapped) }
-    fun toggleSettingsCols() = updateLayout { it.copy(settingsColsSwapped = !it.settingsColsSwapped) }
-    fun toggleQuarters() = updateLayout { it.copy(settingsQuarterOrder = it.settingsQuarterOrder.reversed()) }
     fun resetLayout() = updateLayout { jr.brian.commandpannel.system.OverlayLayout.DEFAULT }
 
     /** Toggles the inverted sync: when on, the Thor ambient-LED colour becomes the overlay accent. */
@@ -182,6 +186,7 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(
             appPickerOpen = false,
             quickLaunchLabel = QuickLaunch.savedLabel(app),
+            quickLaunchComponent = component,
         )
     }
 
@@ -192,7 +197,7 @@ class SettingsViewModel @Inject constructor(
 
     fun clearQuickLaunch() {
         QuickLaunch.clear(app)
-        _state.value = _state.value.copy(quickLaunchLabel = null)
+        _state.value = _state.value.copy(quickLaunchLabel = null, quickLaunchComponent = null)
     }
 
     fun refresh() { _state.value = load() }
@@ -242,6 +247,20 @@ class SettingsViewModel @Inject constructor(
             .toggle(prefs.getString("qs_enabled_tiles", null), key, enable)
         prefs.edit().putString("qs_enabled_tiles", csv).apply()
         _state.value = load()
+    }
+
+    /** Saves a drag-and-drop order of the overlay nav bar buttons. */
+    fun reorderNavBar(keys: List<String>) {
+        val order = jr.brian.commandpannel.system.NavBarButton.run {
+            encode(keys.mapNotNull { fromKey(it) })
+        }
+        prefs.edit().putString("nav_bar_order", order).apply()
+        _state.value = _state.value.copy(navOrder = order.split(","))
+    }
+
+    fun setQuickLaunchShowApp(enable: Boolean) {
+        prefs.edit().putBoolean("quick_launch_show_app", enable).apply()
+        _state.value = _state.value.copy(quickLaunchShowApp = enable)
     }
 
     /** Saves a drag-and-drop order of the enabled quick tiles. */

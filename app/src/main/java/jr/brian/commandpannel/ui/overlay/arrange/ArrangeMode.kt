@@ -48,7 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import jr.brian.commandpannel.system.DropTarget
+import jr.brian.commandpannel.system.GridCell
 import jr.brian.commandpannel.system.NavBarPosition
+import jr.brian.commandpannel.system.OverlayCardGroup
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.system.OverlayLayout
 import jr.brian.commandpannel.ui.theme.LocalTccColors
@@ -80,12 +83,13 @@ class ArrangeController internal constructor(
         private set
     var draggedCard by mutableStateOf<OverlayCardId?>(null)
         private set
-    var hoveredTarget by mutableStateOf<OverlayCardId?>(null)
+    var hoveredTarget by mutableStateOf<DropTarget?>(null)
         private set
 
     internal val pointerOffset = mutableStateOf(Offset.Zero)
 
     private val bounds = HashMap<OverlayCardId, Rect>()
+    private val emptyCellBounds = HashMap<DropTarget.Empty, Rect>()
     private val flipAnimations = HashMap<OverlayCardId, Animatable<Offset, AnimationVector2D>>()
     private var pendingFlip: MutableMap<OverlayCardId, Offset>? = null
     private var dragStartInRoot = Offset.Zero
@@ -122,6 +126,14 @@ class ArrangeController internal constructor(
         bounds.remove(card)
     }
 
+    internal fun onEmptyPositioned(group: OverlayCardGroup, cell: GridCell, rect: Rect) {
+        emptyCellBounds[DropTarget.Empty(group, cell)] = rect
+    }
+
+    internal fun clearEmpty(group: OverlayCardGroup, cell: GridCell) {
+        emptyCellBounds.remove(DropTarget.Empty(group, cell))
+    }
+
     internal fun onPositioned(card: OverlayCardId, rect: Rect) {
         bounds[card] = rect
         val oldTopLeft = pendingFlip?.remove(card) ?: return
@@ -150,9 +162,15 @@ class ArrangeController internal constructor(
         pointerOffset.value += amount
         if (card == OverlayCardId.NAV_BAR) return
         val finger = dragStartInRoot + pointerOffset.value
-        val target = bounds.entries.firstOrNull { (id, rect) ->
+        val cardTarget = bounds.entries.firstOrNull { (id, rect) ->
             id != card && id.group == card.group && rect.contains(finger)
         }?.key
+        val target: DropTarget? = when {
+            cardTarget != null -> DropTarget.Card(cardTarget)
+            else -> emptyCellBounds.entries.firstOrNull { (key, rect) ->
+                key.group == card.group && rect.contains(finger)
+            }?.key
+        }
         if (target != hoveredTarget) {
             hoveredTarget = target
             if (target != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -304,7 +322,7 @@ fun ArrangeableCard(
 
     val isArranging = controller.isArranging
     val isLifted = controller.draggedCard == card
-    val isTarget = controller.hoveredTarget == card
+    val isTarget = controller.hoveredTarget.let { it is DropTarget.Card && it.id == card }
     val scale by animateFloatAsState(
         targetValue = when {
             isLifted -> 1.05f
@@ -359,6 +377,36 @@ fun ArrangeableCard(
             )
         }
     }
+}
+
+/**
+ * An empty grid cell (a gap the user left). While arranging it registers itself as a drop target and shows a
+ * droppable outline; otherwise it is just blank space holding the grid's shape.
+ */
+@Composable
+fun EmptyCell(
+    group: OverlayCardGroup,
+    cell: GridCell,
+    controller: ArrangeController,
+    modifier: Modifier = Modifier,
+) {
+    if (!controller.isArranging) {
+        Box(modifier)
+        return
+    }
+    val colors = LocalTccColors.current
+    val cardShape = LocalTccLookSpec.current.panelCardShape
+    val isTarget = controller.hoveredTarget.let { it is DropTarget.Empty && it.group == group && it.cell == cell }
+    DisposableEffect(group, cell, controller) {
+        onDispose { controller.clearEmpty(group, cell) }
+    }
+    Box(
+        modifier = modifier
+            .onGloballyPositioned { controller.onEmptyPositioned(group, cell, it.boundsInRoot()) }
+            .clip(cardShape)
+            .background(colors.accent.copy(alpha = if (isTarget) 0.18f else 0.06f))
+            .border(2.dp, colors.accent.copy(alpha = if (isTarget) 0.9f else 0.3f), cardShape)
+    )
 }
 
 /** Floating "Arrange layout" pill: tab switcher (the nav bar is draggable, not tappable), Reset, Done. */

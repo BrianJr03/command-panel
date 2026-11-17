@@ -46,6 +46,10 @@ data class OverlayUiState(
     val themeMode: Int = 4,          // tcc_theme_mode: 1 system, 3 light, 4 dark
     val suppressBottomTip: Boolean = false,
     val quickLaunchLabel: String? = null,  // fork feature: null = no Launch nav button
+    /** Quick Launch app shown on its nav button (icon + name); null keeps the stock "Launch" glyph and label. */
+    val quickLaunchApp: android.content.ComponentName? = null,
+    /** Nav bar button order (companion Nav Bar section). */
+    val navOrder: List<jr.brian.commandpannel.system.NavBarButton> = jr.brian.commandpannel.system.NavBarButton.entries,
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
     val layout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,

@@ -1,24 +1,35 @@
 package jr.brian.commandpannel.system
 
+/** How many columns of the 2-column overlay grid a card occupies. */
+enum class CardSpan { FULL, HALF }
+
 /**
- * Cards of the bottom-screen overlay that can be rearranged in Arrange mode.
+ * Cards of the bottom-screen overlay that can be rearranged in Arrange mode. Each tab is a 2-column grid; a card has
+ * an intrinsic [span] (FULL spans both columns and owns its row, HALF takes one column) and an intrinsic [rowWeight]
+ * (its row's share of the tab height). Size is never user-changed, so span/weight are constants, not persisted.
  *
- * Cards never change size: dropping a card onto a same-sized card swaps the two, while dropping
- * it onto a differently sized card swaps the whole row and/or column that holds them.
+ * `NAV_BAR` is not a grid card — it is overlay chrome placed above or below the tab content; its position lives in
+ * [OverlayLayout.navBarPosition].
  */
-enum class OverlayCardId(val key: String, val group: OverlayCardGroup) {
-    MODE_BUTTONS("mode_buttons", OverlayCardGroup.MODE_TAB),
-    BRIGHTNESS("brightness", OverlayCardGroup.MODE_TAB),
-    VOLUME("volume", OverlayCardGroup.MODE_TAB),
-    FRAME_RATE("frame_rate", OverlayCardGroup.SETTINGS_TAB),
-    QUICK_TILES("quick_tiles", OverlayCardGroup.SETTINGS_TAB),
-    TEMP("temp", OverlayCardGroup.SETTINGS_TAB),
-    FAN("fan", OverlayCardGroup.SETTINGS_TAB),
-    RINGS("rings", OverlayCardGroup.SETTINGS_TAB),
+enum class OverlayCardId(
+    val key: String,
+    val group: OverlayCardGroup,
+    val span: CardSpan = CardSpan.HALF,
+    val rowWeight: Float = 1f,
+) {
+    MODE_BUTTONS("mode_buttons", OverlayCardGroup.MODE_TAB, CardSpan.FULL, 0.46f),
+    BRIGHTNESS("brightness", OverlayCardGroup.MODE_TAB, CardSpan.HALF, 0.54f),
+    VOLUME("volume", OverlayCardGroup.MODE_TAB, CardSpan.HALF, 0.54f),
+    FRAME_RATE("frame_rate", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.50f),
+    QUICK_TILES("quick_tiles", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.50f),
+    TEMP("temp", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.26f),
+    FAN("fan", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.26f),
+    RINGS("rings", OverlayCardGroup.SETTINGS_TAB, CardSpan.FULL, 0.24f),
     NAV_BAR("nav_bar", OverlayCardGroup.NAV_BAR);
 
     companion object {
         fun fromKey(key: String): OverlayCardId? = entries.firstOrNull { it.key == key }
+        fun of(group: OverlayCardGroup): List<OverlayCardId> = entries.filter { it.group == group }
     }
 }
 
@@ -33,105 +44,163 @@ enum class NavBarPosition(val key: String) {
     }
 }
 
+/** A card's position in the 2-column grid. [col] is 0 or 1; a FULL card sits at col 0 and owns the whole row. */
+data class GridCell(val row: Int, val col: Int)
+
+/** Where a drag was released: onto another card, or onto an empty grid cell. */
+sealed interface DropTarget {
+    data class Card(val id: OverlayCardId) : DropTarget
+    data class Empty(val group: OverlayCardGroup, val cell: GridCell) : DropTarget
+}
+
 /**
- * Persisted overlay arrangement. Swap flags are relative to the stock layout:
- *
- * - Mode tab: row 0 = [MODE_BUTTONS], row 1 = [modeHalfOrder[0] | modeHalfOrder[1]].
- * - Settings tab: row 0 = [FRAME_RATE | QUICK_TILES], row 1 = [quarters(TEMP, FAN) | RINGS];
- *   column 0 is the narrow left column. Swapped rows/columns keep their own weights.
+ * Persisted overlay arrangement: an explicit [GridCell] per card, per tab, plus the nav-bar position. A drop is
+ * always local — it swaps two cards or fills an empty cell — so moving one card never reflows the others.
  */
 data class OverlayLayout(
-    val modeRowsSwapped: Boolean = false,
-    val modeHalfOrder: List<OverlayCardId> = DEFAULT_MODE_HALVES,
-    val settingsRowsSwapped: Boolean = false,
-    val settingsColsSwapped: Boolean = false,
-    val settingsQuarterOrder: List<OverlayCardId> = DEFAULT_SETTINGS_QUARTERS,
-    val navBarPosition: NavBarPosition = NavBarPosition.BOTTOM
+    val modeCells: Map<OverlayCardId, GridCell> = DEFAULT_MODE_CELLS,
+    val settingsCells: Map<OverlayCardId, GridCell> = DEFAULT_SETTINGS_CELLS,
+    val navBarPosition: NavBarPosition = NavBarPosition.TOP,
 ) {
     val isDefault: Boolean get() = this == DEFAULT
 
-    /** Returns the layout after dropping [dragged] onto [target], or this layout if the drop is not valid. */
-    fun applyDrop(dragged: OverlayCardId, target: OverlayCardId): OverlayLayout {
-        if (dragged == target || dragged.group != target.group) return this
-        return when (dragged.group) {
-            OverlayCardGroup.MODE_TAB -> applyModeDrop(dragged, target)
-            OverlayCardGroup.SETTINGS_TAB -> applySettingsDrop(dragged, target)
-            OverlayCardGroup.NAV_BAR -> this
-        }
+    /** The cell map for [group] (empty for the nav bar, which isn't a grid card). */
+    fun cells(group: OverlayCardGroup): Map<OverlayCardId, GridCell> = when (group) {
+        OverlayCardGroup.MODE_TAB -> modeCells
+        OverlayCardGroup.SETTINGS_TAB -> settingsCells
+        OverlayCardGroup.NAV_BAR -> emptyMap()
     }
 
     fun withNavBarPosition(position: NavBarPosition): OverlayLayout = copy(navBarPosition = position)
 
-    private fun applyModeDrop(dragged: OverlayCardId, target: OverlayCardId): OverlayLayout {
-        return if (dragged in DEFAULT_MODE_HALVES && target in DEFAULT_MODE_HALVES) {
-            copy(modeHalfOrder = modeHalfOrder.reversed())
-        } else {
-            copy(modeRowsSwapped = !modeRowsSwapped)
-        }
+    private fun withCells(group: OverlayCardGroup, cells: Map<OverlayCardId, GridCell>): OverlayLayout = when (group) {
+        OverlayCardGroup.MODE_TAB -> copy(modeCells = cells)
+        OverlayCardGroup.SETTINGS_TAB -> copy(settingsCells = cells)
+        OverlayCardGroup.NAV_BAR -> this
     }
 
-    private fun applySettingsDrop(dragged: OverlayCardId, target: OverlayCardId): OverlayLayout {
-        if (dragged in DEFAULT_SETTINGS_QUARTERS && target in DEFAULT_SETTINGS_QUARTERS) {
-            return copy(settingsQuarterOrder = settingsQuarterOrder.reversed())
+    /** Returns the layout after dropping [dragged] onto [target], or this layout if the drop is not valid. */
+    fun applyDrop(dragged: OverlayCardId, target: DropTarget): OverlayLayout {
+        val group = dragged.group
+        if (group == OverlayCardGroup.NAV_BAR) return this
+        val cells = cells(group).toMutableMap()
+        val draggedCell = cells[dragged] ?: return this
+
+        when (target) {
+            is DropTarget.Card -> {
+                val t = target.id
+                if (t == dragged || t.group != group) return this
+                val targetCell = cells[t] ?: return this
+                if (dragged.span == t.span) {
+                    // Same size: swap the two cards' cells.
+                    cells[dragged] = targetCell
+                    cells[t] = draggedCell
+                } else {
+                    // FULL <-> HALF: the two whole rows trade places.
+                    return swapRows(group, cells, draggedCell.row, targetCell.row)
+                }
+            }
+            is DropTarget.Empty -> {
+                if (target.group != group) return this
+                val cell = target.cell
+                if (dragged.span == CardSpan.FULL) {
+                    // A FULL card needs its whole target row free.
+                    if (cells.any { (k, v) -> k != dragged && v.row == cell.row }) return this
+                    cells[dragged] = GridCell(cell.row, 0)
+                } else {
+                    // A HALF card fills a single empty cell in a row that has no FULL card.
+                    if (cells.any { (k, v) -> k != dragged && (v == cell || (v.row == cell.row && k.span == CardSpan.FULL)) }) return this
+                    cells[dragged] = cell
+                }
+            }
         }
-        val (draggedRow, draggedCol) = settingsCell(dragged)
-        val (targetRow, targetCol) = settingsCell(target)
-        return copy(
-            settingsRowsSwapped = settingsRowsSwapped xor (draggedRow != targetRow),
-            settingsColsSwapped = settingsColsSwapped xor (draggedCol != targetCol)
-        )
+        return if (isValid(group, cells)) withCells(group, cells) else this
     }
 
-    /** Serialized as `key=value` pairs separated by `;`, with orders as comma-separated card keys. */
+    private fun swapRows(group: OverlayCardGroup, cells: Map<OverlayCardId, GridCell>, a: Int, b: Int): OverlayLayout {
+        val next = cells.mapValues { (_, c) ->
+            when (c.row) {
+                a -> c.copy(row = b)
+                b -> c.copy(row = a)
+                else -> c
+            }
+        }
+        return if (isValid(group, next)) withCells(group, next) else this
+    }
+
+    /** Serialized as `key=value;...`, each tab a comma-separated list of `cardKey:row:col`. */
     fun encode(): String = listOf(
         "v=$FORMAT_VERSION",
-        "mode_rows=${if (modeRowsSwapped) 1 else 0}",
-        "mode_halves=${modeHalfOrder.joinToString(",") { it.key }}",
-        "settings_rows=${if (settingsRowsSwapped) 1 else 0}",
-        "settings_cols=${if (settingsColsSwapped) 1 else 0}",
-        "settings_quarters=${settingsQuarterOrder.joinToString(",") { it.key }}",
-        "nav=${navBarPosition.key}"
+        "mode=${encodeCells(modeCells)}",
+        "settings=${encodeCells(settingsCells)}",
+        "nav=${navBarPosition.key}",
     ).joinToString(";")
 
     companion object {
-        const val FORMAT_VERSION = 1
-        val DEFAULT_MODE_HALVES = listOf(OverlayCardId.BRIGHTNESS, OverlayCardId.VOLUME)
-        val DEFAULT_SETTINGS_QUARTERS = listOf(OverlayCardId.TEMP, OverlayCardId.FAN)
+        const val FORMAT_VERSION = 2
+
+        val DEFAULT_MODE_CELLS = mapOf(
+            OverlayCardId.MODE_BUTTONS to GridCell(0, 0),
+            OverlayCardId.BRIGHTNESS to GridCell(1, 0),
+            OverlayCardId.VOLUME to GridCell(1, 1),
+        )
+        val DEFAULT_SETTINGS_CELLS = mapOf(
+            OverlayCardId.FRAME_RATE to GridCell(0, 0),
+            OverlayCardId.QUICK_TILES to GridCell(0, 1),
+            OverlayCardId.RINGS to GridCell(1, 0),
+            OverlayCardId.TEMP to GridCell(2, 0),
+            OverlayCardId.FAN to GridCell(2, 1),
+        )
         val DEFAULT = OverlayLayout()
 
-        /** Parses [encode] output; unknown keys are ignored and invalid values fall back to defaults. */
+        /**
+         * A cell map is valid when it holds exactly the group's cards, every col is 0/1, every FULL card is at col 0
+         * and alone in its row, and no two cards share a cell. Keeps [applyDrop] and [decode] from ever overlapping.
+         */
+        fun isValid(group: OverlayCardGroup, cells: Map<OverlayCardId, GridCell>): Boolean {
+            if (cells.keys != OverlayCardId.of(group).toSet()) return false
+            if (cells.values.any { it.row < 0 || it.col !in 0..1 }) return false
+            if (cells.any { (k, v) -> k.span == CardSpan.FULL && v.col != 0 }) return false
+            if (cells.values.size != cells.values.toSet().size) return false
+            for ((k, v) in cells) {
+                if (k.span == CardSpan.FULL && cells.any { (k2, v2) -> k2 != k && v2.row == v.row }) return false
+            }
+            return true
+        }
+
+        private fun encodeCells(cells: Map<OverlayCardId, GridCell>): String =
+            cells.entries.sortedBy { it.key.ordinal }.joinToString(",") { (id, c) -> "${id.key}:${c.row}:${c.col}" }
+
+        /** Parses [encode] output. Each tab validates as a whole; any missing/extra/overlapping cell reverts that
+         *  tab to its default. Old v1 strings (no `mode=`/`settings=`) fall through to defaults. */
         fun decode(raw: String?): OverlayLayout {
             if (raw.isNullOrBlank()) return DEFAULT
             val values = raw.split(";").mapNotNull { entry ->
-                val separator = entry.indexOf('=')
-                if (separator <= 0) null else entry.substring(0, separator).trim() to entry.substring(separator + 1).trim()
+                val sep = entry.indexOf('=')
+                if (sep <= 0) null else entry.substring(0, sep).trim() to entry.substring(sep + 1).trim()
             }.toMap()
             return OverlayLayout(
-                modeRowsSwapped = values["mode_rows"] == "1",
-                modeHalfOrder = parseOrder(values["mode_halves"], DEFAULT_MODE_HALVES),
-                settingsRowsSwapped = values["settings_rows"] == "1",
-                settingsColsSwapped = values["settings_cols"] == "1",
-                settingsQuarterOrder = parseOrder(values["settings_quarters"], DEFAULT_SETTINGS_QUARTERS),
-                navBarPosition = values["nav"]?.let { NavBarPosition.fromKey(it) } ?: NavBarPosition.BOTTOM
+                modeCells = parseCells(values["mode"], OverlayCardGroup.MODE_TAB, DEFAULT_MODE_CELLS),
+                settingsCells = parseCells(values["settings"], OverlayCardGroup.SETTINGS_TAB, DEFAULT_SETTINGS_CELLS),
+                navBarPosition = values["nav"]?.let { NavBarPosition.fromKey(it) } ?: NavBarPosition.TOP,
             )
         }
 
-        /** Accepts the saved order only if it is exactly a permutation of [defaultOrder]. */
-        private fun parseOrder(raw: String?, defaultOrder: List<OverlayCardId>): List<OverlayCardId> {
-            val parsed = raw?.split(",")?.mapNotNull { OverlayCardId.fromKey(it.trim()) }.orEmpty()
-            return if (parsed.size == defaultOrder.size && parsed.toSet() == defaultOrder.toSet()) {
-                parsed
-            } else {
-                defaultOrder
-            }
-        }
-
-        /** Logical (row, column) of a Settings-tab card in the stock layout. */
-        private fun settingsCell(card: OverlayCardId): Pair<Int, Int> = when (card) {
-            OverlayCardId.FRAME_RATE -> 0 to 0
-            OverlayCardId.QUICK_TILES -> 0 to 1
-            OverlayCardId.TEMP, OverlayCardId.FAN -> 1 to 0
-            else -> 1 to 1
+        private fun parseCells(
+            raw: String?,
+            group: OverlayCardGroup,
+            default: Map<OverlayCardId, GridCell>,
+        ): Map<OverlayCardId, GridCell> {
+            if (raw.isNullOrBlank()) return default
+            val parsed = raw.split(",").mapNotNull { token ->
+                val parts = token.split(":")
+                if (parts.size != 3) return@mapNotNull null
+                val id = OverlayCardId.fromKey(parts[0].trim())?.takeIf { it.group == group } ?: return@mapNotNull null
+                val row = parts[1].trim().toIntOrNull() ?: return@mapNotNull null
+                val col = parts[2].trim().toIntOrNull() ?: return@mapNotNull null
+                id to GridCell(row, col)
+            }.toMap()
+            return if (isValid(group, parsed)) parsed else default
         }
     }
 }

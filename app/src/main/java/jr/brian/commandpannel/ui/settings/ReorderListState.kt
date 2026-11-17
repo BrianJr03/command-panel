@@ -19,13 +19,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Drag-and-drop state for the quick-tile order list. Touch: the dragged row follows the finger, swapping with a
- * neighbour once it crosses half a slot, and the screen auto-scrolls near the viewport edges. Gamepad: A picks a row
- * up ([grab]), D-pad moves it ([moveGrabbed]), A / B drops it ([drop]). Neighbours slide into place; the new order is
- * committed through [onCommit] when the drag ends.
+ * Drag-and-drop state for the companion's order lists (quick tiles, nav bar buttons). Touch: the dragged row follows
+ * the finger, swapping with a neighbour once it crosses half a slot, and the screen auto-scrolls near the viewport
+ * edges. Gamepad: A picks a row up ([grab]), D-pad moves it ([moveGrabbed]), A / B drops it ([drop]). Neighbours
+ * slide into place; the new order is committed through [onCommit] when the drag ends.
  */
 @Stable
-internal class TileReorderState(
+internal class ReorderListState(
     initial: List<String>,
     private val scope: CoroutineScope,
     private val scroll: ScrollState,
