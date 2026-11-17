@@ -218,6 +218,7 @@ class SettingsRepository(
                 QuickSettingTileId.TRIGGER_MODE -> triggerTitle(settings.getInt("trigger_input_mode", 2)) to false
                 QuickSettingTileId.SCREENSHOT -> "Screenshot" to false
                 QuickSettingTileId.CLEAR_ALL_TASKS -> "Clear All\nTasks" to false
+                QuickSettingTileId.REPLAY_BUFFER -> "Replay\nBuffer" to prefs.getBoolean("replay_enabled", false)
             }
             QuickTile(key, id.icon, title, active)
         }
@@ -306,6 +307,15 @@ class SettingsRepository(
             "charge_limit_80" -> toggleIntKey("percent_80_charge_limit", 0)
             "gamepad_mouse_mode" -> toggleIntKey("global_gamepad_to_mouse_mode", 0)
             "clear_all_tasks" -> clearAllTasks()
+            "replay_buffer" -> {
+                val enable = !prefs.getBoolean("replay_enabled", false)
+                prefs.edit().putBoolean("replay_enabled", enable).apply()
+                // Let the service's replay controller arm/disarm to match the pref.
+                context.sendBroadcast(
+                    Intent(jr.brian.commandpannel.service.AssistantService.ACTION_REPLAY_SET_ENABLED)
+                        .setPackage(context.packageName),
+                )
+            }
             // focus_lock, performance, fan, controller, theme, trigger_mode, screenshot → modal dialogs (in the overlay)
         }
         refreshFromSettings()

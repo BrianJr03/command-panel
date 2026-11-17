@@ -51,7 +51,8 @@ enum class QuickSettingTileId(
     VIRTUAL_MOUSE("gamepad_mouse_mode", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Mouse), TileInteraction.TOGGLE),
     TRIGGER_MODE("trigger_mode", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Tune), TileInteraction.DIALOG),
     SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG),
-    CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION);
+    CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION),
+    REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE);
 
     /** Display name for the companion app's enable/disable list. */
     val label: String get() = when (this) {
@@ -76,6 +77,7 @@ enum class QuickSettingTileId(
         TRIGGER_MODE -> "L2/R2 Trigger Mode"
         SCREENSHOT -> "Screenshot"
         CLEAR_ALL_TASKS -> "Clear All Tasks"
+        REPLAY_BUFFER -> "Replay Buffer"
     }
 
     companion object {
