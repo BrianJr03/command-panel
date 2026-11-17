@@ -119,6 +119,21 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
     )
     QuickLaunchCard(state, vm)
     Card {
+        val c = LocalTccColors.current
+        Text("Backup & Restore", color = c.primary, fontSize = 16.sp)
+        Text("Export the companion settings to a JSON file, or restore the most recent backup.",
+            color = c.secondary, fontSize = 13.sp)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = vm::exportBackup) { Text("Export") }
+            Button(onClick = vm::restoreLatestBackup) { Text("Restore latest") }
+        }
+        state.backupMessage?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = c.secondary, fontSize = 12.sp)
+        }
+    }
+    Card {
         Text("Overlay preview", color = LocalTccColors.current.primary, fontSize = 16.sp)
         Spacer(Modifier.height(8.dp))
         Button(onClick = vm::showOverlay) { Text("Open overlay on bottom screen") }

@@ -164,14 +164,17 @@ Done (cont.):
   root dumps, applies the policy, removes via the helper; Tools tile + "Keep Apps On Screen" toggle. Verified on
   device: recents 15→4, kept Command Panel + home, removed background tasks, foreground survived.
 
+- **Settings Backup & Restore (9)** — `SettingsBackup` (allow-listed JSON encode/decode, pure + tested; export via
+  root to `/sdcard/Documents/CommandPanel/backups`, restore latest). General card. Verified on device: exported
+  valid JSON, "Restored 6 settings".
+
 Backlog (remaining fork features, roughly easiest → hardest):
-- Nav bar Home/Launch reorder + Home default (1) — largely BDSA-specific; may not apply.
-- Thor RGB accent sync (6), Dark-on-TV tap-to-wake (7) — device-specific, self-contained.
-- Quick-toggle reorder (12) — rewrite the 160 upstream lines flagged in the manifest.
+- Dark-on-TV tap-to-wake (7) — self-contained but needs an external DisplayPort display to verify.
+- Quick-toggle drag-reorder (12) — rewrite the 160 upstream lines flagged in the manifest; drag-drop UI.
 - Arrange mode (3) — needs the overlay cards made addressable.
-- Settings backup & restore (9) — needs helper file I/O.
 - Look system + 16 looks (8) — large; renderers + fonts + license notices.
 - Replay buffer (11) — largest; needs Command Panel's own screen-capture pipeline in the helper first.
+- Nav bar Home/Launch reorder (1) — BDSA-specific; likely not applicable.
 
 ## Verification
 

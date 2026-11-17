@@ -33,6 +33,7 @@ data class SettingsState(
     val batteryEstimate: Boolean = false,
     val hideNetSpeed: Boolean = false,
     val keepOnScreen: Boolean = true,
+    val backupMessage: String? = null,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
     val enabledTiles: Set<String> = emptySet(),
@@ -122,6 +123,31 @@ class SettingsViewModel @Inject constructor(
     fun setHideNetSpeed(enable: Boolean) {
         prefs.edit().putBoolean("hide_net_speed", enable).apply()
         _state.value = _state.value.copy(hideNetSpeed = enable)
+    }
+
+    fun exportBackup() {
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) {
+                jr.brian.commandpannel.system.SettingsBackup.export(app, privileged)
+            }
+            _state.value = _state.value.copy(backupMessage = if (path != null) "Saved to $path" else "Export failed")
+        }
+    }
+
+    fun restoreLatestBackup() {
+        viewModelScope.launch {
+            val n = withContext(Dispatchers.IO) {
+                val latest = jr.brian.commandpannel.system.SettingsBackup.list(privileged).firstOrNull()
+                    ?: return@withContext -1
+                jr.brian.commandpannel.system.SettingsBackup.import(app, privileged, latest)
+            }
+            val msg = when {
+                n < 0 -> "No backup found"
+                n == 0 -> "Restore failed"
+                else -> "Restored $n settings"
+            }
+            _state.value = load().copy(backupMessage = msg)
+        }
     }
 
     fun setKeepOnScreen(enable: Boolean) {

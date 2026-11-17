@@ -76,4 +76,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20231013")  // real org.json for unit tests (the SDK one is a stub)
 }
