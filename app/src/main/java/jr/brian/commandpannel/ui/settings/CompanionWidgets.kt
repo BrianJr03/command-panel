@@ -177,9 +177,9 @@ internal fun Modifier.companionCard(focused: Boolean = false, focusable: Boolean
 
 /** A plain visual container (not a focus target); its rows are the focus targets. */
 @Composable
-internal fun Card(content: @Composable () -> Unit) {
+internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().companionCard().padding(18.dp),
+        modifier.fillMaxWidth().companionCard().padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) { content() }
 }
@@ -460,4 +460,18 @@ internal fun GamepadTextField(
         // While not editing, a tap anywhere on the field starts editing (the disabled text field would swallow it).
         if (!editing) Box(Modifier.matchParentSize().noRippleClickable { editing = true })
     }
+}
+
+/**
+ * Scrolls this whole element into view (with the padded margins) whenever focus lands anywhere inside it. For
+ * multi-control cards, so moving onto a card's buttons shows the entire card, not just the row of buttons.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.bringIntoViewOnFocus(): Modifier {
+    val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    return this
+        .bringIntoViewRequester(requester)
+        .onFocusChanged { if (it.hasFocus) scope.launch { requester.bringIntoView() } }
 }

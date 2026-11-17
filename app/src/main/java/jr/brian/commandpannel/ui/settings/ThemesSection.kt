@@ -153,9 +153,9 @@ private fun SavedLookCard(
 ) {
     val active = state.overlayLookRef == look.ref
     var confirmDelete by remember(look.id) { mutableStateOf(false) }
-    Card {
+    Card(Modifier.bringIntoViewOnFocus()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OverlayLookPreview(state, look.baseLook, look, width = 150.dp)
+            OverlayLookPreview(state, look.baseLook, look, width = 160.dp, padding = LOOK_PREVIEW_PADDING)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 CardTitle(look.name)
@@ -179,6 +179,9 @@ private fun SavedLookCard(
         }
     }
 }
+
+/** Breathing room between a look's preview frame and the miniature overlay inside it. */
+private val LOOK_PREVIEW_PADDING = 6.dp
 
 private val LOOK_MIME_TYPES = arrayOf("application/json", "text/plain", "application/octet-stream")
 
@@ -220,8 +223,8 @@ private fun FolderPackCard(fp: FolderPack, state: SettingsState, vm: SettingsVie
         }
         if (expanded) pack.looks.forEach { look ->
             Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OverlayLookPreview(state, look.baseLook, look, width = 150.dp)
+            Row(Modifier.bringIntoViewOnFocus(), verticalAlignment = Alignment.CenterVertically) {
+                OverlayLookPreview(state, look.baseLook, look, width = 160.dp, padding = LOOK_PREVIEW_PADDING)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(look.name, color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

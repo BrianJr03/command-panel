@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,16 +55,21 @@ internal fun ScaledPreview(
     width: Dp,
     design: DpSize = OverlayScreenSize,
     modifier: Modifier = Modifier,
+    /** Space between the frame and the miniature, so the overlay's edges don't touch the border. */
+    padding: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
-    val scale = width / design.width
+    val scale = (width - padding * 2) / design.width
     val outer = LocalDensity.current
     Box(
         modifier
-            .size(width, design.height * scale)
+            .size(width, design.height * scale + padding * 2)
             .clip(cardShape())
             .border(1.dp, p.border, cardShape())
+            // The miniature overlay has focusable controls of its own. Fencing it in a group that can't be entered
+            // keeps D-pad focus from landing on (invisible) controls inside a preview.
             .focusProperties { onEnter = { cancelFocusChange() } }
+            .focusGroup()
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
@@ -71,7 +77,7 @@ internal fun ScaledPreview(
             },
     ) {
         CompositionLocalProvider(LocalDensity provides Density(outer.density * scale, outer.fontScale)) {
-            Box(Modifier.fillMaxSize()) { content() }
+            Box(Modifier.fillMaxSize().padding(padding / scale)) { content() }
         }
     }
 }
@@ -86,8 +92,9 @@ internal fun OverlayLookPreview(
     tab: OverlayTab = OverlayTab.SETTINGS,
     themeMode: Int = state.themeMode,
     modifier: Modifier = Modifier,
+    padding: Dp = 0.dp,
 ) {
-    ScaledPreview(width, modifier = modifier) {
+    ScaledPreview(width, modifier = modifier, padding = padding) {
         OverlayRoot(
             OverlayUiState(
                 themeMode = themeMode,
