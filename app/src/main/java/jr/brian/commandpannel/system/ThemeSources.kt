@@ -105,14 +105,20 @@ object ThemeSources {
         val downloadUrls: Map<String, String>
         val prefetched = mutableMapOf<String, String>()
         if (source.isGitHub) {
-            val ref = source.branch?.let { "?ref=$it" }.orEmpty()
+            // The listing is cached for up to 60 s (s-maxage), so a fresh query string keeps "Update" right after a push
+            // from reporting stale versions.
+            val query = listOfNotNull(source.branch?.let { "ref=$it" }, "t=${System.currentTimeMillis()}").joinToString("&")
             val listing = JSONArray(
-                Http.getText("https://api.github.com/repos/${source.owner}/${source.repo}/contents/themes$ref", 256 * 1024, "application/vnd.github+json"),
+                Http.getText("https://api.github.com/repos/${source.owner}/${source.repo}/contents/themes?$query", 256 * 1024, "application/vnd.github+json"),
             )
             val files = (0 until listing.length()).mapNotNull { listing.optJSONObject(it) }
                 .filter { it.optString("type") == "file" && it.optString("name").endsWith(LookPackJson.EXTENSION) }
             remote = files.associate { it.optString("path") to it.optString("sha") }
-            downloadUrls = files.associate { it.optString("path") to it.optString("download_url") }
+            // Fetch each pack by its blob sha rather than download_url: raw.githubusercontent caches files for minutes,
+            // which could install stale content under the new sha (and then never re-download it). Blobs are immutable.
+            downloadUrls = files.associate {
+                it.optString("path") to "https://api.github.com/repos/${source.owner}/${source.repo}/git/blobs/${it.optString("sha")}"
+            }
         } else {
             // A single file has no listing; its content hash decides whether it changed.
             val text = Http.getText(source.url, LookPackJson.MAX_BYTES)
@@ -128,7 +134,10 @@ object ThemeSources {
         val fontLooks = mutableListOf<CustomLook>()
         var fonts = emptyMap<String, jr.brian.commandpannel.ui.theme.FontSource>()
         for (path in changed) {
-            val text = prefetched[path] ?: Http.getText(downloadUrls.getValue(path), LookPackJson.MAX_BYTES)
+            val text = prefetched[path] ?: Http.getText(downloadUrls.getValue(path), LookPackJson.MAX_BYTES, "application/vnd.github.raw").also {
+                // Only record a version whose content we actually have, so a bad download is retried next sync.
+                check(gitBlobSha(it.toByteArray()) == remote.getValue(path)) { "content didn't match $path" }
+            }
             val fileName = path.substringAfterLast('/')
             val pack = LookPackJson.decode(text, fileName.substringBefore('.')) ?: continue
             packs += pack
@@ -177,6 +186,13 @@ object ThemeSources {
             owner = o.optString("owner").ifBlank { null }, repo = o.optString("repo").ifBlank { null },
             branch = o.optString("branch").ifBlank { null }, lastSync = o.optLong("lastSync"), files = files,
         )
+    }
+
+    /** Git's blob id for [bytes] (`sha1("blob <size>\u0000" + bytes)`), which the GitHub contents API reports as `sha`. */
+    internal fun gitBlobSha(bytes: ByteArray): String {
+        val md = MessageDigest.getInstance("SHA-1")
+        md.update("blob ${bytes.size}\u0000".toByteArray())
+        return md.digest(bytes).joinToString("") { "%02x".format(it) }
     }
 
     private fun sha1(text: String): String =

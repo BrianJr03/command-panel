@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -114,8 +116,9 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         CardDesc(stringResource(R.string.theme_repos_desc))
         var link by remember { mutableStateOf("") }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            LinkField(link, Modifier.weight(1f)) { link = it }
-            Chip(stringResource(R.string.theme_repo_add), enabled = link.isNotBlank() && !state.themeBusy) { vm.addSource(link); link = "" }
+            val follow = { if (link.isNotBlank() && !state.themeBusy) { vm.addSource(link); link = "" } }
+            LinkField(link, Modifier.weight(1f), onSubmit = follow) { link = it }
+            Chip(stringResource(R.string.theme_repo_add), enabled = link.isNotBlank() && !state.themeBusy, onClick = follow)
         }
         state.repoMessage?.let { InfoLine(it) }
     }
@@ -251,7 +254,7 @@ private fun SourceCard(source: ThemeSource, state: SettingsState, vm: SettingsVi
 
 /** Single-line field for pasting a theme repo link (opens the keyboard when focused). */
 @Composable
-private fun LinkField(value: String, modifier: Modifier, onChange: (String) -> Unit) {
+private fun LinkField(value: String, modifier: Modifier, onSubmit: () -> Unit, onChange: (String) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = controlShape(10.dp)
     Box(
@@ -267,7 +270,9 @@ private fun LinkField(value: String, modifier: Modifier, onChange: (String) -> U
             singleLine = true,
             textStyle = TextStyle(color = p.textPrimary, fontSize = 14.sp),
             cursorBrush = SolidColor(p.accent),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            // The keyboard's Go key follows the link (taps outside the field don't land while the keyboard is up).
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { onSubmit() }),
             modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
         )
     }

@@ -108,4 +108,10 @@ class ThemePackTest {
         assertEquals(jr.brian.commandpannel.ui.theme.GaugeKind.ARC, block.custom.gauge.kind)
         assertEquals(jr.brian.commandpannel.ui.theme.NavIndicator.BLOCK, block.custom.nav.indicator)
     }
+
+    @Test
+    fun `git blob sha matches git's object id`() {
+        // `printf 'hello\n' | git hash-object --stdin`
+        assertEquals("ce013625030ba8dba906f756967f9e9ca394464a", ThemeSources.gitBlobSha("hello\n".toByteArray()))
+    }
 }

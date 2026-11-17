@@ -99,7 +99,9 @@ internal object Http {
         try {
             conn.connectTimeout = 10_000
             conn.readTimeout = 15_000
+            conn.useCaches = false
             conn.setRequestProperty("User-Agent", "TCP-Theme-Studio")
+            conn.setRequestProperty("Cache-Control", "no-cache")
             accept?.let { conn.setRequestProperty("Accept", it) }
             val code = conn.responseCode
             if (code !in 200..299) error("HTTP $code")
