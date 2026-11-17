@@ -22,6 +22,8 @@ enum class SettingsCategory(val title: String) {
 
 data class SettingsState(
     val replaceStock: Boolean = false,
+    val batteryEstimate: Boolean = false,
+    val hideNetSpeed: Boolean = false,
     val themeMode: Int = 4,              // tcc_theme_mode
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
     val diagnosticsRunning: Boolean = false,
@@ -41,14 +43,21 @@ class SettingsViewModel @Inject constructor(
 
     private fun load() = SettingsState(
         replaceStock = prefs.getBoolean("replace_stock_assistant", false),
+        batteryEstimate = prefs.getBoolean("battery_estimate", false),
+        hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
     )
 
-    fun refresh() {
-        _state.value = _state.value.copy(
-            replaceStock = prefs.getBoolean("replace_stock_assistant", false),
-            themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
-        )
+    fun refresh() { _state.value = load() }
+
+    fun setBatteryEstimate(enable: Boolean) {
+        prefs.edit().putBoolean("battery_estimate", enable).apply()
+        _state.value = _state.value.copy(batteryEstimate = enable)
+    }
+
+    fun setHideNetSpeed(enable: Boolean) {
+        prefs.edit().putBoolean("hide_net_speed", enable).apply()
+        _state.value = _state.value.copy(hideNetSpeed = enable)
     }
 
     fun setReplaceStock(enable: Boolean) {

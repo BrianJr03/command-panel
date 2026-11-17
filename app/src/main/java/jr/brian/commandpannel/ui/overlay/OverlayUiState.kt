@@ -11,6 +11,8 @@ data class OverlayUiState(
     val netSpeed: String = "7.3KB/S",
     val batteryPercent: Int = 35,
     val charging: Boolean = false,
+    val batteryEstimate: String? = null,   // fork feature: time-to-empty/full after the %
+    val hideNetSpeed: Boolean = false,     // fork feature: hide the status-bar download speed
 
     val displayMode: Int = 0,        // 0 dual, 1 top only, 2 bottom only
     val focusLockTitle: String = "Top screen",

@@ -44,6 +44,7 @@ class SettingsRepository(
     private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val telemetry = TelemetryMonitor(context, privileged, refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 })
+    private val batteryEstimate = BatteryEstimateMonitor(context, settings, enabled = { prefs.getBoolean("battery_estimate", false) })
 
     private val _uiState = MutableStateFlow(OverlayUiState())
     val uiState: StateFlow<OverlayUiState> = _uiState.asStateFlow()
@@ -67,6 +68,8 @@ class SettingsRepository(
         }
         refreshFromSettings()
         telemetry.start(scope)
+        batteryEstimate.start(scope)
+        scope.launch { batteryEstimate.text.collect { est -> _uiState.update { it.copy(batteryEstimate = est) } } }
         scope.launch {
             telemetry.state.collect { t ->
                 _uiState.update {
@@ -92,6 +95,7 @@ class SettingsRepository(
     fun stop() {
         context.contentResolver.unregisterContentObserver(observer)
         telemetry.stop()
+        batteryEstimate.stop()
         fastJob?.cancel(); fastJob = null
     }
 
@@ -147,6 +151,7 @@ class SettingsRepository(
                 batteryPercent = percent,
                 charging = charging,
                 netSpeed = formatSpeed(bps),
+                hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
                 wifiLevel = wifiLevel(),
                 bluetoothOn = bluetoothConnected(),
             )

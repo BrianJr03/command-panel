@@ -44,7 +44,9 @@ fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
                     modifier = Modifier.size(18.dp),
                 )
             }
-            Text(state.netSpeed, color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            if (!state.hideNetSpeed) {
+                Text(state.netSpeed, color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
             if (state.wifiLevel in 0..3) {
                 Image(
                     painter = rememberStockPainter("ic_status_wifi_${state.wifiLevel}"),
@@ -60,6 +62,9 @@ fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(width = 30.dp, height = 15.dp),
             )
             Text("${state.batteryPercent}%", color = colors.primary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            state.batteryEstimate?.let {
+                Text("· $it", color = colors.secondary, fontSize = 13.sp)
+            }
         }
     }
 }

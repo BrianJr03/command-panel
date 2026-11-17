@@ -92,6 +92,19 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         checked = state.replaceStock,
         onChange = vm::setReplaceStock,
     )
+    SwitchCard(
+        title = "Battery Estimate",
+        description = "Show the estimated time to empty (or to full / the 80% limit while charging) after the " +
+            "battery percentage in the overlay status bar.",
+        checked = state.batteryEstimate,
+        onChange = vm::setBatteryEstimate,
+    )
+    SwitchCard(
+        title = "Hide Network Speed",
+        description = "Hide the download-speed readout in the overlay status bar.",
+        checked = state.hideNetSpeed,
+        onChange = vm::setHideNetSpeed,
+    )
     Card {
         Text("Overlay preview", color = LocalTccColors.current.primary, fontSize = 16.sp)
         Spacer(Modifier.height(8.dp))

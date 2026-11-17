@@ -139,20 +139,27 @@ Verified on the Thor: two-pane renders, categories switch, diagnostics all pass 
 Remaining: full gamepad navigation + sticky section labels (fork feature 13, arrives with the Megingiard-style
 framework in phase 7); the fork features' own settings get added here as each is ported.
 
-### 7. Fork features, in this order
-Each is repackaged from `fork-port/`, upstream-origin lines rewritten, tests ported.
-1. Nav bar Home / Mode / Launch / Tasks / Settings, Home default (1)
-2. Hide network speed (4)
-3. Battery time-remaining estimate (5)
-4. Quick Launch (2)
-5. Arrange mode (3)
-6. Thor RGB accent sync (6)
-7. Dark-on-TV tap-to-wake (7)
-8. Settings backup & restore (9)
-9. Look system + all looks, with font license notices (8)
-10. Clear All Tasks tile with keep-on-screen policy (10)
-11. Quick-toggle reorder (12)
-12. Replay buffer — after writing Command Panel's own capture pipeline in the helper (11)
+### 7. Fork features — in progress
+Each is repackaged from `fork-port/` (Brian's own code), upstream-origin lines rewritten, tests ported.
+
+Done (2026-11-16):
+- **5000 ms screen-off unfreeze (14)** — landed with phase 5.
+- **Hide network speed (4)** — `hide_net_speed` pref + General toggle; status bar gates the speed. Verified.
+- **Battery time-remaining estimate (5)** — ported `BatteryEstimator` (fork-authored, 217 lines, verbatim but
+  repackaged) + new `BatteryEstimateMonitor` feeding it from `BatteryManager`/sysfs; General toggle; shown after the
+  battery % as "· full in 47m". Ported the fork's estimator test (mode-enum test dropped; `flowFor` helper kept).
+  Verified on device.
+
+Backlog (remaining fork features, roughly easiest → hardest):
+- Quick Launch nav button (2) — app picker + target display.
+- Clear All Tasks tile with keep-on-screen policy (10) — port `ClearTasksPolicy` (pure) + task listing via helper.
+- Nav bar Home/Launch reorder + Home default (1).
+- Thor RGB accent sync (6), Dark-on-TV tap-to-wake (7) — device-specific, self-contained.
+- Quick-toggle reorder (12) — rewrite the 160 upstream lines flagged in the manifest.
+- Arrange mode (3) — needs the overlay cards made addressable.
+- Settings backup & restore (9) — needs helper file I/O.
+- Look system + 16 looks (8) — large; renderers + fonts + license notices.
+- Replay buffer (11) — largest; needs Command Panel's own screen-capture pipeline in the helper first.
 
 ## Verification
 
