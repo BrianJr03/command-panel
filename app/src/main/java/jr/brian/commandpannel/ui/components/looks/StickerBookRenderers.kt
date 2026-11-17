@@ -256,4 +256,8 @@ internal object StickerBookNav : LookNavRenderer {
 
     override fun iconTint(p: LookPaint, selected: Boolean): Color =
         if (selected) p.lookColors.onAccent2 else p.colors.secondary
+
+    // The label sits below the sticker on the panel, so the selected one needs the panel-contrasting primary.
+    override fun textColor(p: LookPaint, selected: Boolean): Color =
+        if (selected) p.colors.primary else p.colors.secondary
 }

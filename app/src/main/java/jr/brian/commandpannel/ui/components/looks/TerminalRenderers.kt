@@ -287,6 +287,10 @@ internal object TerminalNav : LookNavRenderer {
     override fun iconTint(p: LookPaint, selected: Boolean): Color =
         if (selected) p.colors.primaryBackground else p.lookColors.terminalInk.copy(alpha = 0.7f)
 
+    // Nav shows labels only (no icon / no highlight fill), so the selected label must read on the dark backdrop.
+    override fun textColor(p: LookPaint, selected: Boolean): Color =
+        if (selected) Color.White else p.lookColors.terminalInk.copy(alpha = 0.7f)
+
     override fun label(text: String, selected: Boolean): String = terminalNavLabel(text, selected)
 
     override val showIcon: Boolean get() = false

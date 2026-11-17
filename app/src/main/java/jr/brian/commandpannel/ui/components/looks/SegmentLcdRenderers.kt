@@ -306,6 +306,10 @@ internal object SegmentLcdNav : LookNavRenderer {
 
     override fun iconTint(p: LookPaint, selected: Boolean): Color =
         if (selected) p.lookColors.lcdPanel else p.lookColors.lcdInk.copy(alpha = 0.65f)
+
+    // The label sits below the ink pill on the panel, so the selected one needs ink (not the on-pill panel colour).
+    override fun textColor(p: LookPaint, selected: Boolean): Color =
+        if (selected) p.lookColors.lcdInk else p.lookColors.lcdInk.copy(alpha = 0.65f)
 }
 
 /**
