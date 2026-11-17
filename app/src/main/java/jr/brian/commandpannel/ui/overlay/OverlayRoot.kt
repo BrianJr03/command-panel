@@ -42,11 +42,16 @@ fun OverlayRoot(
         val bg = LocalTccColors.current.primaryBackground
         var tab by remember { mutableStateOf(initialTab) }
         var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
+        var showBottomTip by remember { mutableStateOf(false) }
 
         // Modal tiles open a dialog; instant tiles run their action.
         val onTile: (String) -> Unit = { id ->
             val d = dialogForTile(id)
             if (d != null) dialog = d else actions.onTileClick(id)
+        }
+        // "Only top screen" shows the wake tip first unless suppressed.
+        val onRequestMode: (Int) -> Unit = { mode ->
+            if (mode == 1 && !state.suppressBottomTip) showBottomTip = true else actions.selectMode(mode)
         }
 
         Box(Modifier.fillMaxSize()) {
@@ -57,7 +62,7 @@ fun OverlayRoot(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
                 ) {
                     when (tab) {
-                        OverlayTab.MODE -> ModeTab(state, actions, Modifier.fillMaxSize())
+                        OverlayTab.MODE -> ModeTab(state, actions, onRequestMode, Modifier.fillMaxSize())
                         OverlayTab.SETTINGS -> SettingsTab(state, actions, onTile, Modifier.fillMaxSize())
                     }
                 }
@@ -70,6 +75,16 @@ fun OverlayRoot(
                 Spacer(Modifier.height(12.dp))
             }
             OverlayDialogLayer(dialog, state, actions, onDismiss = { dialog = OverlayDialogKind.NONE })
+            if (showBottomTip) {
+                BottomTipDialog(
+                    onConfirm = { dontShow ->
+                        if (dontShow) actions.setSuppressBottomTip(true)
+                        showBottomTip = false
+                        actions.selectMode(1)
+                    },
+                    onDismiss = { showBottomTip = false },
+                )
+            }
         }
     }
 }

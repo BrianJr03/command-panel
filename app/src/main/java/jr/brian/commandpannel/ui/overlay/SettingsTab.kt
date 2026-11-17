@@ -108,36 +108,44 @@ private fun FrameRatePill(is120: Boolean) {
 @Composable
 private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
     val colors = LocalTccColors.current
-    val page = state.tiles.take(8)
+    val pages = state.tiles.chunked(8)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
     TccCard(modifier) {
         Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp)) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.SpaceEvenly,
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                items(page, key = { it.id }) { tile ->
-                    TccIconButton(
-                        iconBase = tile.iconBase,
-                        label = tile.title,
-                        circleSize = 72.dp,
-                        active = tile.active,
-                        labelSize = 12.sp,
-                        iconInset = 16.dp,
-                        onClick = { onTile(tile.id) },
-                    )
+            ) { pageIndex ->
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    items(pages.getOrElse(pageIndex) { emptyList() }, key = { it.id }) { tile ->
+                        TccIconButton(
+                            iconBase = tile.iconBase,
+                            label = tile.title,
+                            circleSize = 72.dp,
+                            active = tile.active,
+                            labelSize = 12.sp,
+                            iconInset = 16.dp,
+                            onClick = { onTile(tile.id) },
+                        )
+                    }
                 }
             }
-            Row(
-                Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                repeat(2) { i ->
-                    Box(
-                        Modifier.padding(horizontal = 4.dp).size(8.dp).clip(CircleShape)
-                            .background(if (i == state.tilePage) colors.accent else colors.secondary)
-                    )
+            if (pages.size > 1) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    repeat(pages.size) { i ->
+                        Box(
+                            Modifier.padding(horizontal = 4.dp).size(8.dp).clip(CircleShape)
+                                .background(if (i == pagerState.currentPage) colors.accent else colors.secondary)
+                        )
+                    }
                 }
             }
         }

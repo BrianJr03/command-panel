@@ -41,6 +41,7 @@ data class OverlayUiState(
     val ramFraction: Float = 0.62f,
 
     val themeMode: Int = 4,          // tcc_theme_mode: 1 system, 3 light, 4 dark
+    val suppressBottomTip: Boolean = false,
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
 )

@@ -109,11 +109,13 @@ Part 2 done and verified on the Thor (2026-11-16):
   Verified: mode 1 → touch `0,1`, focus 1, bottom fully black; mode 0 → restored. AYN long-press (blank) / press
   (wake) are wired to it.
 
-Remaining (part 3):
-- Top-screen cover for mode 2 (needs the helper's type-2021 window; currently applies focus + touch only), the
-  "Only top screen" tip dialog, keyguard handling and crash/exit recovery, the vendor pin-screen-mode save/restore.
-- Quick-tile pager swipe to page 2, the Fan custom-speed slider, Clean Memory exclusion logic (currently a blunt
-  root kill), the volume-key overflow rule.
+Part 3 done (2026-11-16): quick-tile `HorizontalPager` (page 2 shows the remaining tiles, synced dots — verified);
+the "Only top screen" tip dialog with "Do not show again" (stock text, persisted suppression — verified).
+
+Remaining (robustness, revisit later):
+- Top-screen cover for mode 2 (needs the helper's type-2021 window; currently applies focus + touch only), keyguard
+  handling and crash/exit recovery, the vendor pin-screen-mode save/restore.
+- Fan custom-speed slider, Clean Memory exclusion logic (currently a blunt root kill), the volume-key overflow rule.
 
 ### 5. Stock coexistence (opt-in)
 "Replace stock assistant" setting. Suppression sequence, 5000 ms `SCREEN_OFF` unfreeze (fork feature 14), restore

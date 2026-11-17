@@ -19,9 +19,14 @@ import jr.brian.commandpannel.ui.components.TccSliderRow
  * Stock Mode tab: a screen-mode panel on top, then a brightness card and a volume card side by side.
  */
 @Composable
-fun ModeTab(state: OverlayUiState, actions: OverlayActions, modifier: Modifier = Modifier) {
+fun ModeTab(
+    state: OverlayUiState,
+    actions: OverlayActions,
+    onRequestMode: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ScreenModePanel(state, actions, Modifier.fillMaxWidth().weight(0.46f))
+        ScreenModePanel(state, onRequestMode, Modifier.fillMaxWidth().weight(0.46f))
         Row(Modifier.fillMaxWidth().weight(0.54f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             BrightnessCard(state, actions, Modifier.weight(1f).fillMaxHeight())
             VolumeCard(state, actions, Modifier.weight(1f).fillMaxHeight())
@@ -30,16 +35,16 @@ fun ModeTab(state: OverlayUiState, actions: OverlayActions, modifier: Modifier =
 }
 
 @Composable
-private fun ScreenModePanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
+private fun ScreenModePanel(state: OverlayUiState, onRequestMode: (Int) -> Unit, modifier: Modifier) {
     TccCard(modifier) {
         Row(
             modifier = Modifier.fillMaxSize().padding(vertical = 8.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ModeButton("ic_dual_screen_display", "Dual-screen\ndisplay", state.displayMode == 0) { actions.selectMode(0) }
-            ModeButton("ic_just_screen_above", "Only top\nscreen", state.displayMode == 1) { actions.selectMode(1) }
-            ModeButton("ic_just_screen_below", "Only bottom\nscreen", state.displayMode == 2) { actions.selectMode(2) }
+            ModeButton("ic_dual_screen_display", "Dual-screen\ndisplay", state.displayMode == 0) { onRequestMode(0) }
+            ModeButton("ic_just_screen_above", "Only top\nscreen", state.displayMode == 1) { onRequestMode(1) }
+            ModeButton("ic_just_screen_below", "Only bottom\nscreen", state.displayMode == 2) { onRequestMode(2) }
         }
     }
 }

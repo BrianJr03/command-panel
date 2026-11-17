@@ -41,6 +41,7 @@ class SettingsRepository(
 ) : OverlayActions {
 
     private val settings = SystemSettings(context.contentResolver, privileged)
+    private val prefs = context.getSharedPreferences("command_panel", Context.MODE_PRIVATE)
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val telemetry = TelemetryMonitor(context, privileged, refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 })
 
@@ -112,6 +113,7 @@ class SettingsRepository(
                 controllerStyle = settings.getInt(Keys.CONTROLLER_STYLE, 1),
                 is120Hz = peak >= 90f,
                 themeMode = themeMode,
+                suppressBottomTip = prefs.getBoolean("suppress_bottom_tip", false),
                 bottomVolume = settings.getInt(Keys.SECONDARY_VOLUME, 7) / 15f,
                 dualBrightness = settings.getInt(Keys.DUAL_BRIGHTNESS, 50) / 100f,
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,
@@ -284,6 +286,11 @@ class SettingsRepository(
     override fun cleanMemory() {
         // Full stock exclusion logic is a later refinement; the root kill is the core action.
         privileged.shell("am kill-all")
+    }
+
+    override fun setSuppressBottomTip(suppress: Boolean) {
+        prefs.edit().putBoolean("suppress_bottom_tip", suppress).apply()
+        _uiState.update { it.copy(suppressBottomTip = suppress) }
     }
 
     private fun toggleIntKey(key: String, default: Int) {
