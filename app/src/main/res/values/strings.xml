@@ -112,11 +112,13 @@
     <string name="settings_cat_quick_toggles">Quick Toggles</string>
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_diagnostics">Diagnostics</string>
+    <string name="settings_cat_themes">Themes</string>
     <string name="settings_cat_general_desc">Core behavior and companion features</string>
     <string name="settings_cat_nav_bar_desc">Arrange the overlay nav bar and its Quick Launch button</string>
     <string name="settings_cat_quick_toggles_desc">Pick and order the overlay\'s quick tiles</string>
     <string name="settings_cat_appearance_desc">Theme and look of the bottom-screen overlay</string>
     <string name="settings_cat_diagnostics_desc">Check the privileged access layer</string>
+    <string name="settings_cat_themes_desc">Mix, build and save your own overlay looks</string>
 
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>
@@ -177,6 +179,7 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_overlay_look">Overlay look</string>
     <string name="settings_overlay_look_desc">The surface style for the bottom-screen overlay. Auto uses the stock AYN look.</string>
+    <string name="settings_overlay_look_moved">Looks moved to Themes, where you can also mix parts from different looks and save your own.</string>
     <string name="settings_companion_follow_look">Companion follows overlay look</string>
     <string name="settings_companion_follow_look_desc">Apply the overlay\'s look, theme and accent to this settings screen. Off keeps the default companion style.</string>
     <string name="settings_rgb_accent">Accent from Ambient LED</string>
@@ -200,6 +203,62 @@
     <string name="look_comic_panel">Comic Panel</string>
     <string name="look_y2k_chrome">Y2K Chrome</string>
     <string name="look_e_ink">E-Ink</string>
+
+    <!-- Theme Studio -->
+    <string name="theme_active">Active look</string>
+    <string name="theme_based_on">Based on %1$s</string>
+    <string name="theme_customize">Customize</string>
+    <string name="theme_mix">Mix and match</string>
+    <string name="theme_mix_desc">Combine cards, tiles, gauges, sliders, nav and fonts from any look, preview it live, and save it as your own.</string>
+    <string name="theme_my_looks">My looks</string>
+    <string name="theme_my_looks_empty">No saved looks yet. Use Mix and match or Customize to make one.</string>
+    <string name="theme_builtin">Built-in looks</string>
+    <string name="theme_new_look_name">My look %1$d</string>
+    <string name="theme_apply">Apply</string>
+    <string name="theme_applied">Applied</string>
+    <string name="theme_edit">Edit</string>
+    <string name="theme_delete">Delete</string>
+    <string name="theme_delete_confirm">Press again to delete</string>
+    <string name="theme_back">Back</string>
+    <string name="theme_save">Save</string>
+    <string name="theme_save_new">Save as new</string>
+    <string name="theme_save_apply">Save and apply</string>
+    <string name="theme_saved">Saved</string>
+    <string name="theme_start_from">Start from</string>
+    <string name="theme_start_from_desc">The base look. Anything you don\'t change below comes from it.</string>
+    <string name="theme_parts">Parts</string>
+    <string name="theme_parts_desc">Each option is named after the look it comes from.</string>
+    <string name="theme_reset_parts">Reset parts to the base look</string>
+    <string name="theme_part_cards">Cards</string>
+    <string name="theme_part_tiles">Quick tiles</string>
+    <string name="theme_part_gauges">Gauges</string>
+    <string name="theme_part_sliders">Sliders</string>
+    <string name="theme_part_nav">Nav bar</string>
+    <string name="theme_part_backdrop">Backdrop</string>
+    <string name="theme_part_header">Card headers</string>
+    <string name="theme_fonts">Fonts</string>
+    <string name="theme_fonts_desc">Bundled fonts or your own TTF/OTF files. Imported fonts stay on this device.</string>
+    <string name="theme_font_labels">Label font</string>
+    <string name="theme_font_numbers">Number font</string>
+    <string name="theme_font_look_default">Look default</string>
+    <string name="theme_font_import">Import font…</string>
+    <string name="theme_font_imported">Imported %1$s</string>
+    <string name="theme_font_manage">Imported fonts (press to remove)</string>
+    <string name="theme_font_remove">Remove %1$s</string>
+    <string name="theme_preview_settings">Settings</string>
+    <string name="theme_preview_mode">Mode</string>
+    <string name="theme_preview_dark">Dark</string>
+    <string name="theme_preview_light">Light</string>
+    <string name="font_system">System</string>
+    <string name="font_condensed">Barlow Condensed</string>
+    <string name="font_condensed_display">Barlow Condensed ExtraBold</string>
+    <string name="font_mono">JetBrains Mono</string>
+    <string name="font_segment">DSEG7 Classic</string>
+    <string name="font_rounded">Baloo 2</string>
+    <string name="font_stencil">Black Ops One</string>
+    <string name="font_comic">Bangers</string>
+    <string name="font_chrome_wide">Michroma</string>
+    <string name="font_serif">Literata</string>
 
     <!-- Companion: Diagnostics -->
     <string name="settings_privileged_layer">Privileged layer</string>

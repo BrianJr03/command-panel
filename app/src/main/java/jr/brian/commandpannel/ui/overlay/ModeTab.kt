@@ -43,7 +43,7 @@ fun ModeTab(
 }
 
 @Composable
-private fun ScreenModePanel(state: OverlayUiState, onRequestMode: (Int) -> Unit, modifier: Modifier) {
+internal fun ScreenModePanel(state: OverlayUiState, onRequestMode: (Int) -> Unit, modifier: Modifier) {
     TccCard(modifier) {
         Row(
             modifier = Modifier.fillMaxSize().padding(vertical = 8.dp, horizontal = 8.dp),
@@ -63,7 +63,7 @@ private fun ModeButton(icon: String, label: String, active: Boolean, onClick: ()
 }
 
 @Composable
-private fun BrightnessCard(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
+internal fun BrightnessCard(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     TccCard(modifier) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
@@ -77,7 +77,7 @@ private fun BrightnessCard(state: OverlayUiState, actions: OverlayActions, modif
 }
 
 @Composable
-private fun VolumeCard(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
+internal fun VolumeCard(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     TccCard(modifier) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),

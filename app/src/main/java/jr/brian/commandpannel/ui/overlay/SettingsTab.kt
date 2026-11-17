@@ -66,7 +66,7 @@ fun SettingsTab(
 }
 
 @Composable
-private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
+internal fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     val colors = LocalTccColors.current
     val displayStyle = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle()
     TccCard(modifier) {
@@ -94,7 +94,7 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
 }
 
 @Composable
-private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
+internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
     val colors = LocalTccColors.current
     val pages = state.tiles.chunked(8)
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
@@ -140,7 +140,7 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
 }
 
 @Composable
-private fun RingsCard(state: OverlayUiState, modifier: Modifier) {
+internal fun RingsCard(state: OverlayUiState, modifier: Modifier) {
     val cpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.cpuFraction, RingColors.Cpu, stringResource(R.string.gauge_cpu), "%.2f".format(state.cpuGhz), stringResource(R.string.unit_ghz), m) }
     val gpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.gpuFraction, RingColors.Gpu, stringResource(R.string.gauge_gpu), "${state.gpuMhz}", stringResource(R.string.unit_mhz), m) }
     val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, stringResource(R.string.gauge_pwr), "%.2f".format(state.powerW), stringResource(R.string.unit_watts), m) }
@@ -170,7 +170,7 @@ private fun RingsCard(state: OverlayUiState, modifier: Modifier) {
 /** Combined TEMP + FAN readings in one card, so the hardware strip is a single row (frees height for quick tiles).
  *  Adapts like the rings: stacked rows in a compact strip, two side-by-side stat columns in a tall/big card. */
 @Composable
-private fun TempFanCard(state: OverlayUiState, modifier: Modifier) {
+internal fun TempFanCard(state: OverlayUiState, modifier: Modifier) {
     TccCard(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
             if (maxHeight > maxWidth * 0.52f) {

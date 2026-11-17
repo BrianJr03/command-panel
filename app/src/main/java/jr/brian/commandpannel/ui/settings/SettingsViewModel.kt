@@ -33,6 +33,7 @@ enum class SettingsCategory(@StringRes val titleRes: Int) {
     NAV_BAR(R.string.settings_cat_nav_bar),
     QUICK_TOGGLES(R.string.settings_cat_quick_toggles),
     APPEARANCE(R.string.settings_cat_appearance),
+    THEMES(R.string.settings_cat_themes),
     DIAGNOSTICS(R.string.settings_cat_diagnostics),
 }
 

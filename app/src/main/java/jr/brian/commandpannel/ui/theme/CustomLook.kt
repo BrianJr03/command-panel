@@ -1,5 +1,6 @@
 package jr.brian.commandpannel.ui.theme
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Immutable
@@ -13,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
+import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.ChamferShape
 import jr.brian.commandpannel.ui.components.SquircleShape
 import org.json.JSONObject
@@ -80,17 +82,17 @@ data class ShapeDef(val kind: ShapeKind, val size: Float = 0f) {
 }
 
 /** The bundled OFL families (see [TccFonts]); [DEFAULT] is the system font. */
-enum class BundledFont(val family: FontFamily?) {
-    DEFAULT(null),
-    CONDENSED(TccCondensedFontFamily),
-    CONDENSED_DISPLAY(TccCondensedDisplayFontFamily),
-    MONO(TccMonoFontFamily),
-    SEGMENT(TccSegmentFontFamily),
-    ROUNDED(TccRoundedFontFamily),
-    STENCIL(TccStencilFontFamily),
-    COMIC(TccComicFontFamily),
-    CHROME_WIDE(TccChromeWideFontFamily),
-    SERIF(TccSerifFontFamily),
+enum class BundledFont(val family: FontFamily?, @StringRes val labelRes: Int) {
+    DEFAULT(null, R.string.font_system),
+    CONDENSED(TccCondensedFontFamily, R.string.font_condensed),
+    CONDENSED_DISPLAY(TccCondensedDisplayFontFamily, R.string.font_condensed_display),
+    MONO(TccMonoFontFamily, R.string.font_mono),
+    SEGMENT(TccSegmentFontFamily, R.string.font_segment),
+    ROUNDED(TccRoundedFontFamily, R.string.font_rounded),
+    STENCIL(TccStencilFontFamily, R.string.font_stencil),
+    COMIC(TccComicFontFamily, R.string.font_comic),
+    CHROME_WIDE(TccChromeWideFontFamily, R.string.font_chrome_wide),
+    SERIF(TccSerifFontFamily, R.string.font_serif),
 }
 
 /** A font choice: a bundled family, or a user-imported file (resolved at runtime; missing files fall back). */
