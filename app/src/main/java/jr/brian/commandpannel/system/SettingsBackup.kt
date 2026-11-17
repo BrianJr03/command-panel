@@ -28,7 +28,7 @@ object SettingsBackup {
         "overlay_look", "companion_follow_look", "nav_bar_order", "quick_launch_show_app",
     )
 
-    /** Serialises the exported prefs to JSON. Pure, so it is unit-tested. */
+    /** Serializes the exported prefs to JSON. Pure, so it is unit-tested. */
     fun encode(all: Map<String, *>, appVersion: String): String {
         val prefs = JSONObject()
         for ((k, v) in all) {

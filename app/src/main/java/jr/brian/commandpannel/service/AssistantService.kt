@@ -176,11 +176,11 @@ class AssistantService : Service() {
     private fun startAsForeground() {
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "TCP", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, getString(R.string.app_name), NotificationManager.IMPORTANCE_LOW)
         )
         val notification: Notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("TCP")
-            .setContentText("Dual-screen assistant is running")
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.notif_running))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()

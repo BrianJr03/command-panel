@@ -16,7 +16,7 @@ import kotlin.math.roundToInt
  * can't go through `painterResource`, which only accepts own-package resource ids.
  *
  * Stock icons are static `VectorDrawable`s, so no Animatable/invalidation handling is needed. Tint is forwarded via
- * [applyColorFilter] so the existing `ColorFilter.tint(...)` at call sites still colours the icon per look.
+ * [applyColorFilter] so the existing `ColorFilter.tint(...)` at call sites still colors the icon per look.
  */
 class DrawablePainter(private val drawable: Drawable) : Painter() {
 

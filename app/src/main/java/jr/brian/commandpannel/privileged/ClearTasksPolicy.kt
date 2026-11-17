@@ -146,7 +146,7 @@ object ClearTasksPolicy {
 
     /**
      * Parses `dumpsys activity recents` into snapshots, skipping `autoRemoveRecents=true` tasks.
-     * Returns `null` when no recent entries could be recognised.
+     * Returns `null` when no recent entries could be recognized.
      */
     fun parseRecentsDump(dump: String): List<TaskSnapshot>? {
         val result = ArrayList<TaskSnapshot>()
@@ -199,7 +199,7 @@ object ClearTasksPolicy {
     /**
      * Parses `dumpsys activity activities` into root and child tasks per display, with the
      * package of each task taken from its activity records. Returns `null` when no display
-     * section could be recognised.
+     * section could be recognized.
      */
     fun parseActivitiesDump(dump: String): List<TaskSnapshot>? {
         data class Header(val taskId: Int, val displayId: Int, val type: Int, val uid: Int?, val visible: Boolean, val rootTaskId: Int?)

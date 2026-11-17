@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import jr.brian.commandpannel.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +78,7 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
             val fpsSp = if (big) 24.sp else 15.sp
             val hzSp = if (big) 22.sp else 16.sp
             Text(
-                if (state.is120Hz) "120Hz" else "60Hz",
+                stringResource(R.string.overlay_refresh_hz, if (state.is120Hz) 120 else 60),
                 color = colors.primary,
                 fontSize = hzSp,
                 fontWeight = FontWeight.Bold,
@@ -85,7 +87,7 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
             )
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.Bottom) {
                 Text("${state.fps}", color = colors.primary, fontSize = numberSp, fontWeight = FontWeight.Bold, maxLines = 1, style = displayStyle)
-                Text(" FPS", color = colors.primary, fontSize = fpsSp, modifier = Modifier.padding(bottom = if (big) 14.dp else 10.dp))
+                Text(stringResource(R.string.overlay_fps_suffix), color = colors.primary, fontSize = fpsSp, modifier = Modifier.padding(bottom = if (big) 14.dp else 10.dp))
             }
         }
     }
@@ -139,10 +141,10 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
 
 @Composable
 private fun RingsCard(state: OverlayUiState, modifier: Modifier) {
-    val cpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", m) }
-    val gpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", m) }
-    val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", m) }
-    val ram: @Composable (Modifier) -> Unit = { m -> RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", m) }
+    val cpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.cpuFraction, RingColors.Cpu, stringResource(R.string.gauge_cpu), "%.2f".format(state.cpuGhz), stringResource(R.string.unit_ghz), m) }
+    val gpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.gpuFraction, RingColors.Gpu, stringResource(R.string.gauge_gpu), "${state.gpuMhz}", stringResource(R.string.unit_mhz), m) }
+    val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, stringResource(R.string.gauge_pwr), "%.2f".format(state.powerW), stringResource(R.string.unit_watts), m) }
+    val ram: @Composable (Modifier) -> Unit = { m -> RingGauge(state.ramFraction, RingColors.Ram, stringResource(R.string.gauge_ram), "%.2f".format(state.ramGb), stringResource(R.string.unit_gb), m) }
     TccCard(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
             // In a tall/square card (e.g. moved to its own big slot) fill the space with a 2x2 grid; a wide strip stays 1x4.
@@ -173,13 +175,13 @@ private fun TempFanCard(state: OverlayUiState, modifier: Modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
             if (maxHeight > maxWidth * 0.52f) {
                 Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatBlock(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
-                    StatBlock(icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+                    StatBlock(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = stringResource(R.string.overlay_temp), value = stringResource(R.string.unit_celsius, state.tempC))
+                    StatBlock(icon = "ic_fan_normal", iconTint = null, title = stringResource(R.string.overlay_fan), value = stringResource(R.string.unit_percent, state.fanPercent))
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
-                    InfoRow(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
-                    InfoRow(icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+                    InfoRow(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = stringResource(R.string.overlay_temp), value = stringResource(R.string.unit_celsius, state.tempC))
+                    InfoRow(icon = "ic_fan_normal", iconTint = null, title = stringResource(R.string.overlay_fan), value = stringResource(R.string.unit_percent, state.fanPercent))
                 }
             }
         }

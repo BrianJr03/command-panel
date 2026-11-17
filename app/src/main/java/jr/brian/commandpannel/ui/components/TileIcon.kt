@@ -14,7 +14,7 @@ import androidx.core.graphics.drawable.toBitmap
 /**
  * A tile/button icon source: either a stock app drawable (the 10 stock tiles, nav and mode buttons), a Material
  * icon (the extra Android/Tools tiles the stock app never shipped drawables for), or an installed app's launcher
- * icon (the Quick Launch nav button). [App] icons are full-colour and must not be tinted.
+ * icon (the Quick Launch nav button). [App] icons are full-color and must not be tinted.
  */
 sealed interface TileIcon {
     data class Stock(val name: String) : TileIcon

@@ -2,6 +2,8 @@ package jr.brian.commandpannel.ui.settings
 
 import android.app.Application
 import android.content.Intent
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,12 +23,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-enum class SettingsCategory(val title: String) {
-    GENERAL("General"),
-    NAV_BAR("Nav Bar"),
-    QUICK_TOGGLES("Quick Toggles"),
-    APPEARANCE("Appearance"),
-    DIAGNOSTICS("Diagnostics"),
+enum class SettingsCategory(@StringRes val titleRes: Int) {
+    GENERAL(R.string.settings_cat_general),
+    NAV_BAR(R.string.settings_cat_nav_bar),
+    QUICK_TOGGLES(R.string.settings_cat_quick_toggles),
+    APPEARANCE(R.string.settings_cat_appearance),
+    DIAGNOSTICS(R.string.settings_cat_diagnostics),
 }
 
 data class SettingsState(
@@ -109,28 +111,28 @@ class SettingsViewModel @Inject constructor(
             Intent(AssistantService.ACTION_REPLAY_SET_ENABLED).setPackage(app.packageName)
                 .putExtra(AssistantService.EXTRA_ENABLE, enable),
         )
-        _state.value = _state.value.copy(replayEnabled = enable, replayMessage = if (enable) "Replay buffer arming…" else "Replay buffer off")
+        _state.value = _state.value.copy(replayEnabled = enable, replayMessage = app.getString(if (enable) R.string.msg_replay_arming else R.string.msg_replay_off))
     }
 
     fun setReplayWindowSeconds(seconds: Int) {
         prefs.edit().putInt("replay_window_seconds", seconds).apply()
-        _state.value = _state.value.copy(replayWindowSeconds = seconds, replayMessage = "Takes effect next time the buffer arms")
+        _state.value = _state.value.copy(replayWindowSeconds = seconds, replayMessage = app.getString(R.string.msg_replay_next_arm))
     }
 
     fun setReplayPreset(preset: jr.brian.commandpannel.privileged.ReplayBitratePreset) {
         prefs.edit().putString("replay_bitrate", preset.key).apply()
-        _state.value = _state.value.copy(replayPreset = preset, replayMessage = "Takes effect next time the buffer arms")
+        _state.value = _state.value.copy(replayPreset = preset, replayMessage = app.getString(R.string.msg_replay_next_arm))
     }
 
     fun saveReplayClip() {
         app.sendBroadcast(Intent(AssistantService.ACTION_REPLAY_SAVE).setPackage(app.packageName))
-        _state.value = _state.value.copy(replayMessage = "Saving clip…")
+        _state.value = _state.value.copy(replayMessage = app.getString(R.string.msg_replay_saving))
         // Surface the result the service broadcasts back.
         val filter = android.content.IntentFilter(AssistantService.ACTION_REPLAY_SAVED)
         app.registerReceiver(object : android.content.BroadcastReceiver() {
             override fun onReceive(c: android.content.Context, i: Intent) {
                 val result = i.getStringExtra(AssistantService.EXTRA_REPLAY_RESULT).orEmpty()
-                val msg = if (result.startsWith("error:")) "Save failed (${result.removePrefix("error:")})" else "Saved to $result"
+                val msg = if (result.startsWith("error:")) app.getString(R.string.msg_save_failed, result.removePrefix("error:")) else app.getString(R.string.msg_saved_to, result)
                 _state.value = _state.value.copy(replayMessage = msg)
                 runCatching { c.unregisterReceiver(this) }
             }
@@ -156,10 +158,10 @@ class SettingsViewModel @Inject constructor(
     }
     fun resetLayout() = updateLayout { jr.brian.commandpannel.system.OverlayLayout.DEFAULT }
 
-    /** Toggles the inverted sync: when on, the Thor ambient-LED colour becomes the overlay accent. */
+    /** Toggles the inverted sync: when on, the Thor ambient-LED color becomes the overlay accent. */
     fun setRgbAccentSync(enable: Boolean) {
         prefs.edit().putBoolean("rgb_accent_sync", enable).apply()
-        // The overlay repository reads the LED colour on the next refresh (its pref listener fires here).
+        // The overlay repository reads the LED color on the next refresh (its pref listener fires here).
         _state.value = _state.value.copy(rgbAccentSync = enable, accentOverride = ThorRgbController.accentOverride(app, enable))
     }
 
@@ -217,7 +219,7 @@ class SettingsViewModel @Inject constructor(
             val path = withContext(Dispatchers.IO) {
                 jr.brian.commandpannel.system.SettingsBackup.export(app, privileged)
             }
-            _state.value = _state.value.copy(backupMessage = if (path != null) "Saved to $path" else "Export failed")
+            _state.value = _state.value.copy(backupMessage = if (path != null) app.getString(R.string.msg_saved_to, path) else app.getString(R.string.msg_export_failed))
         }
     }
 
@@ -229,9 +231,9 @@ class SettingsViewModel @Inject constructor(
                 jr.brian.commandpannel.system.SettingsBackup.import(app, privileged, latest)
             }
             val msg = when {
-                n < 0 -> "No backup found"
-                n == 0 -> "Restore failed"
-                else -> "Restored $n settings"
+                n < 0 -> app.getString(R.string.msg_no_backup)
+                n == 0 -> app.getString(R.string.msg_restore_failed)
+                else -> app.resources.getQuantityString(R.plurals.msg_restored_settings, n, n)
             }
             _state.value = load().copy(backupMessage = msg)
         }
@@ -305,9 +307,9 @@ class SettingsViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 diagnosticsRunning = false,
                 diagnostics = buildList {
-                    add("Hidden-API exemptions" to r.hiddenApi)
-                    add("PServerBinder root shell" to r.rootShell)
-                    add("Root helper connected" to r.helper)
+                    add(app.getString(R.string.diag_hidden_api) to r.hiddenApi)
+                    add(app.getString(R.string.diag_root_shell) to r.rootShell)
+                    add(app.getString(R.string.diag_helper) to r.helper)
                     r.helperIdentity?.let { add(it to true) }
                 },
             )

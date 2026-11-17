@@ -1,7 +1,7 @@
 # Command Panel — build plan
 
 A user-installable replacement for the AYN Thor's stock bottom-screen assistant
-(`com.odin.dualscreen.assistant`): stock UI and behaviour 1:1, plus the features Brian built in his BDSA fork.
+(`com.odin.dualscreen.assistant`): stock UI and behavior 1:1, plus the features Brian built in his BDSA fork.
 
 ## Decisions
 
@@ -17,7 +17,7 @@ A user-installable replacement for the AYN Thor's stock bottom-screen assistant
 
 ## Reference material
 
-- Stock teardown: `~/thor-re/DualScreenAssistant/NOTES.md` (keys, binders, timings, layout numbers, colours) and
+- Stock teardown: `~/thor-re/DualScreenAssistant/NOTES.md` (keys, binders, timings, layout numbers, colors) and
   `device/shots/` (live screenshots).
 - Probe results: `NOTES.md` §10 and `thor-probe/README.md`.
 - Fork features: `fork-port/PORT_MANIFEST.md`.
@@ -37,7 +37,7 @@ A user-installable replacement for the AYN Thor's stock bottom-screen assistant
 ### 0. Scaffold — done 2026-11-16
 Gradle project, `:app` + `:probe`, Hilt, Compose, `.debug` variant, `scripts/dev.sh`.
 Imported from the stock APK: 106 app drawables (with `_black` variants; three apktool-split gradients re-inlined as
-`aapt:attr`), 12 colours (+7 night), 67 strings in 8 locales (`values`, `ja`, `ko`, `zh`, `zh-rCN/HK/MO/TW`), the
+`aapt:attr`), 12 colors (+7 night), 67 strings in 8 locales (`values`, `ja`, `ko`, `zh`, `zh-rCN/HK/MO/TW`), the
 launcher icon. Library resources and RxTool crash strings were left out.
 Verified on the Thor: placeholder screen renders stock icons/strings; `:probe` reproduces the recorded results
 (15 PASS / 3 expected FAIL); 2 unit tests guard the resource import.
@@ -80,7 +80,7 @@ decompiled themes, `LocalTccColors`), `StockIcon` resolver (dark uses the `_blac
 Driven by `OverlayUiState` sample values that match the stock screenshots (phase 4 feeds it live state). Wired into
 `AssistantService`'s `OverlayHost` in place of the placeholder.
 Verified on the Thor: both tabs render as a faithful match of `device/shots/` (status bar, frame-rate pill, the ten
-stock tiles with the active purple glow, ring colours, TEMP/FAN, mode buttons with the dual-screen highlight,
+stock tiles with the active purple glow, ring colors, TEMP/FAN, mode buttons with the dual-screen highlight,
 brightness/volume sliders, nav labels). 3 new unit tests. Frame-rate pill is drawn in Compose (its stock drawable is
 a gradient shape, not a vector). Dialogs, pager swipe, theme switching and live data are phase 4.
 

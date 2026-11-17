@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.lerp
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 
 /**
- * Stock status-bar battery (`BatteryView`): a horizontal body with a cap and a fill whose colour lerps toward red
+ * Stock status-bar battery (`BatteryView`): a horizontal body with a cap and a fill whose color lerps toward red
  * below 50%, plus a charging bolt. Drawn horizontally (the stock view rotates a vertical drawing).
  */
 @Composable

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Command Panel's own UI strings. Text that matches the stock AYN app reuses the keys in stock_strings.xml
+  (which carry ja/ko/zh translations); everything here is new to the fork and currently English-only.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="app_full_name" translatable="false">Thor Command Panel</string>
+
+    <!-- Units / numeric formats -->
+    <string name="unit_percent">%1$d%%</string>
+    <string name="unit_celsius" translatable="false">%1$d℃</string>
+    <string name="unit_ghz" translatable="false">GHz</string>
+    <string name="unit_mhz" translatable="false">MHz</string>
+    <string name="unit_watts" translatable="false">W</string>
+    <string name="unit_gb" translatable="false">GB</string>
+    <string name="unit_kb_per_sec" translatable="false">%1$.2fKB/S</string>
+    <string name="unit_mb_per_sec" translatable="false">%1$.2fMB/S</string>
+
+    <!-- Overlay: status bar -->
+    <string name="overlay_bluetooth">Bluetooth</string>
+    <string name="overlay_wifi">Wi-Fi</string>
+    <string name="overlay_battery_estimate">· %1$s</string>
+
+    <!-- Overlay: nav bar -->
+    <string name="nav_launch">Launch</string>
+    <string name="nav_app">App</string>
+
+    <!-- Overlay: Mode tab -->
+    <string name="mode_dual_screen_display">Dual-screen\ndisplay</string>
+    <string name="mode_only_top_screen">Only top\nscreen</string>
+    <string name="mode_only_bottom_screen">Only bottom\nscreen</string>
+    <string name="slider_dual_screen">Dual\nScreen</string>
+    <string name="slider_top_screen">Top\nScreen</string>
+    <string name="slider_bottom_screen">Bottom\nScreen</string>
+
+    <!-- Overlay: Settings tab -->
+    <string name="overlay_refresh_hz">%1$dHz</string>
+    <string name="overlay_fps_suffix"> FPS</string>
+    <string name="overlay_temp">TEMP</string>
+    <string name="overlay_fan">FAN</string>
+    <string name="gauge_cpu">CPU</string>
+    <string name="gauge_gpu">GPU</string>
+    <string name="gauge_pwr">PWR</string>
+    <string name="gauge_ram">RAM</string>
+
+    <!-- Overlay: arrange mode -->
+    <string name="arrange_hint">Drag to rearrange</string>
+    <string name="arrange_reset">Reset</string>
+    <string name="arrange_done">Done</string>
+
+    <!-- Overlay: quick-tile dialogs (others reuse stock keys) -->
+    <string name="dialog_trigger_analog">Analog</string>
+    <string name="dialog_trigger_digital">Digital</string>
+    <string name="dialog_trigger_both">Both</string>
+    <string name="dialog_screenshot_top">Top Screen</string>
+    <string name="dialog_screenshot_bottom">Bottom Screen</string>
+    <string name="dialog_screenshot_both">Both Screens</string>
+
+    <!-- Quick tile names (companion list; stock tiles reuse stock keys) -->
+    <string name="tile_name_wifi">Wi-Fi</string>
+    <string name="tile_name_bluetooth">Bluetooth</string>
+    <string name="tile_name_do_not_disturb">Do Not Disturb</string>
+    <string name="tile_name_airplane">Airplane Mode</string>
+    <string name="tile_name_keep_screen_on">Keep Screen On</string>
+    <string name="tile_name_double_tap_home">Double-Tap HOME</string>
+    <string name="tile_name_charge_limit_80" formatted="false">80% Charge Limit</string>
+    <string name="tile_name_virtual_mouse">Virtual Mouse</string>
+    <string name="tile_name_trigger_mode">L2/R2 Trigger Mode</string>
+    <string name="tile_name_screenshot">Screenshot</string>
+    <string name="tile_name_clear_all_tasks">Clear All Tasks</string>
+    <string name="tile_name_replay_buffer">Replay Buffer</string>
+    <string name="tile_category_stock">Stock</string>
+    <string name="tile_category_android">Android System</string>
+    <string name="tile_category_tools">Tools</string>
+
+    <!-- Quick tile labels on the overlay (two-line forms) -->
+    <string name="tile_clean_memory">Clean\nMemory</string>
+    <string name="tile_direct_power_supply">Direct Power\nSupply</string>
+    <string name="tile_force_landscape">Force\nLandscape</string>
+    <string name="tile_do_not_disturb">Do Not\nDisturb</string>
+    <string name="tile_airplane_mode">Airplane\nMode</string>
+    <string name="tile_keep_screen_on">Keep\nScreen On</string>
+    <string name="tile_double_tap_home">Double-Tap\nHOME</string>
+    <string name="tile_charge_limit_80" formatted="false">80% Charge\nLimit</string>
+    <string name="tile_virtual_mouse">Virtual\nMouse</string>
+    <string name="tile_clear_all_tasks">Clear All\nTasks</string>
+    <string name="tile_replay_buffer">Replay\nBuffer</string>
+    <string name="tile_trigger_digital">Trigger:\nDigital</string>
+    <string name="tile_trigger_analog">Trigger:\nAnalog</string>
+    <string name="tile_trigger_both">Trigger:\nBoth</string>
+    <string name="tile_perf_standard">Standard\nPerformance</string>
+    <string name="tile_perf_medium">Medium\nPerformance</string>
+    <string name="tile_perf_high">High\nPerformance</string>
+    <string name="tile_style_standard">Standard\nStyle</string>
+    <string name="tile_theme_system">System\nTheme</string>
+
+    <!-- Battery estimate -->
+    <string name="battery_time_to_empty">~%1$s</string>
+    <string name="battery_time_to_full">full in %1$s</string>
+    <string name="battery_limit_reached">Limit reached</string>
+    <string name="battery_full">Full</string>
+    <string name="duration_minutes">%1$dm</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_hours_minutes">%1$dh %2$dm</string>
+
+    <!-- Foreground service notification -->
+    <string name="notif_running">Dual-screen assistant is running</string>
+
+    <!-- Companion: categories -->
+    <string name="settings_cat_general">General</string>
+    <string name="settings_cat_nav_bar">Nav Bar</string>
+    <string name="settings_cat_quick_toggles">Quick Toggles</string>
+    <string name="settings_cat_appearance">Appearance</string>
+    <string name="settings_cat_diagnostics">Diagnostics</string>
+    <string name="settings_cat_general_desc">Core behavior and companion features</string>
+    <string name="settings_cat_nav_bar_desc">Arrange the overlay nav bar and its Quick Launch button</string>
+    <string name="settings_cat_quick_toggles_desc">Pick and order the overlay\'s quick tiles</string>
+    <string name="settings_cat_appearance_desc">Theme and look of the bottom-screen overlay</string>
+    <string name="settings_cat_diagnostics_desc">Check the privileged access layer</string>
+
+    <!-- Companion: General -->
+    <string name="settings_replace_stock">Replace Stock Assistant</string>
+    <string name="settings_replace_stock_desc">Suppress the built-in dual-screen assistant so Command Panel handles the AYN button. Turning this off restores the stock assistant.</string>
+    <string name="settings_battery_estimate">Battery Estimate</string>
+    <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
+    <string name="settings_hide_net_speed">Hide Network Speed</string>
+    <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>
+    <string name="settings_keep_on_screen">Keep Apps That Are On Screen</string>
+    <string name="settings_keep_on_screen_desc">When Clear All Tasks runs, keep apps showing on either screen, their companion screens and the home app. Turn off to clear everything except this app, the stock assistant and the system.</string>
+    <string name="settings_backup_title">Backup &amp; Restore</string>
+    <string name="settings_backup_desc">Export the companion settings to a JSON file, or restore the most recent backup.</string>
+    <string name="settings_backup_export">Export</string>
+    <string name="settings_backup_restore">Restore latest</string>
+    <string name="settings_preview_title">Overlay preview</string>
+    <string name="settings_preview_desc">Open the overlay on the bottom screen to preview your settings.</string>
+    <string name="settings_preview_open">Open overlay on bottom screen</string>
+
+    <!-- Companion: Replay buffer -->
+    <string name="settings_replay_desc">Continuously keep the last few seconds of the top screen in memory so you can save a clip after something happens. Uses root screen capture (no cast prompt).</string>
+    <string name="settings_replay_save_last">Save last</string>
+    <string name="settings_replay_seconds">%1$ds</string>
+    <string name="settings_replay_quality">Quality</string>
+    <string name="settings_replay_save_now">Save clip now</string>
+    <string name="replay_quality_high">High</string>
+    <string name="replay_quality_balanced">Balanced</string>
+    <string name="replay_quality_low">Low</string>
+
+    <!-- Companion: Quick Launch / Nav Bar -->
+    <string name="settings_quick_launch">Quick Launch</string>
+    <string name="settings_quick_launch_desc">Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.</string>
+    <string name="settings_no_app_chosen">No app chosen</string>
+    <string name="settings_choose_app">Choose app</string>
+    <string name="settings_clear">Clear</string>
+    <string name="settings_open_on">Open on:</string>
+    <string name="settings_choose_an_app">Choose an app</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_loading">Loading…</string>
+    <string name="settings_button_order">Button order</string>
+    <string name="settings_button_order_desc">Drag a button by its handle, or long-press it, to set its place in the overlay nav bar. With a controller: A to pick up, D-pad to move, A to drop.</string>
+    <string name="settings_nav_note_mode">Screen mode tab</string>
+    <string name="settings_nav_note_task">Recent apps</string>
+    <string name="settings_nav_note_launch_hidden">Quick Launch · hidden until an app is chosen</string>
+    <string name="settings_nav_note_settings">Settings tab</string>
+    <string name="settings_nav_note_app">Opens this companion</string>
+    <string name="settings_show_app_on_launch">Show app on the Launch button</string>
+    <string name="settings_show_app_on_launch_desc">Use the chosen app\'s icon and name on the nav bar instead of the Launch glyph and label.</string>
+
+    <!-- Companion: Quick Toggles -->
+    <string name="settings_order">Order</string>
+    <string name="settings_tile_order_desc">Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, D-pad to move, A to drop.</string>
+    <string name="settings_drag_to_reorder">Drag to reorder</string>
+
+    <!-- Companion: Appearance -->
+    <string name="settings_overlay_theme">Overlay theme</string>
+    <string name="settings_theme_follow_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_overlay_look">Overlay look</string>
+    <string name="settings_overlay_look_desc">The surface style for the bottom-screen overlay. Auto uses the stock AYN look.</string>
+    <string name="settings_companion_follow_look">Companion follows overlay look</string>
+    <string name="settings_companion_follow_look_desc">Apply the overlay\'s look, theme and accent to this settings screen. Off keeps the default companion style.</string>
+    <string name="settings_rgb_accent">Accent from Ambient LED</string>
+    <string name="settings_rgb_accent_desc">Use the color you set for the Thor\'s Ambient LED as the overlay\'s accent — so the overlay theme follows your joystick LED color.</string>
+
+    <!-- Overlay looks (proper names) -->
+    <string name="look_auto">Auto (stock)</string>
+    <string name="look_aurora_glass">Aurora Glass</string>
+    <string name="look_cartridge">Cartridge</string>
+    <string name="look_tactical_hud">Tactical HUD</string>
+    <string name="look_soft_console">Soft Console</string>
+    <string name="look_soft_console_oled">Soft Console OLED</string>
+    <string name="look_segment_lcd">Segment LCD</string>
+    <string name="look_bloom">Bloom</string>
+    <string name="look_neon_arcade">Neon Arcade</string>
+    <string name="look_terminal">Terminal</string>
+    <string name="look_cockpit">Cockpit</string>
+    <string name="look_sticker_book">Sticker Book</string>
+    <string name="look_industrial">Industrial</string>
+    <string name="look_jelly">Jelly</string>
+    <string name="look_comic_panel">Comic Panel</string>
+    <string name="look_y2k_chrome">Y2K Chrome</string>
+    <string name="look_e_ink">E-Ink</string>
+
+    <!-- Companion: Diagnostics -->
+    <string name="settings_privileged_layer">Privileged layer</string>
+    <string name="settings_privileged_layer_desc">Verify hidden-API access, the PServerBinder root shell and the root helper.</string>
+    <string name="settings_run_check">Run check</string>
+    <string name="settings_running">Running…</string>
+    <string name="diag_pass">PASS</string>
+    <string name="diag_fail">FAIL</string>
+    <string name="diag_info">INFO</string>
+    <string name="diag_hidden_api">Hidden-API exemptions</string>
+    <string name="diag_root_shell">PServerBinder root shell</string>
+    <string name="diag_helper">Root helper connected</string>
+
+    <!-- Companion: status messages -->
+    <string name="msg_replay_arming">Replay buffer arming…</string>
+    <string name="msg_replay_off">Replay buffer off</string>
+    <string name="msg_replay_next_arm">Takes effect next time the buffer arms</string>
+    <string name="msg_replay_saving">Saving clip…</string>
+    <string name="msg_save_failed">Save failed (%1$s)</string>
+    <string name="msg_saved_to">Saved to %1$s</string>
+    <string name="msg_export_failed">Export failed</string>
+    <string name="msg_no_backup">No backup found</string>
+    <string name="msg_restore_failed">Restore failed</string>
+    <plurals name="msg_restored_settings">
+        <item quantity="one">Restored %1$d setting</item>
+        <item quantity="other">Restored %1$d settings</item>
+    </plurals>
+</resources>

@@ -1,12 +1,14 @@
 package jr.brian.commandpannel.privileged
 
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
 import java.nio.ByteBuffer
 
 /** Bitrate preset for the Replay Buffer, as a fraction of the normal Screen Record bitrate. */
-enum class ReplayBitratePreset(val key: String, val label: String, val bitRateScale: Float) {
-    HIGH("high", "High", 1.0f),
-    BALANCED("balanced", "Balanced", 0.5f),
-    LOW("low", "Low", 0.25f);
+enum class ReplayBitratePreset(val key: String, @StringRes val labelRes: Int, val bitRateScale: Float) {
+    HIGH("high", R.string.replay_quality_high, 1.0f),
+    BALANCED("balanced", R.string.replay_quality_balanced, 0.5f),
+    LOW("low", R.string.replay_quality_low, 0.25f);
 
     companion object {
         val DEFAULT = BALANCED

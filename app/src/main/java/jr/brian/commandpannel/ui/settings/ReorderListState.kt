@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Drag-and-drop state for the companion's order lists (quick tiles, nav bar buttons). Touch: the dragged row follows
- * the finger, swapping with a neighbour once it crosses half a slot, and the screen auto-scrolls near the viewport
- * edges. Gamepad: A picks a row up ([grab]), D-pad moves it ([moveGrabbed]), A / B drops it ([drop]). Neighbours
+ * the finger, swapping with a neighbor once it crosses half a slot, and the screen auto-scrolls near the viewport
+ * edges. Gamepad: A picks a row up ([grab]), D-pad moves it ([moveGrabbed]), A / B drops it ([drop]). Neighbors
  * slide into place; the new order is committed through [onCommit] when the drag ends.
  */
 @Stable
@@ -120,7 +120,7 @@ internal class ReorderListState(
         if (now != startOrder) onCommit(now)
     }
 
-    /** Swaps the dragged row past neighbours while it sits more than half a slot away from its own. */
+    /** Swaps the dragged row past neighbors while it sits more than half a slot away from its own. */
     private fun settle() {
         val key = dragged ?: return
         if (slotPx <= 0f) return
@@ -129,7 +129,7 @@ internal class ReorderListState(
         while (dragOffset < -slotPx / 2 && i > 0) { swap(i, i - 1, animateMover = false); dragOffset += slotPx; i-- }
     }
 
-    /** Moves the row at [from] to [to]; the displaced neighbour (and optionally the mover) slide from their old spot. */
+    /** Moves the row at [from] to [to]; the displaced neighbor (and optionally the mover) slide from their old spot. */
     private fun swap(from: Int, to: Int, animateMover: Boolean) {
         val mover = items[from]
         val other = items[to]

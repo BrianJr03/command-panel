@@ -1,8 +1,37 @@
 package jr.brian.commandpannel.system
 
+import jr.brian.commandpannel.R
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToLong
+
+/**
+ * Format templates for [BatteryEstimator.formatShort]. Production builds them from string resources ([from]); the
+ * [ENGLISH] default keeps the estimator pure for JVM unit tests and must stay in sync with `strings.xml`.
+ */
+data class BatteryLabels(
+    val timeToEmpty: String,
+    val timeToFull: String,
+    val limitReached: String,
+    val full: String,
+    val minutes: String,
+    val hours: String,
+    val hoursMinutes: String,
+) {
+    companion object {
+        val ENGLISH = BatteryLabels("~%1\$s", "full in %1\$s", "Limit reached", "Full", "%1\$dm", "%1\$dh", "%1\$dh %2\$dm")
+
+        fun from(res: android.content.res.Resources) = BatteryLabels(
+            timeToEmpty = res.getString(R.string.battery_time_to_empty),
+            timeToFull = res.getString(R.string.battery_time_to_full),
+            limitReached = res.getString(R.string.battery_limit_reached),
+            full = res.getString(R.string.battery_full),
+            minutes = res.getString(R.string.duration_minutes),
+            hours = res.getString(R.string.duration_hours),
+            hoursMinutes = res.getString(R.string.duration_hours_minutes),
+        )
+    }
+}
 
 /** Unit of the raw battery `current_now` reading on a device ([DeviceProfile.batteryCurrentUnit]). */
 enum class BatteryCurrentUnit {
@@ -68,22 +97,22 @@ class BatteryEstimator(
         const val CHARGE_LIMIT_PERCENT = 80
 
         /** Short label for the telemetry panel / status bar, or `null` when nothing should be shown. */
-        fun formatShort(estimate: BatteryEstimate): String? = when (estimate) {
-            is BatteryEstimate.TimeToEmpty -> "~${formatDuration(estimate.minutes)}"
-            is BatteryEstimate.TimeToFull -> "full in ${formatDuration(estimate.minutes)}"
-            is BatteryEstimate.AtTarget -> if (estimate.chargeLimitReached) "Limit reached" else "Full"
+        fun formatShort(estimate: BatteryEstimate, labels: BatteryLabels = BatteryLabels.ENGLISH): String? = when (estimate) {
+            is BatteryEstimate.TimeToEmpty -> labels.timeToEmpty.format(formatDuration(estimate.minutes, labels))
+            is BatteryEstimate.TimeToFull -> labels.timeToFull.format(formatDuration(estimate.minutes, labels))
+            is BatteryEstimate.AtTarget -> if (estimate.chargeLimitReached) labels.limitReached else labels.full
             BatteryEstimate.Hidden,
             BatteryEstimate.WarmingUp -> null
         }
 
-        fun formatDuration(minutes: Long): String {
+        fun formatDuration(minutes: Long, labels: BatteryLabels = BatteryLabels.ENGLISH): String {
             val m = minutes.coerceIn(0L, MAX_MINUTES)
             val h = m / 60L
             val rem = m % 60L
             return when {
-                h == 0L -> "${rem}m"
-                rem == 0L -> "${h}h"
-                else -> "${h}h ${rem}m"
+                h == 0L -> labels.minutes.format(rem)
+                rem == 0L -> labels.hours.format(h)
+                else -> labels.hoursMinutes.format(h, rem)
             }
         }
     }

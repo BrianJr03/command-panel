@@ -17,7 +17,7 @@ open, not glossed over.
 ## 2. How BDSA was consulted
 
 BDSA was read as prior art for *how a user app can replace the stock assistant* (personal reading is permitted by
-licence §1). Files read: `LICENSE`, `AGENTS.md`, `CLAUDE.md`, `docs/SYSTEM_INTEGRATION_REFERENCE.md`,
+license §1). Files read: `LICENSE`, `AGENTS.md`, `CLAUDE.md`, `docs/SYSTEM_INTEGRATION_REFERENCE.md`,
 `docs/TECHNICAL_ARCHITECTURE.md`, `docs/devices/AYN_THOR.md`, `docs/FUNCTIONAL_SPECIFICATION.md`,
 `app/src/main/AndroidManifest.xml`, `privileged/PServerClient.kt`.
 
@@ -48,7 +48,7 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 - Two ported features sat on upstream infrastructure (the screen-capture engine under the replay buffer, the settings
   activity hosting most fork settings). Command Panel writes its own versions of those instead of porting them.
 
-## 4. Licence clauses
+## 4. License clauses
 
 | Clause | Status |
 |---|---|
@@ -69,7 +69,7 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 2. **Command Panel published publicly — 2026-11-17.** With every ported feature integrated and its upstream
    dependencies rewritten, and with `fork-port/` purged from git history (see §6), Command Panel was pushed to a
    **public** GitHub repo. What is published is the app in `app/` plus project docs — it contains **no BDSA
-   (stormpanda) code**, so BDSA's licence (which governs BDSA's code, not Brian's own) does not restrict it. It ships
+   (stormpanda) code**, so BDSA's license (which governs BDSA's code, not Brian's own) does not restrict it. It ships
    OFL fonts (with notices) and, as of the same day, **no AYN icon art** (loaded at runtime instead — see §7). No
    keystore or signing secret is tracked (`.gitignore` excludes `*.jks`/`*.keystore`/`*.apk`); release signing runs
    in CI from repo secrets.
@@ -96,7 +96,7 @@ Arrange mode, Replay Buffer, launcher icon). Findings:
   engine (`ReplayCaptureEngine`, upstream's `ScreenRecorderEngine` capture was **not** ported) are Command Panel's
   own code; only Brian's pure helpers (replay bitrate/path math, ring buffer, renderers) were ported.
 - **Fonts.** The 8 bundled font families are SIL OFL 1.1; `assets/THIRD_PARTY_NOTICES.txt` ships the attribution +
-  full licence alongside them.
+  full license alongside them.
 - **Still unpublished / private.** Command Panel has **no git remote** and tracks no binaries/keystore; the fork is
   **private** (`gh repo view` → `PRIVATE`); no upstream `LICENSE`/`README`/binary is copied into `app/src/`.
 

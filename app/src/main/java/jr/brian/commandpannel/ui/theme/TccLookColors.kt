@@ -139,7 +139,7 @@ private fun hsvColor(h: Float, s: Float, v: Float, alpha: Float = 1f): Color {
 
 private fun Color.hueShifted(degrees: Float): Color {
     val hsv = toHsv()
-    // Keep low-saturation accents (greys) visibly distinct from their complement.
+    // Keep low-saturation accents (grays) visibly distinct from their complement.
     return hsvColor(
         ((hsv[0] + degrees) % 360f + 360f) % 360f,
         hsv[1].coerceAtLeast(0.55f),

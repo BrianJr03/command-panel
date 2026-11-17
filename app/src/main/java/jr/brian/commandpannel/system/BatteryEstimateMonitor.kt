@@ -30,6 +30,7 @@ class BatteryEstimateMonitor(
 ) {
     private val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     private val estimator = BatteryEstimator()
+    private val labels by lazy { BatteryLabels.from(context.resources) }
 
     companion object {
         /** Charge direction from `BatteryManager` status + plug state (never the current's sign). */
@@ -50,7 +51,7 @@ class BatteryEstimateMonitor(
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                _text.value = if (enabled()) BatteryEstimator.formatShort(sample()) else { estimator.reset(); null }
+                _text.value = if (enabled()) BatteryEstimator.formatShort(sample(), labels) else { estimator.reset(); null }
                 delay(intervalMs)
             }
         }
@@ -96,6 +97,6 @@ class BatteryEstimateMonitor(
     }
 
     suspend fun snapshot(): String? = withContext(Dispatchers.IO) {
-        if (enabled()) BatteryEstimator.formatShort(sample()) else null
+        if (enabled()) BatteryEstimator.formatShort(sample(), labels) else null
     }
 }

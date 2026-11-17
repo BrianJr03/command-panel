@@ -5,14 +5,16 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
 
 /** A launchable app the overlay's Quick Launch button can open. */
 data class QuickLaunchApp(val component: ComponentName, val label: String)
 
 /** Screen the Quick Launch app opens on (matches the Thor display ids). */
-enum class QuickLaunchDisplay(val displayId: Int, val label: String) {
-    TOP(0, "Top screen"),
-    BOTTOM(4, "Bottom screen");
+enum class QuickLaunchDisplay(val displayId: Int, @StringRes val labelRes: Int) {
+    TOP(0, R.string.key_focus_mode_lock_on_upper_screen),
+    BOTTOM(4, R.string.key_focus_mode_lock_on_lower_screen);
 
     companion object {
         fun fromId(id: Int): QuickLaunchDisplay = entries.firstOrNull { it.displayId == id } ?: TOP

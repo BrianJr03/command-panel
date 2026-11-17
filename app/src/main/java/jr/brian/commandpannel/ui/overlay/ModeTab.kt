@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import jr.brian.commandpannel.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,9 +50,9 @@ private fun ScreenModePanel(state: OverlayUiState, onRequestMode: (Int) -> Unit,
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ModeButton("ic_dual_screen_display", "Dual-screen\ndisplay", state.displayMode == 0) { onRequestMode(0) }
-            ModeButton("ic_just_screen_above", "Only top\nscreen", state.displayMode == 1) { onRequestMode(1) }
-            ModeButton("ic_just_screen_below", "Only bottom\nscreen", state.displayMode == 2) { onRequestMode(2) }
+            ModeButton("ic_dual_screen_display", stringResource(R.string.mode_dual_screen_display), state.displayMode == 0) { onRequestMode(0) }
+            ModeButton("ic_just_screen_above", stringResource(R.string.mode_only_top_screen), state.displayMode == 1) { onRequestMode(1) }
+            ModeButton("ic_just_screen_below", stringResource(R.string.mode_only_bottom_screen), state.displayMode == 2) { onRequestMode(2) }
         }
     }
 }
@@ -67,9 +69,9 @@ private fun BrightnessCard(state: OverlayUiState, actions: OverlayActions, modif
             modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            TccSliderRow("Dual\nScreen", state.dualBrightness, brightnessIcon(state.dualBrightness), dimmed = true) { f, c -> actions.setDualBrightness(f, c) }
-            TccSliderRow("Top\nScreen", state.topBrightness, brightnessIcon(state.topBrightness)) { f, c -> actions.setTopBrightness(f, c) }
-            TccSliderRow("Bottom\nScreen", state.bottomBrightness, brightnessIcon(state.bottomBrightness)) { f, c -> actions.setBottomBrightness(f, c) }
+            TccSliderRow(stringResource(R.string.slider_dual_screen), state.dualBrightness, brightnessIcon(state.dualBrightness), dimmed = true) { f, c -> actions.setDualBrightness(f, c) }
+            TccSliderRow(stringResource(R.string.slider_top_screen), state.topBrightness, brightnessIcon(state.topBrightness)) { f, c -> actions.setTopBrightness(f, c) }
+            TccSliderRow(stringResource(R.string.slider_bottom_screen), state.bottomBrightness, brightnessIcon(state.bottomBrightness)) { f, c -> actions.setBottomBrightness(f, c) }
         }
     }
 }
@@ -81,8 +83,8 @@ private fun VolumeCard(state: OverlayUiState, actions: OverlayActions, modifier:
             modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            TccSliderRow("Top\nScreen", state.topVolume, volumeIcon(state.topVolume)) { f, c -> actions.setTopVolume(f, c) }
-            TccSliderRow("Bottom\nScreen", state.bottomVolume, volumeIcon(state.bottomVolume)) { f, c -> actions.setBottomVolume(f, c) }
+            TccSliderRow(stringResource(R.string.slider_top_screen), state.topVolume, volumeIcon(state.topVolume)) { f, c -> actions.setTopVolume(f, c) }
+            TccSliderRow(stringResource(R.string.slider_bottom_screen), state.bottomVolume, volumeIcon(state.bottomVolume)) { f, c -> actions.setBottomVolume(f, c) }
         }
     }
 }

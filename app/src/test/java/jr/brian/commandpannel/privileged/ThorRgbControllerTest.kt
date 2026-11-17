@@ -3,7 +3,7 @@ package jr.brian.commandpannel.privileged
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Covers the pure colour/format logic of the ported Thor RGB controller. */
+/** Covers the pure color/format logic of the ported Thor RGB controller. */
 class ThorRgbControllerTest {
 
     @Test

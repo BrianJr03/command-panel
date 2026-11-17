@@ -47,8 +47,8 @@ object ThorRgbController {
     }
 
     /**
-     * The ambient-LED colour as an opaque ARGB accent when the `rgb_accent_sync` pref is on, else `null`. Shared by
-     * the overlay and the companion so both theme from the same colour.
+     * The ambient-LED color as an opaque ARGB accent when the `rgb_accent_sync` pref is on, else `null`. Shared by
+     * the overlay and the companion so both theme from the same color.
      */
     fun accentOverride(context: Context, syncEnabled: Boolean): Int? {
         if (!syncEnabled) return null

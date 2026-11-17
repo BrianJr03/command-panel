@@ -11,14 +11,14 @@
 
 Command Panel stands on the shoulders of two projects:
 
-- **AYN's stock Dual-Screen Assistant** (`com.odin.dualscreen.assistant`) — the built-in app this replaces. Command Panel rebuilds its layout, behaviour and hardware integration so it feels native on the Thor.
+- **AYN's stock Dual-Screen Assistant** (`com.odin.dualscreen.assistant`) — the built-in app this replaces. Command Panel rebuilds its layout, behavior and hardware integration so it feels native on the Thor.
 - **[Better Dual Screen Assistant](https://github.com/stormpanda) by stormpanda** — the source-available project that first showed how a normal app can stand in for the system assistant on this hardware. It was studied as **prior art and inspiration** — patterns to learn from, not code to copy. Everything shipped here is either my own work or re-derived from AYN's stock app. See [Upstream & licensing](#upstream--licensing) at the bottom.
 
 ---
 
 ## Looks
 
-Command Panel ships **16 overlay themes** (plus the stock look) — the whole panel re-skins live, fonts and all. Three favourites:
+Command Panel ships **16 overlay themes** (plus the stock look) — the whole panel re-skins live, fonts and all. Three favorites:
 
 | Aurora Glass | Tactical HUD | Stock |
 |:---:|:---:|:---:|
@@ -46,10 +46,10 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
 - 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything.
-- 🧩 **Customisable quick toggles** — enable/disable tiles and **drag-and-drop to reorder** them.
+- 🧩 **Customizable quick toggles** — enable/disable tiles and **drag-and-drop to reorder** them.
 - ✋ **Arrange mode** — long-press the overlay to drag-and-drop its cards into any layout.
 - ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment.
-- 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED colour.
+- 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
 - 🔋 **Battery time estimate** and an option to **hide the network-speed** readout.
 - 💾 **Settings backup & restore.**
@@ -90,7 +90,7 @@ The easiest way to contribute is a **new theme (Look)** — one Look re-skins bo
 
 ## Upstream & licensing
 
-Command Panel was **inspired by** stormpanda's Better Dual Screen Assistant (a source-available, personal-use project), and care was taken to respect that licence. At a high level:
+Command Panel was **inspired by** stormpanda's Better Dual Screen Assistant (a source-available, personal-use project), and care was taken to respect that license. At a high level:
 
 - **No upstream code is shipped.** BDSA was read as prior art; every technical fact was re-derived from AYN's own stock app. The app contains no stormpanda code.
 - **Only my own work was ported.** Features I wrote in my personal BDSA fork are mine to reuse; the few places that sat on upstream base code were **rewritten clean-room**, and the staging area that once held that work was **purged from this repo's git history**.

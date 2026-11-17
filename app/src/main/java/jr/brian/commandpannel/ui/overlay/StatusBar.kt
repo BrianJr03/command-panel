@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import jr.brian.commandpannel.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -39,7 +41,7 @@ fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
             if (state.bluetoothOn) {
                 Image(
                     painter = rememberStockPainter("ic_bluetooth"),
-                    contentDescription = "Bluetooth",
+                    contentDescription = stringResource(R.string.overlay_bluetooth),
                     colorFilter = stockIconColorFilter(colors.primary),
                     modifier = Modifier.size(15.dp),
                 )
@@ -50,7 +52,7 @@ fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
             if (state.wifiLevel in 0..3) {
                 Image(
                     painter = rememberStockPainter("ic_status_wifi_${state.wifiLevel}"),
-                    contentDescription = "Wi-Fi",
+                    contentDescription = stringResource(R.string.overlay_wifi),
                     colorFilter = stockIconColorFilter(colors.primary),
                     modifier = Modifier.size(width = 17.dp, height = 13.dp),
                 )
@@ -61,9 +63,9 @@ fun StatusBar(state: OverlayUiState, modifier: Modifier = Modifier) {
                 lightning = colors.lightning,
                 modifier = Modifier.size(width = 26.dp, height = 13.dp),
             )
-            Text("${state.batteryPercent}%", color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.unit_percent, state.batteryPercent), color = colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             state.batteryEstimate?.let {
-                Text("· $it", color = colors.secondary, fontSize = 12.sp)
+                Text(stringResource(R.string.overlay_battery_estimate, it), color = colors.secondary, fontSize = 12.sp)
             }
         }
     }

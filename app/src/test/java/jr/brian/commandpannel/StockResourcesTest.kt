@@ -4,7 +4,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Guards the stock resource import: every themed icon keeps its pure-black twin, and no apktool artefacts remain. */
+/** Guards the stock resource import: every themed icon keeps its pure-black twin, and no apktool artifacts remain. */
 class StockResourcesTest {
 
     private val drawables = File("src/main/res/drawable").listFiles().orEmpty().map { it.nameWithoutExtension }.toSet()

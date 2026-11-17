@@ -70,7 +70,7 @@ Show = inflate `main_layout` (cached `TccView`), restore last tab, `addView`. Hi
 
 Extras `key_action_down` and `key_isLongPress` (both default **true** when absent).
 
-| Event | Behaviour |
+| Event | Behavior |
 |---|---|
 | down, not long | no-op |
 | down, long | if bottom cover is not showing: switch to mode 1 (top only) via `ScreenModeControlPanel.m8970e`, set "swallow next up" |
@@ -170,7 +170,7 @@ Shell via `Runtime.exec` (works because of system uid): `service call SurfaceFli
 
 **Brightness** (`views/mainpanel/screencontrol/sliding/controlview2/screen/`, base `SRC/p176y0/AbstractC3212c.java`, calls in `SRC/p031K0/C0114c.java`)
 - Sliders 0–100. Primary = display 0, External = the overlay's display.
-- Drag: `DisplayManager.setTemporaryBrightness(displayId, f)`; release: `setBrightness(displayId, f)`; read: `Display.getBrightnessInfo()` normalised by min/max; listener with event mask 8.
+- Drag: `DisplayManager.setTemporaryBrightness(displayId, f)`; release: `setBrightness(displayId, f)`; read: `Display.getBrightnessInfo()` normalized by min/max; listener with event mask 8.
 - Dual slider stores `dual_screen_brightness_level` and pushes the same progress to both. Its end icon calls `DevicePolicyManager.lockNow()`.
 - L1/R1 (keycodes 102/103) step ±10 %.
 
@@ -193,11 +193,11 @@ Shell via `Runtime.exec` (works because of system uid): `service call SurfaceFli
 | PWR | `/sys/class/power_supply/battery/current_now` × `voltage_now`, ring −20..25 W | 2000 ms |
 | RAM | meminfo used vs `ActivityManager` total | 1500 ms |
 
-Temp icon colour: ≤50 `#818184`, 51–70 `#f6a6a6`, 71–85 `#f67474`, ≥86 `#f64646`.
+Temp icon color: ≤50 `#818184`, 51–70 `#f6a6a6`, 71–85 `#f67474`, ≥86 `#f64646`.
 
 **Quick tiles** (`views/mainpanel/systemset/quicksettings/`), in order:
 
-| # | Tile | Behaviour |
+| # | Tile | Behavior |
 |---|---|---|
 | 1 | Focus Mode | dialog → `screen_focus_lock`; hidden unless mode 0 |
 | 2 | Performance Mode | dialog → `performance_mode` |
@@ -208,7 +208,7 @@ Temp icon colour: ≤50 `#818184`, 51–70 `#f6a6a6`, 71–85 `#f67474`, ≥86 `
 | 7 | Vibration | toggles `vibrate_on` |
 | 8 | Ambient LED | broadcast above |
 | 9 | Force Landscape | toggles `force_landscape` |
-| 10 | Theme Mode | dialog → `tcc_theme_mode`; recolours the overlay only |
+| 10 | Theme Mode | dialog → `tcc_theme_mode`; recolors the overlay only |
 
 Option dialogs close 300 ms after a pick. Grid is computed from panel size (tile 145 × 175 px at 1080 high); L1/R1 page.
 
@@ -229,15 +229,15 @@ NavigationBar     marginBottom 15dp     Mode | Task | Settings between 15 % and 
 - Sizes derive from display height h = 1080: status unit `0.065h` = 70 px (icons 42 px); nav/tile button base `0.135h` = 145 px (icon circle 101 px, label box 58 px).
 - Width is clamped to `1.148 × h` when the display is wider than that ratio (1239 px here).
 - Only one `@dimen` is used (`status_view_margin` 2.5dp); everything else is literal dp or computed in code. No size-qualifier overrides apply.
-- Panels: `SRC/p156t0/C3137a.java` ConstraintLayout, 20dp corners, panel colour, focused = panel-select colour.
+- Panels: `SRC/p156t0/C3137a.java` ConstraintLayout, 20dp corners, panel color, focused = panel-select color.
 
 Mode tab (`screen_control_layout`): top half = three mode buttons (15dp padding, 15dp corners, 500 ms click guard); bottom half split 50/50 = brightness card (Dual / Top / Bottom) and volume card (Top / Bottom).
 The "60Hz" pill row inside each mode button is never populated.
 
 Settings tab (`system_set_layout`): guidelines at 70 % horizontal and 40 % vertical. Frame-rate card (mode pill 0–30 %, FPS number 30–70 %, "CURRENT FPS" label), quick-settings pager with dot indicator (4dp dots, 13dp spacing), hardware row (TEMP 20 %, FAN 20 %, four rings 60 %).
-Ring colours: CPU `#ee188c`, GPU `#70e7ff`, PWR `#e26e01`, RAM `#76ca40`; stroke `0.05 × min(w,h)`, arc alpha 150, 300 ms decelerate.
+Ring colors: CPU `#ee188c`, GPU `#70e7ff`, PWR `#e26e01`, RAM `#76ca40`; stroke `0.05 × min(w,h)`, arc alpha 150, 300 ms decelerate.
 
-Theme colours (`SRC/p148r0/C3104a.java`; styles `TccColorsThemeLight` / `TccColorsThemePureBlack`):
+Theme colors (`SRC/p148r0/C3104a.java`; styles `TccColorsThemeLight` / `TccColorsThemePureBlack`):
 
 | Token | Light | Pure black |
 |---|---|---|
@@ -257,7 +257,7 @@ Theme colours (`SRC/p148r0/C3104a.java`; styles `TccColorsThemeLight` / `TccColo
 
 `TccColorsThemeDark` exists but is never selected. Icons are all vectors in `RES/drawable/`; pure-black variants use a `_black` suffix.
 
-Animations: `tcc_anim` = `pop_win_enter_anim` / `pop_win_exit_anim` (translateY 90 %p ↔ 0 plus alpha, 200 ms). Press effect scale 0.9 over 50 ms. Tile active colour 200 ms.
+Animations: `tcc_anim` = `pop_win_enter_anim` / `pop_win_exit_anim` (translateY 90 %p ↔ 0 plus alpha, 200 ms). Press effect scale 0.9 over 50 ms. Tile active color 200 ms.
 
 Dialogs:
 - Tip dialogs (`SRC/p144q0/C3098b.java`): own window, type 2021, same flags as the overlay, `#BB000000` scrim, card 15dp corners; 200 ms morph from the source view (`dialog/DialogAnimator.java`).

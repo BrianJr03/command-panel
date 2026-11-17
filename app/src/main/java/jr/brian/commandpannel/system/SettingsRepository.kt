@@ -1,8 +1,13 @@
 package jr.brian.commandpannel.system
 
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.database.ContentObserver
@@ -186,11 +191,13 @@ class SettingsRepository(
         }
     }
 
-    private fun focusTitle(v: Int) = when (v) {
-        1 -> "Top screen"
-        2 -> "Bottom screen"
-        else -> "Auto-lock"
-    }
+    private fun focusTitle(v: Int) = context.getString(
+        when (v) {
+            1 -> R.string.key_focus_mode_lock_on_upper_screen
+            2 -> R.string.key_focus_mode_lock_on_lower_screen
+            else -> R.string.key_focus_mode_touch_switchable
+        },
+    )
 
     private fun enabledTileKeys(): List<String> =
         QuickSettingTileId.enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null))
@@ -209,40 +216,56 @@ class SettingsRepository(
                 QuickSettingTileId.FOCUS_LOCK -> focusTitle(focus) to false
                 QuickSettingTileId.PERFORMANCE -> perfTitle(perf) to false
                 QuickSettingTileId.FAN -> fanTitle(fan) to (fan != 0)
-                QuickSettingTileId.CLEAR_MEMORY -> "Clean\nMemory" to false
+                QuickSettingTileId.CLEAR_MEMORY -> str(R.string.tile_clean_memory) to false
                 QuickSettingTileId.CONTROLLER -> styleTitle(style) to false
-                QuickSettingTileId.CHARGING_SEP -> "Direct Power\nSupply" to (settings.getInt(Keys.CHARGING_SEPARATION, 0) == 1)
-                QuickSettingTileId.VIBRATION -> "Vibration" to (settings.getInt(Keys.VIBRATE_ON, 1) == 1)
-                QuickSettingTileId.AMBIENT_LED -> "Ambient LED" to light
-                QuickSettingTileId.FORCE_LANDSCAPE -> "Force\nLandscape" to (settings.getInt(Keys.FORCE_LANDSCAPE, 0) == 1)
+                QuickSettingTileId.CHARGING_SEP -> str(R.string.tile_direct_power_supply) to (settings.getInt(Keys.CHARGING_SEPARATION, 0) == 1)
+                QuickSettingTileId.VIBRATION -> str(R.string.text_vibration_open_title) to (settings.getInt(Keys.VIBRATE_ON, 1) == 1)
+                QuickSettingTileId.AMBIENT_LED -> str(R.string.text_led_lights_open_title) to light
+                QuickSettingTileId.FORCE_LANDSCAPE -> str(R.string.tile_force_landscape) to (settings.getInt(Keys.FORCE_LANDSCAPE, 0) == 1)
                 QuickSettingTileId.THEME -> themeTitle(theme) to true
-                QuickSettingTileId.WIFI -> "Wi-Fi" to (wifiLevel() >= 0)
-                QuickSettingTileId.BLUETOOTH -> "Bluetooth" to bluetoothConnected()
-                QuickSettingTileId.DO_NOT_DISTURB -> "Do Not\nDisturb" to (settings.getInt("zen_mode", 0) != 0)
-                QuickSettingTileId.AIRPLANE -> "Airplane\nMode" to (android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1)
-                QuickSettingTileId.KEEP_SCREEN_ON -> "Keep\nScreen On" to (settings.getInt("keep_screen_on", 0) == 1)
-                QuickSettingTileId.DOUBLE_TAP_HOME -> "Double-Tap\nHOME" to (settings.getInt("prevent_press_home_accidentally", 0) == 1)
-                QuickSettingTileId.CHARGE_LIMIT_80 -> "80% Charge\nLimit" to (settings.getInt("percent_80_charge_limit", 0) == 1)
-                QuickSettingTileId.VIRTUAL_MOUSE -> "Virtual\nMouse" to (settings.getInt("global_gamepad_to_mouse_mode", 0) == 1)
+                QuickSettingTileId.WIFI -> str(R.string.tile_name_wifi) to (wifiLevel() >= 0)
+                QuickSettingTileId.BLUETOOTH -> str(R.string.tile_name_bluetooth) to bluetoothConnected()
+                QuickSettingTileId.DO_NOT_DISTURB -> str(R.string.tile_do_not_disturb) to (settings.getInt("zen_mode", 0) != 0)
+                QuickSettingTileId.AIRPLANE -> str(R.string.tile_airplane_mode) to (android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1)
+                QuickSettingTileId.KEEP_SCREEN_ON -> str(R.string.tile_keep_screen_on) to (settings.getInt("keep_screen_on", 0) == 1)
+                QuickSettingTileId.DOUBLE_TAP_HOME -> str(R.string.tile_double_tap_home) to (settings.getInt("prevent_press_home_accidentally", 0) == 1)
+                QuickSettingTileId.CHARGE_LIMIT_80 -> str(R.string.tile_charge_limit_80) to (settings.getInt("percent_80_charge_limit", 0) == 1)
+                QuickSettingTileId.VIRTUAL_MOUSE -> str(R.string.tile_virtual_mouse) to (settings.getInt("global_gamepad_to_mouse_mode", 0) == 1)
                 QuickSettingTileId.TRIGGER_MODE -> triggerTitle(settings.getInt("trigger_input_mode", 2)) to false
-                QuickSettingTileId.SCREENSHOT -> "Screenshot" to false
-                QuickSettingTileId.CLEAR_ALL_TASKS -> "Clear All\nTasks" to false
-                QuickSettingTileId.REPLAY_BUFFER -> "Replay\nBuffer" to prefs.getBoolean("replay_enabled", false)
+                QuickSettingTileId.SCREENSHOT -> str(R.string.tile_name_screenshot) to false
+                QuickSettingTileId.CLEAR_ALL_TASKS -> str(R.string.tile_clear_all_tasks) to false
+                QuickSettingTileId.REPLAY_BUFFER -> str(R.string.tile_replay_buffer) to prefs.getBoolean("replay_enabled", false)
             }
             QuickTile(key, id.icon, title, active)
         }
     }
 
-    private fun triggerTitle(v: Int) = when (v) { 0 -> "Trigger:\nDigital"; 1 -> "Trigger:\nAnalog"; else -> "Trigger:\nBoth" }
+    private fun str(@StringRes id: Int): String = context.getString(id)
 
-    private fun perfTitle(v: Int) = when (v) { 1 -> "Medium\nPerformance"; 2 -> "High\nPerformance"; else -> "Standard\nPerformance" }
-    private fun fanTitle(v: Int) = when (v) { 0 -> "Turned Off"; 4 -> "Smart Mode"; 5 -> "Sports Mode"; 6 -> "Custom"; else -> "Quiet Mode" }
-    private fun styleTitle(v: Int) = when (v) { 0 -> "XBox Style"; 2 -> "Ban On Use"; else -> "Standard\nStyle" }
-    private fun themeTitle(v: Int) = when (v) { 1 -> "System\nTheme"; 3 -> "Light Theme"; else -> "Dark Theme" }
+    private fun triggerTitle(v: Int) = str(
+        when (v) { 0 -> R.string.tile_trigger_digital; 1 -> R.string.tile_trigger_analog; else -> R.string.tile_trigger_both },
+    )
+
+    private fun perfTitle(v: Int) = str(
+        when (v) { 1 -> R.string.tile_perf_medium; 2 -> R.string.tile_perf_high; else -> R.string.tile_perf_standard },
+    )
+    private fun fanTitle(v: Int) = str(
+        when (v) {
+            0 -> R.string.text_fan_control_off; 4 -> R.string.text_fan_control_smart; 5 -> R.string.text_fan_control_medium_speed
+            6 -> R.string.text_fan_control_custom; else -> R.string.text_fan_control_low_speed
+        },
+    )
+    private fun styleTitle(v: Int) = str(
+        when (v) { 0 -> R.string.fan_option_xbox_style; 2 -> R.string.fan_option_disable; else -> R.string.tile_style_standard },
+    )
+    private fun themeTitle(v: Int) = str(
+        when (v) { 1 -> R.string.tile_theme_system; 3 -> R.string.text_light_theme; else -> R.string.text_dark_theme },
+    )
 
     private fun formatSpeed(bps: Double): String {
         val kb = bps / 1024.0
-        return if (kb >= 1024) "%.2fMB/S".format(kb / 1024.0) else "%.2fKB/S".format(kb.coerceAtLeast(0.0))
+        return if (kb >= 1024) context.getString(R.string.unit_mb_per_sec, kb / 1024.0)
+        else context.getString(R.string.unit_kb_per_sec, kb.coerceAtLeast(0.0))
     }
 
     private fun wifiLevel(): Int {
@@ -253,9 +276,11 @@ class SettingsRepository(
     }
 
     private fun bluetoothConnected(): Boolean {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        // BLUETOOTH_CONNECT is granted by PermissionGranter (root); until then report "not connected".
+        if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return false
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return false
         return runCatching {
-            adapter.isEnabled && adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothProfile.STATE_CONNECTED
+            adapter.isEnabled && adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothAdapter.STATE_CONNECTED
         }.getOrDefault(false)
     }
 
@@ -452,7 +477,7 @@ class SettingsRepository(
     }
 
     /**
-     * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED colour becomes the
+     * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED color becomes the
      * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
      */
     private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController

@@ -3,7 +3,7 @@ package jr.brian.commandpannel.service
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Covers the AYN button three-state logic, mirroring the stock assistant's behaviour. */
+/** Covers the AYN button three-state logic, mirroring the stock assistant's behavior. */
 class AynButtonMachineTest {
 
     private class Recorder {

@@ -61,7 +61,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
-/** Spring used for cards sliding into their new slot and for cancelled drags returning home. */
+/** Spring used for cards sliding into their new slot and for canceled drags returning home. */
 private val ArrangeSpring = spring<Offset>(dampingRatio = 0.85f, stiffness = 350f)
 
 /**
@@ -270,7 +270,7 @@ fun Modifier.arrangeLayer(controller: ArrangeController, cards: Collection<Overl
 
 /**
  * Enters Arrange mode on long-press without stealing taps from children: the gesture is observed
- * in the Initial pass, and only consumed once the long-press fires so the child's click is cancelled.
+ * in the Initial pass, and only consumed once the long-press fires so the child's click is canceled.
  */
 fun Modifier.longPressToArrange(controller: ArrangeController): Modifier =
     pointerInput(controller) {

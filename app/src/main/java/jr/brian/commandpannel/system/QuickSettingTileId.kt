@@ -12,9 +12,13 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.TileIcon
 
-enum class TileCategory(val title: String) { STOCK("Stock"), ANDROID("Android System"), TOOLS("Tools") }
+enum class TileCategory(@StringRes val titleRes: Int) {
+    STOCK(R.string.tile_category_stock), ANDROID(R.string.tile_category_android), TOOLS(R.string.tile_category_tools)
+}
 
 enum class TileInteraction { TOGGLE, DIALOG, ACTION }
 
@@ -55,29 +59,30 @@ enum class QuickSettingTileId(
     REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE);
 
     /** Display name for the companion app's enable/disable list. */
-    val label: String get() = when (this) {
-        FOCUS_LOCK -> "Focus Mode"
-        PERFORMANCE -> "Performance Mode"
-        FAN -> "Fan Control"
-        CLEAR_MEMORY -> "Clean Memory"
-        CONTROLLER -> "Handle Style"
-        CHARGING_SEP -> "Direct Power Supply"
-        VIBRATION -> "Vibration"
-        AMBIENT_LED -> "Ambient LED"
-        FORCE_LANDSCAPE -> "Force Landscape"
-        THEME -> "Theme Mode"
-        WIFI -> "Wi-Fi"
-        BLUETOOTH -> "Bluetooth"
-        DO_NOT_DISTURB -> "Do Not Disturb"
-        AIRPLANE -> "Airplane Mode"
-        KEEP_SCREEN_ON -> "Keep Screen On"
-        DOUBLE_TAP_HOME -> "Double-Tap HOME"
-        CHARGE_LIMIT_80 -> "80% Charge Limit"
-        VIRTUAL_MOUSE -> "Virtual Mouse"
-        TRIGGER_MODE -> "L2/R2 Trigger Mode"
-        SCREENSHOT -> "Screenshot"
-        CLEAR_ALL_TASKS -> "Clear All Tasks"
-        REPLAY_BUFFER -> "Replay Buffer"
+    @get:StringRes
+    val labelRes: Int get() = when (this) {
+        FOCUS_LOCK -> R.string.key_focus_mode_title_text
+        PERFORMANCE -> R.string.text_performance_mode_title
+        FAN -> R.string.text_fan_control_title
+        CLEAR_MEMORY -> R.string.text_clear_memory_title
+        CONTROLLER -> R.string.text_handle_style_title
+        CHARGING_SEP -> R.string.text_charging_separation_title
+        VIBRATION -> R.string.text_vibration_open_title
+        AMBIENT_LED -> R.string.text_led_lights_open_title
+        FORCE_LANDSCAPE -> R.string.force_landscape_mode_text
+        THEME -> R.string.text_theme_mode_title
+        WIFI -> R.string.tile_name_wifi
+        BLUETOOTH -> R.string.tile_name_bluetooth
+        DO_NOT_DISTURB -> R.string.tile_name_do_not_disturb
+        AIRPLANE -> R.string.tile_name_airplane
+        KEEP_SCREEN_ON -> R.string.tile_name_keep_screen_on
+        DOUBLE_TAP_HOME -> R.string.tile_name_double_tap_home
+        CHARGE_LIMIT_80 -> R.string.tile_name_charge_limit_80
+        VIRTUAL_MOUSE -> R.string.tile_name_virtual_mouse
+        TRIGGER_MODE -> R.string.tile_name_trigger_mode
+        SCREENSHOT -> R.string.tile_name_screenshot
+        CLEAR_ALL_TASKS -> R.string.tile_name_clear_all_tasks
+        REPLAY_BUFFER -> R.string.tile_name_replay_buffer
     }
 
     companion object {

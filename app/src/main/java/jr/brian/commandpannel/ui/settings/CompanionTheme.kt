@@ -22,7 +22,7 @@ import jr.brian.commandpannel.ui.theme.resolvePalette
 import jr.brian.commandpannel.ui.theme.specForLook
 
 /**
- * Colours of the companion settings screen. [Default] is the companion's own polished dark style; when the
+ * Colors of the companion settings screen. [Default] is the companion's own polished dark style; when the
  * "Companion follows overlay look" setting is on, [companionPaletteFrom] derives the same roles from the overlay
  * palette so the screen picks up the overlay's theme mode and accent.
  */
@@ -35,7 +35,7 @@ data class CompanionPalette(
     val border: Color,
     val accent: Color,
     val accentSoft: Color,
-    /** Accent-filled button colour while focused. */
+    /** Accent-filled button color while focused. */
     val accentFocused: Color,
     /** Content on [accent] fills (buttons, the app badge). */
     val onAccent: Color,
@@ -65,7 +65,7 @@ data class CompanionPalette(
     }
 }
 
-/** Maps the overlay palette onto the companion's colour roles, keeping text and accent readable on its surfaces. */
+/** Maps the overlay palette onto the companion's color roles, keeping text and accent readable on its surfaces. */
 fun companionPaletteFrom(colors: TccColors): CompanionPalette {
     val surface = colors.panelBackground
     val accent = colors.accent.copy(alpha = 1f).clampContrast(surface, LOOK_LINE_CONTRAST)

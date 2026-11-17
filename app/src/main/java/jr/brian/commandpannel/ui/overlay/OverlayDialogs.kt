@@ -1,6 +1,9 @@
 package jr.brian.commandpannel.ui.overlay
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.stringResource
+import jr.brian.commandpannel.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import jr.brian.commandpannel.ui.components.noRippleClickable
@@ -44,9 +47,9 @@ fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
     else -> null
 }
 
-private data class DialogOption(val label: String, val icon: String, val value: Int)
+private data class DialogOption(@StringRes val labelRes: Int, val icon: String, val value: Int)
 
-private data class DialogSpec(val titleIcon: String, val title: String, val options: List<DialogOption>, val selected: Int, val onSelect: (Int) -> Unit)
+private data class DialogSpec(val titleIcon: String, @StringRes val titleRes: Int, val options: List<DialogOption>, val selected: Int, val onSelect: (Int) -> Unit)
 
 @Composable
 fun OverlayDialogLayer(
@@ -81,7 +84,7 @@ fun OverlayDialogLayer(
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(10.dp))
-                Text(spec.title, color = colors.primary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(spec.titleRes), color = colors.primary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             }
             spec.options.forEach { opt ->
                 OptionRow(opt, selected = opt.value == spec.selected) {
@@ -112,7 +115,7 @@ private fun OptionRow(option: DialogOption, selected: Boolean, onClick: () -> Un
             )
             Spacer(Modifier.width(16.dp))
         }
-        Text(option.label, color = colors.primary, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        Text(stringResource(option.labelRes), color = colors.primary, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Box(
             modifier = Modifier
                 .size(20.dp)
@@ -130,68 +133,68 @@ private fun OptionRow(option: DialogOption, selected: Boolean, onClick: () -> Un
 
 private fun specFor(kind: OverlayDialogKind, state: OverlayUiState, actions: OverlayActions): DialogSpec = when (kind) {
     OverlayDialogKind.FOCUS -> DialogSpec(
-        "ic_screen_focus_lock_mode", "Focus Mode",
+        "ic_screen_focus_lock_mode", R.string.key_focus_mode_title_text,
         listOf(
-            DialogOption("Auto-lock", "ic_screen_focus_lock_switchable", 0),
-            DialogOption("Top screen", "ic_screen_focus_lock_upper", 1),
-            DialogOption("Bottom screen", "ic_screen_focus_lock_lower", 2),
+            DialogOption(R.string.key_focus_mode_touch_switchable, "ic_screen_focus_lock_switchable", 0),
+            DialogOption(R.string.key_focus_mode_lock_on_upper_screen, "ic_screen_focus_lock_upper", 1),
+            DialogOption(R.string.key_focus_mode_lock_on_lower_screen, "ic_screen_focus_lock_lower", 2),
         ),
         state.focusLock, actions::setFocusLock,
     )
     OverlayDialogKind.PERFORMANCE -> DialogSpec(
-        "ic_qs_performance", "Performance Mode",
+        "ic_qs_performance", R.string.text_performance_mode_title,
         listOf(
-            DialogOption("Standard Performance", "ic_normal_mode", 0),
-            DialogOption("Medium Performance", "ic_performance_mode", 1),
-            DialogOption("High Performance", "ic_height_performance_mode", 2),
+            DialogOption(R.string.text_performance_mode_normal, "ic_normal_mode", 0),
+            DialogOption(R.string.text_performance_mode_performance, "ic_performance_mode", 1),
+            DialogOption(R.string.text_performance_mode_height_performance, "ic_height_performance_mode", 2),
         ),
         state.performanceMode, actions::setPerformance,
     )
     OverlayDialogKind.FAN -> DialogSpec(
-        "ic_qs_fan_control", "Fan Control",
+        "ic_qs_fan_control", R.string.text_fan_control_title,
         buildList {
             // Stock: perf 1 hides Off; perf 2 hides Off + Quiet; perf 0 hides Custom.
-            if (state.performanceMode == 0) add(DialogOption("Turned Off", "ic_ban_on_use", 0))
-            if (state.performanceMode < 2) add(DialogOption("Quiet Mode", "ic_fan_quiet_mode", 1))
-            add(DialogOption("Smart Mode", "ic_fan_smart_mode", 4))
-            add(DialogOption("Sports Mode", "ic_fan_sport_mode", 5))
-            if (state.performanceMode != 0) add(DialogOption("Custom", "ic_fan_custom_mode", 6))
+            if (state.performanceMode == 0) add(DialogOption(R.string.text_fan_control_off, "ic_ban_on_use", 0))
+            if (state.performanceMode < 2) add(DialogOption(R.string.text_fan_control_low_speed, "ic_fan_quiet_mode", 1))
+            add(DialogOption(R.string.text_fan_control_smart, "ic_fan_smart_mode", 4))
+            add(DialogOption(R.string.text_fan_control_medium_speed, "ic_fan_sport_mode", 5))
+            if (state.performanceMode != 0) add(DialogOption(R.string.text_fan_control_custom, "ic_fan_custom_mode", 6))
         },
         state.fanMode, actions::setFanMode,
     )
     OverlayDialogKind.CONTROLLER -> DialogSpec(
-        "ic_qs_controller_style", "Handle Style",
+        "ic_qs_controller_style", R.string.text_handle_style_title,
         listOf(
-            DialogOption("Standard Style", "ic_controller_odin_style", 1),
-            DialogOption("XBox Style", "ic_controller__xbox_style", 0),
-            DialogOption("Ban On Use", "ic_ban_on_use", 2),
+            DialogOption(R.string.fan_option_odin_style, "ic_controller_odin_style", 1),
+            DialogOption(R.string.fan_option_xbox_style, "ic_controller__xbox_style", 0),
+            DialogOption(R.string.fan_option_disable, "ic_ban_on_use", 2),
         ),
         state.controllerStyle, actions::setControllerStyle,
     )
     OverlayDialogKind.THEME -> DialogSpec(
-        "ic_qs_theme_mode", "Theme Mode",
+        "ic_qs_theme_mode", R.string.text_theme_mode_title,
         listOf(
-            DialogOption("System Theme", "ic_qs_system_theme", 1),
-            DialogOption("Light Theme", "ic_qs_light_theme", 3),
-            DialogOption("Dark Theme", "ic_qs_dark_theme", 4),
+            DialogOption(R.string.text_system_theme, "ic_qs_system_theme", 1),
+            DialogOption(R.string.text_light_theme, "ic_qs_light_theme", 3),
+            DialogOption(R.string.text_dark_theme, "ic_qs_dark_theme", 4),
         ),
         state.themeMode, actions::setThemeMode,
     )
     OverlayDialogKind.TRIGGER -> DialogSpec(
-        "ic_qs_controller_style", "L2/R2 Trigger Mode",
+        "ic_qs_controller_style", R.string.tile_name_trigger_mode,
         listOf(
-            DialogOption("Analog", "", 1),
-            DialogOption("Digital", "", 0),
-            DialogOption("Both", "", 2),
+            DialogOption(R.string.dialog_trigger_analog, "", 1),
+            DialogOption(R.string.dialog_trigger_digital, "", 0),
+            DialogOption(R.string.dialog_trigger_both, "", 2),
         ),
         state.triggerMode, actions::setTriggerMode,
     )
     OverlayDialogKind.SCREENSHOT -> DialogSpec(
-        "ic_qs_clean", "Screenshot",
+        "ic_qs_clean", R.string.tile_name_screenshot,
         listOf(
-            DialogOption("Top Screen", "", 0),
-            DialogOption("Bottom Screen", "", 1),
-            DialogOption("Both Screens", "", 2),
+            DialogOption(R.string.dialog_screenshot_top, "", 0),
+            DialogOption(R.string.dialog_screenshot_bottom, "", 1),
+            DialogOption(R.string.dialog_screenshot_both, "", 2),
         ),
         selected = -1, onSelect = actions::takeScreenshot,
     )

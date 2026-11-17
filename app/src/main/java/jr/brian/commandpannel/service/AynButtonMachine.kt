@@ -1,7 +1,7 @@
 package jr.brian.commandpannel.service
 
 /**
- * The physical AYN button's three-state logic, modelled exactly on the stock assistant
+ * The physical AYN button's three-state logic, modeled exactly on the stock assistant
  * (`TccKeyReceiver` -> `TccServices`). Pure and side-effect-free except through the injected callbacks, so it is
  * unit-tested without Android.
  *

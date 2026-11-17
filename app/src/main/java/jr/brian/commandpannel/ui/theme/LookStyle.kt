@@ -1,11 +1,13 @@
 package jr.brian.commandpannel.ui.theme
 
 import androidx.annotation.FontRes
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import jr.brian.commandpannel.R
 
 /**
  * The overlay "looks" — the stock AYN surface plus the fork's additional themes. AUTO follows the
@@ -19,24 +21,25 @@ enum class TccUiLook {
     TERMINAL, COCKPIT, STICKER_BOOK, INDUSTRIAL,
     JELLY, COMIC_PANEL, Y2K_CHROME, E_INK;
 
-    val label: String get() = when (this) {
-        AUTO -> "Auto (stock)"
-        AURORA_GLASS -> "Aurora Glass"
-        CARTRIDGE -> "Cartridge"
-        TACTICAL_HUD -> "Tactical HUD"
-        SOFT_CONSOLE -> "Soft Console"
-        SOFT_CONSOLE_OLED -> "Soft Console OLED"
-        SEGMENT_LCD -> "Segment LCD"
-        BLOOM -> "Bloom"
-        NEON_ARCADE -> "Neon Arcade"
-        TERMINAL -> "Terminal"
-        COCKPIT -> "Cockpit"
-        STICKER_BOOK -> "Sticker Book"
-        INDUSTRIAL -> "Industrial"
-        JELLY -> "Jelly"
-        COMIC_PANEL -> "Comic Panel"
-        Y2K_CHROME -> "Y2K Chrome"
-        E_INK -> "E-Ink"
+    @get:StringRes
+    val labelRes: Int get() = when (this) {
+        AUTO -> R.string.look_auto
+        AURORA_GLASS -> R.string.look_aurora_glass
+        CARTRIDGE -> R.string.look_cartridge
+        TACTICAL_HUD -> R.string.look_tactical_hud
+        SOFT_CONSOLE -> R.string.look_soft_console
+        SOFT_CONSOLE_OLED -> R.string.look_soft_console_oled
+        SEGMENT_LCD -> R.string.look_segment_lcd
+        BLOOM -> R.string.look_bloom
+        NEON_ARCADE -> R.string.look_neon_arcade
+        TERMINAL -> R.string.look_terminal
+        COCKPIT -> R.string.look_cockpit
+        STICKER_BOOK -> R.string.look_sticker_book
+        INDUSTRIAL -> R.string.look_industrial
+        JELLY -> R.string.look_jelly
+        COMIC_PANEL -> R.string.look_comic_panel
+        Y2K_CHROME -> R.string.look_y2k_chrome
+        E_INK -> R.string.look_e_ink
     }
 
     companion object {

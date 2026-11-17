@@ -40,6 +40,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import androidx.compose.ui.zIndex
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.TileIcon
@@ -114,12 +116,12 @@ import androidx.compose.ui.unit.sp
  * overlay's look, theme mode and accent, and the cards / backdrop / type below route through the look renderers.
  */
 
-private enum class NavItem(val category: SettingsCategory, val icon: ImageVector, val subtitle: String) {
-    GENERAL(SettingsCategory.GENERAL, Icons.Rounded.Tune, "Core behaviour and companion features"),
-    NAV_BAR(SettingsCategory.NAV_BAR, Icons.Rounded.WebAsset, "Arrange the overlay nav bar and its Quick Launch button"),
-    QUICK_TOGGLES(SettingsCategory.QUICK_TOGGLES, Icons.Rounded.ViewAgenda, "Pick and order the overlay's quick tiles"),
-    APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, "Theme and look of the bottom-screen overlay"),
-    DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, "Check the privileged access layer"),
+private enum class NavItem(val category: SettingsCategory, val icon: ImageVector, @StringRes val subtitleRes: Int) {
+    GENERAL(SettingsCategory.GENERAL, Icons.Rounded.Tune, R.string.settings_cat_general_desc),
+    NAV_BAR(SettingsCategory.NAV_BAR, Icons.Rounded.WebAsset, R.string.settings_cat_nav_bar_desc),
+    QUICK_TOGGLES(SettingsCategory.QUICK_TOGGLES, Icons.Rounded.ViewAgenda, R.string.settings_cat_quick_toggles_desc),
+    APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, R.string.settings_cat_appearance_desc),
+    DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, R.string.settings_cat_diagnostics_desc),
 }
 
 // ---- gamepad focus plumbing ----
@@ -141,7 +143,7 @@ private fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: ()
 // With "Companion follows overlay look" off, CompanionTheme provides the stock spec and the default palette, so
 // every hook below resolves to the companion's original style.
 
-/** The active companion colours. */
+/** The active companion colors. */
 private val p: CompanionPalette
     @Composable get() = LocalCompanionPalette.current
 
@@ -212,10 +214,10 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                lookLabel(nav.category.title), color = p.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                lookLabel(stringResource(nav.category.titleRes)), color = p.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                 style = tccDisplayTextStyle(),
             )
-            Text(nav.subtitle, color = p.textSecondary, fontSize = 14.sp)
+            Text(stringResource(nav.subtitleRes), color = p.textSecondary, fontSize = 14.sp)
             Spacer(Modifier.height(6.dp))
             when (nav.category) {
                 SettingsCategory.GENERAL -> General(state, vm)
@@ -272,8 +274,8 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
             AppIconBadge(if (themed) LocalTccLookSpec.current.tile.buttonShape else RoundedCornerShape(11.dp))
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("TCP", color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
-                Text(lookLabel("Thor Command Panel"), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
+                Text(stringResource(R.string.app_name), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
+                Text(lookLabel(stringResource(R.string.app_full_name)), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
             }
         }
         NavItem.entries.forEach { item ->
@@ -299,7 +301,7 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
                 Icon(item.icon, null, tint = if (on || f.value) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(13.dp))
                 Text(
-                    lookLabel(item.category.title),
+                    lookLabel(stringResource(item.category.titleRes)),
                     color = if (on || f.value) p.textPrimary else p.textSecondary,
                     fontSize = 15.sp,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
@@ -482,70 +484,66 @@ private fun Chip(text: String, selected: Boolean = false, enabled: Boolean = tru
 @Composable
 private fun General(state: SettingsState, vm: SettingsViewModel) {
     SwitchCard(
-        "Replace Stock Assistant",
-        "Suppress the built-in dual-screen assistant so Command Panel handles the AYN button. Turning this off " +
-            "restores the stock assistant.",
+        stringResource(R.string.settings_replace_stock),
+        stringResource(R.string.settings_replace_stock_desc),
         state.replaceStock, vm::setReplaceStock,
     )
     SwitchCard(
-        "Battery Estimate",
-        "Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage " +
-            "in the overlay status bar.",
+        stringResource(R.string.settings_battery_estimate),
+        stringResource(R.string.settings_battery_estimate_desc),
         state.batteryEstimate, vm::setBatteryEstimate,
     )
     SwitchCard(
-        "Hide Network Speed",
-        "Hide the download-speed readout in the overlay status bar.",
+        stringResource(R.string.settings_hide_net_speed),
+        stringResource(R.string.settings_hide_net_speed_desc),
         state.hideNetSpeed, vm::setHideNetSpeed,
     )
     SwitchCard(
-        "Keep Apps That Are On Screen",
-        "When Clear All Tasks runs, keep apps showing on either screen, their companion screens and the home app. " +
-            "Turn off to clear everything except this app, the stock assistant and the system.",
+        stringResource(R.string.settings_keep_on_screen),
+        stringResource(R.string.settings_keep_on_screen_desc),
         state.keepOnScreen, vm::setKeepOnScreen,
     )
     Card {
-        CardTitle("Backup & Restore")
-        CardDesc("Export the companion settings to a JSON file, or restore the most recent backup.")
+        CardTitle(stringResource(R.string.settings_backup_title))
+        CardDesc(stringResource(R.string.settings_backup_desc))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AccentButton("Export", onClick = vm::exportBackup)
-            AccentButton("Restore latest", onClick = vm::restoreLatestBackup)
+            AccentButton(stringResource(R.string.settings_backup_export), onClick = vm::exportBackup)
+            AccentButton(stringResource(R.string.settings_backup_restore), onClick = vm::restoreLatestBackup)
         }
         state.backupMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
     ReplayBufferCard(state, vm)
     Card {
-        CardTitle("Overlay preview")
-        CardDesc("Open the overlay on the bottom screen to preview your settings.")
+        CardTitle(stringResource(R.string.settings_preview_title))
+        CardDesc(stringResource(R.string.settings_preview_desc))
         Spacer(Modifier.height(10.dp))
-        AccentButton("Open overlay on bottom screen", onClick = vm::showOverlay)
+        AccentButton(stringResource(R.string.settings_preview_open), onClick = vm::showOverlay)
     }
 }
 
 @Composable
 private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
     SwitchCard(
-        "Replay Buffer",
-        "Continuously keep the last few seconds of the top screen in memory so you can save a clip after something " +
-            "happens. Uses root screen capture (no cast prompt).",
+        stringResource(R.string.tile_name_replay_buffer),
+        stringResource(R.string.settings_replay_desc),
         state.replayEnabled, vm::setReplayEnabled,
     )
     Card {
-        CardTitle("Save last")
+        CardTitle(stringResource(R.string.settings_replay_save_last))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(15, 30, 60, 90).forEach { secs ->
-                Chip("${secs}s", selected = state.replayWindowSeconds == secs) { vm.setReplayWindowSeconds(secs) }
+                Chip(stringResource(R.string.settings_replay_seconds, secs), selected = state.replayWindowSeconds == secs) { vm.setReplayWindowSeconds(secs) }
             }
         }
         Spacer(Modifier.height(14.dp))
-        CardTitle("Quality")
+        CardTitle(stringResource(R.string.settings_replay_quality))
         jr.brian.commandpannel.privileged.ReplayBitratePreset.entries.forEach { preset ->
-            RadioRow(preset.label, state.replayPreset == preset) { vm.setReplayPreset(preset) }
+            RadioRow(stringResource(preset.labelRes), state.replayPreset == preset) { vm.setReplayPreset(preset) }
         }
         Spacer(Modifier.height(12.dp))
-        AccentButton("Save clip now", enabled = state.replayEnabled, onClick = vm::saveReplayClip)
+        AccentButton(stringResource(R.string.settings_replay_save_now), enabled = state.replayEnabled, onClick = vm::saveReplayClip)
         state.replayMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
 }
@@ -553,26 +551,26 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
     Card {
-        CardTitle("Quick Launch")
-        CardDesc("Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.")
+        CardTitle(stringResource(R.string.settings_quick_launch))
+        CardDesc(stringResource(R.string.settings_quick_launch_desc))
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             state.quickLaunchComponent?.takeIf { state.quickLaunchLabel != null }?.let { cn ->
                 Image(TileIcon.App(cn).painter(), null, Modifier.size(32.dp))
                 Spacer(Modifier.width(12.dp))
             }
-            Text(state.quickLaunchLabel ?: "No app chosen", color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
+            Text(state.quickLaunchLabel ?: stringResource(R.string.settings_no_app_chosen), color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AccentButton("Choose app", onClick = vm::openAppPicker)
-            if (state.quickLaunchLabel != null) AccentButton("Clear", onClick = vm::clearQuickLaunch)
+            AccentButton(stringResource(R.string.settings_choose_app), onClick = vm::openAppPicker)
+            if (state.quickLaunchLabel != null) AccentButton(stringResource(R.string.settings_clear), onClick = vm::clearQuickLaunch)
         }
         if (state.quickLaunchLabel != null) {
             Spacer(Modifier.height(10.dp))
-            CardDesc("Open on:")
+            CardDesc(stringResource(R.string.settings_open_on))
             jr.brian.commandpannel.system.QuickLaunchDisplay.entries.forEach { d ->
-                RadioRow(d.label, state.quickLaunchDisplay == d) { vm.setQuickLaunchDisplay(d) }
+                RadioRow(stringResource(d.labelRes), state.quickLaunchDisplay == d) { vm.setQuickLaunchDisplay(d) }
             }
         }
     }
@@ -581,12 +579,12 @@ private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Choose an app", color = p.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        AccentButton("Back", onClick = vm::closeAppPicker)
+        Text(stringResource(R.string.settings_choose_an_app), color = p.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        AccentButton(stringResource(R.string.settings_back), onClick = vm::closeAppPicker)
     }
     Spacer(Modifier.height(6.dp))
     if (state.apps.isEmpty()) {
-        CardDesc("Loading…")
+        CardDesc(stringResource(R.string.settings_loading))
     } else {
         Card {
             state.apps.forEach { app ->
@@ -600,23 +598,22 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: ScrollState, viewport: () -> Rect) {
-    SectionHeader("Order")
+    SectionHeader(stringResource(R.string.settings_order))
     OrderCard(
         items = state.orderedEnabledTiles,
-        description = "Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, " +
-            "D-pad to move, A to drop.",
-        label = { jr.brian.commandpannel.system.QuickSettingTileId.fromKey(it)?.label ?: it },
+        description = stringResource(R.string.settings_tile_order_desc),
+        label = { jr.brian.commandpannel.system.QuickSettingTileId.fromKey(it)?.let { id -> stringResource(id.labelRes) } ?: it },
         onCommit = vm::reorderTiles,
         scroll = scroll,
         viewport = viewport,
     )
     jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
-        SectionHeader(cat.title)
+        SectionHeader(stringResource(cat.titleRes))
         Card {
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
                 val checked = tile.key in state.enabledTiles
                 FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
-                    Text(tile.label, color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(stringResource(tile.labelRes), color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
                 }
             }
@@ -632,8 +629,8 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
 private fun OrderCard(
     items: List<String>,
     description: String,
-    label: (String) -> String,
-    note: (String) -> String? = { null },
+    label: @Composable (String) -> String,
+    note: @Composable (String) -> String? = { null },
     onCommit: (List<String>) -> Unit,
     scroll: ScrollState,
     viewport: () -> Rect,
@@ -726,7 +723,7 @@ private fun OrderRow(index: Int, key: String, label: String, note: String?, reor
         }
         Icon(
             Icons.Rounded.DragHandle,
-            contentDescription = "Drag to reorder",
+            contentDescription = stringResource(R.string.settings_drag_to_reorder),
             tint = if (lifted || f.value) p.accent else p.textTertiary,
             modifier = Modifier.size(36.dp)
                 .onGloballyPositioned { handleCoords[0] = it }
@@ -751,27 +748,26 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
         AppPicker(state, vm)
         return
     }
-    SectionHeader("Button order")
+    SectionHeader(stringResource(R.string.settings_button_order))
     OrderCard(
         items = state.navOrder,
-        description = "Drag a button by its handle, or long-press it, to set its place in the overlay nav bar. " +
-            "With a controller: A to pick up, D-pad to move, A to drop.",
+        description = stringResource(R.string.settings_button_order_desc),
         label = { key ->
             val button = jr.brian.commandpannel.system.NavBarButton.fromKey(key)
             if (button == jr.brian.commandpannel.system.NavBarButton.LAUNCH && state.quickLaunchLabel != null && state.quickLaunchShowApp) {
                 state.quickLaunchLabel
             } else {
-                button?.label ?: key
+                button?.let { stringResource(it.labelRes) } ?: key
             }
         },
         note = { key ->
             when (jr.brian.commandpannel.system.NavBarButton.fromKey(key)) {
-                jr.brian.commandpannel.system.NavBarButton.MODE -> "Screen mode tab"
-                jr.brian.commandpannel.system.NavBarButton.TASK -> "Recent apps"
+                jr.brian.commandpannel.system.NavBarButton.MODE -> stringResource(R.string.settings_nav_note_mode)
+                jr.brian.commandpannel.system.NavBarButton.TASK -> stringResource(R.string.settings_nav_note_task)
                 jr.brian.commandpannel.system.NavBarButton.LAUNCH ->
-                    if (state.quickLaunchLabel == null) "Quick Launch · hidden until an app is chosen" else "Quick Launch"
-                jr.brian.commandpannel.system.NavBarButton.SETTINGS -> "Settings tab"
-                jr.brian.commandpannel.system.NavBarButton.APP -> "Opens this companion"
+                    stringResource(if (state.quickLaunchLabel == null) R.string.settings_nav_note_launch_hidden else R.string.settings_quick_launch)
+                jr.brian.commandpannel.system.NavBarButton.SETTINGS -> stringResource(R.string.settings_nav_note_settings)
+                jr.brian.commandpannel.system.NavBarButton.APP -> stringResource(R.string.settings_nav_note_app)
                 null -> null
             }
         },
@@ -779,11 +775,11 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
         scroll = scroll,
         viewport = viewport,
     )
-    SectionHeader("Quick Launch")
+    SectionHeader(stringResource(R.string.settings_quick_launch))
     QuickLaunchCard(state, vm)
     SwitchCard(
-        "Show app on the Launch button",
-        "Use the chosen app's icon and name on the nav bar instead of the Launch glyph and label.",
+        stringResource(R.string.settings_show_app_on_launch),
+        stringResource(R.string.settings_show_app_on_launch_desc),
         state.quickLaunchShowApp, vm::setQuickLaunchShowApp,
     )
 }
@@ -793,29 +789,30 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
 @Composable
 private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
     Card {
-        CardTitle("Overlay theme")
+        CardTitle(stringResource(R.string.settings_overlay_theme))
         Spacer(Modifier.height(6.dp))
-        listOf(1 to "Follow system", 3 to "Light", 4 to "Dark").forEach { (mode, label) ->
-            RadioRow(label, state.themeMode == mode) { vm.setThemeMode(mode) }
+        listOf(
+            1 to R.string.settings_theme_follow_system, 3 to R.string.settings_theme_light, 4 to R.string.settings_theme_dark,
+        ).forEach { (mode, label) ->
+            RadioRow(stringResource(label), state.themeMode == mode) { vm.setThemeMode(mode) }
         }
     }
-    SectionHeader("Overlay look")
+    SectionHeader(stringResource(R.string.settings_overlay_look))
     Card {
-        CardDesc("The surface style for the bottom-screen overlay. Auto uses the stock AYN look.")
+        CardDesc(stringResource(R.string.settings_overlay_look_desc))
         Spacer(Modifier.height(6.dp))
         jr.brian.commandpannel.ui.theme.TccUiLook.entries.forEach { look ->
-            RadioRow(look.label, state.overlayLook == look) { vm.setLook(look) }
+            RadioRow(stringResource(look.labelRes), state.overlayLook == look) { vm.setLook(look) }
         }
     }
     SwitchCard(
-        "Companion follows overlay look",
-        "Apply the overlay's look, theme and accent to this settings screen. Off keeps the default companion style.",
+        stringResource(R.string.settings_companion_follow_look),
+        stringResource(R.string.settings_companion_follow_look_desc),
         state.companionFollowLook, vm::setCompanionFollowLook,
     )
     SwitchCard(
-        "Accent from Ambient LED",
-        "Use the colour you set for the Thor's Ambient LED as the overlay's accent — so the overlay theme follows " +
-            "your joystick LED colour.",
+        stringResource(R.string.settings_rgb_accent),
+        stringResource(R.string.settings_rgb_accent_desc),
         state.rgbAccentSync, vm::setRgbAccentSync,
     )
 }
@@ -825,16 +822,16 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun Diagnostics(state: SettingsState, vm: SettingsViewModel) {
     Card {
-        CardTitle("Privileged layer")
-        CardDesc("Verify hidden-API access, the PServerBinder root shell and the root helper.")
+        CardTitle(stringResource(R.string.settings_privileged_layer))
+        CardDesc(stringResource(R.string.settings_privileged_layer_desc))
         Spacer(Modifier.height(10.dp))
-        AccentButton(if (state.diagnosticsRunning) "Running…" else "Run check", enabled = !state.diagnosticsRunning, onClick = vm::runDiagnostics)
+        AccentButton(stringResource(if (state.diagnosticsRunning) R.string.settings_running else R.string.settings_run_check), enabled = !state.diagnosticsRunning, onClick = vm::runDiagnostics)
         if (state.diagnostics.isNotEmpty()) Spacer(Modifier.height(12.dp))
         state.diagnostics.forEach { (text, ok) ->
             val (mark, tone) = when (ok) {
-                true -> "PASS" to p.success
-                false -> "FAIL" to p.danger
-                else -> "INFO" to p.textTertiary
+                true -> stringResource(R.string.diag_pass) to p.success
+                false -> stringResource(R.string.diag_fail) to p.danger
+                else -> stringResource(R.string.diag_info) to p.textTertiary
             }
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(mark, color = tone, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.width(48.dp))

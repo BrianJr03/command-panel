@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import jr.brian.commandpannel.R
+import androidx.compose.ui.res.stringResource
 import android.content.ComponentName
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -47,25 +49,25 @@ fun NavBar(
             shown.forEachIndexed { index, button ->
                 when (button) {
                     NavBarButton.MODE -> TccIconButton(
-                        "ic_screen_control", "Mode", circleSize = 44.dp, active = activeTab == OverlayTab.MODE,
+                        "ic_screen_control", stringResource(R.string.navigation_screen_control_text), circleSize = 44.dp, active = activeTab == OverlayTab.MODE,
                         variant = nav, index = index, onClick = onMode,
                     )
-                    NavBarButton.TASK -> TccIconButton("ic_task_manage", "Task", circleSize = 44.dp, variant = nav, index = index, onClick = onTask)
+                    NavBarButton.TASK -> TccIconButton("ic_task_manage", stringResource(R.string.navigation_task_manage_text), circleSize = 44.dp, variant = nav, index = index, onClick = onTask)
                     NavBarButton.LAUNCH -> if (quickLaunchApp != null) {
                         TccIconButton(
-                            icon = TileIcon.App(quickLaunchApp), label = quickLaunchLabel ?: "Launch", circleSize = 44.dp,
+                            icon = TileIcon.App(quickLaunchApp), label = quickLaunchLabel ?: stringResource(R.string.nav_launch), circleSize = 44.dp,
                             iconInset = 44.dp * 0.14f, variant = nav, index = index, onClick = onLaunch,
                         )
                     } else {
-                        TccIconButton("ic_app_manage", "Launch", circleSize = 44.dp, variant = nav, index = index, onClick = onLaunch)
+                        TccIconButton("ic_app_manage", stringResource(R.string.nav_launch), circleSize = 44.dp, variant = nav, index = index, onClick = onLaunch)
                     }
                     NavBarButton.SETTINGS -> TccIconButton(
-                        "ic_system_set", "Settings", circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS,
+                        "ic_system_set", stringResource(R.string.navigation_system_set_text), circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS,
                         variant = nav, index = index, onClick = onSettings,
                     )
                     NavBarButton.APP -> TccIconButton(
                         icon = TileIcon.Vector(Icons.Filled.OpenInNew),
-                        label = "App", circleSize = 44.dp, variant = nav, index = index, onClick = onApp,
+                        label = stringResource(R.string.nav_app), circleSize = 44.dp, variant = nav, index = index, onClick = onApp,
                     )
                 }
             }

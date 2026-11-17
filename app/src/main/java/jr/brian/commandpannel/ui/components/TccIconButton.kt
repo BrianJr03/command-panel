@@ -105,7 +105,7 @@ fun TccIconButton(
                 Image(
                     painter = icon.painter(),
                     contentDescription = label,
-                    // App launcher icons keep their own colours.
+                    // App launcher icons keep their own colors.
                     colorFilter = if (icon is TileIcon.App) null else stockIconColorFilter(iconTint),
                     modifier = imageModifier,
                 )

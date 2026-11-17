@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import jr.brian.commandpannel.R
+import androidx.compose.ui.res.stringResource
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -41,7 +43,7 @@ fun OverlayRoot(
 ) {
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
-    // When the LED→accent sync is on, the Thor's ambient-LED colour becomes the overlay accent.
+    // When the LED→accent sync is on, the Thor's ambient-LED color becomes the overlay accent.
     val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride)
     TccTheme(colors) {
       androidx.compose.runtime.CompositionLocalProvider(
@@ -108,14 +110,14 @@ fun OverlayRoot(
             if (arrange.isArranging) {
                 Box(Modifier.fillMaxSize().padding(top = 44.dp), contentAlignment = Alignment.TopCenter) {
                     ArrangeToolbar(
-                        hint = "Drag to rearrange",
-                        tabLabels = listOf("Mode", "Settings"),
+                        hint = stringResource(R.string.arrange_hint),
+                        tabLabels = listOf(stringResource(R.string.navigation_screen_control_text), stringResource(R.string.navigation_system_set_text)),
                         activeTab = if (tab == OverlayTab.MODE) 0 else 1,
                         onSelectTab = { selectTab(if (it == 0) OverlayTab.MODE else OverlayTab.SETTINGS) },
-                        resetLabel = "Reset",
+                        resetLabel = stringResource(R.string.arrange_reset),
                         isResetEnabled = !state.layout.isDefault,
                         onReset = { arrange.reset() },
-                        doneLabel = "Done",
+                        doneLabel = stringResource(R.string.arrange_done),
                         onDone = { arrange.exit() },
                         modifier = Modifier.wrapContentHeight(),
                     )
