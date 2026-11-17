@@ -26,7 +26,7 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 
 **[→ Browse all 17 looks](assets/looks/)** &nbsp;·&nbsp; or see the [gallery image](assets/looks-gallery.png) (Cartridge, Segment LCD, Terminal, Cockpit, Comic Panel, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, Industrial, Sticker Book, Soft Console, …).
 
-> 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See **[GUIDELINE.md](GUIDELINE.md)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
+> 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See the **[Theming Guide wiki](https://github.com/BrianJr03/command-panel/wiki)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
 >
 > 🧩 **Prefer no code?** Build your own in the **[Theme Studio](#theme-studio)** right on the device.
 
@@ -121,7 +121,7 @@ Signed release builds are produced by CI (`.github/workflows/build-release.yml`)
 
 **Sharing looks doesn't need a PR.** Build them in the [Theme Studio](#theme-studio), publish them in a repo made from the [tcp-themes template](https://github.com/BrianJr03/tcp-themes), and share the link.
 
-To add a **built-in** Look to the app itself, contribute a **new theme (Look)** — one Look re-skins both the overlay and the companion. **[GUIDELINE.md](GUIDELINE.md)** is a full walkthrough (including a ready-to-use AI-agent prompt): the anatomy of a Look, a remix-existing-styles path vs. a new-renderer path, the screenshot workflow, and the gotchas (palette/contrast, font clipping, OFL-fonts-only, runtime stock icons). Please include before/after screenshots of both overlay tabs in your PR. Only contribute fonts/art/code you have the right to ship.
+To add a **built-in** Look to the app itself, contribute a **new theme (Look)** — one Look re-skins both the overlay and the companion. The **[Theming Guide wiki](https://github.com/BrianJr03/command-panel/wiki)** is a full walkthrough (including a ready-to-use AI-agent prompt): the anatomy of a Look, a remix-existing-styles path vs. a new-renderer path, the screenshot workflow, and the gotchas (palette/contrast, font clipping, OFL-fonts-only, runtime stock icons). Please include before/after screenshots of both overlay tabs in your PR. Only contribute fonts/art/code you have the right to ship.
 
 ---
 
