@@ -1,6 +1,9 @@
 package jr.brian.commandpannel
 
+import android.app.ActivityOptions
+import android.content.Intent
 import android.os.Bundle
+import android.view.Display
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -19,6 +22,23 @@ import jr.brian.commandpannel.ui.settings.SettingsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The companion UI is designed for the top screen; if it was launched on the bottom (or any other)
+        // display, move it to the top display so the two-pane layout isn't cramped.
+        val currentDisplay = display?.displayId ?: windowManager.defaultDisplay.displayId
+        android.util.Log.i("MainActivity", "onCreate on display $currentDisplay")
+        if (currentDisplay != Display.DEFAULT_DISPLAY) {
+            val moved = runCatching {
+                val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                    opts.toBundle(),
+                )
+            }.isSuccess
+            android.util.Log.i("MainActivity", "relaunch on display 0 requested=$moved")
+            finish()
+            return
+        }
         AssistantService.start(this)
         setContent {
             val vm: SettingsViewModel = hiltViewModel()
