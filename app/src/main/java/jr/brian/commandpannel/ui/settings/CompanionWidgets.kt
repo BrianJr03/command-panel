@@ -360,3 +360,23 @@ internal fun PaddedBringIntoView(margin: Dp = FOCUS_SCROLL_MARGIN, content: @Com
     val spec = remember(marginPx) { PaddedBringIntoViewSpec(marginPx) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
 }
+
+/** Built-in looks in alphabetical order of their display names (locale-aware), for every look list in the companion. */
+@Composable
+internal fun sortedLooks(): List<jr.brian.commandpannel.ui.theme.TccUiLook> {
+    val res = androidx.compose.ui.platform.LocalContext.current.resources
+    return remember(res.configuration) {
+        val collator = java.text.Collator.getInstance(res.configuration.locales[0])
+        jr.brian.commandpannel.ui.theme.TccUiLook.entries.sortedWith(compareBy(collator) { res.getString(it.labelRes) })
+    }
+}
+
+/** Sorts option pairs by their label resource's text (locale-aware). */
+@Composable
+internal fun <T> sortedByLabel(options: List<Pair<T, Int>>): List<Pair<T, Int>> {
+    val res = androidx.compose.ui.platform.LocalContext.current.resources
+    return remember(options, res.configuration) {
+        val collator = java.text.Collator.getInstance(res.configuration.locales[0])
+        options.sortedWith(compareBy(collator) { res.getString(it.second) })
+    }
+}

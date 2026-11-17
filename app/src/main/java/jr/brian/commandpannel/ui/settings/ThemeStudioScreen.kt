@@ -104,14 +104,20 @@ internal fun ThemeStudioScreen(
             Chip(stringResource(R.string.theme_back), onClick = onClose)
             NameField(draft.name, Modifier.weight(1f)) { draft = draft.copy(name = it) }
             message?.let { InfoLine(it, p.success) }
-            if (saved) {
+            // Looks synced from a theme repo are replaced on update, so edits always save as the user's own copy.
+            val fromRepo = draft.source != null
+            fun ownCopy() = draft.copy(id = UUID.randomUUID().toString(), source = null)
+            if (saved || fromRepo) {
                 Chip(stringResource(R.string.theme_save_new)) {
-                    val copy = draft.copy(id = UUID.randomUUID().toString())
+                    val copy = ownCopy()
                     vm.saveCustomLook(copy); draft = copy; message = savedMsg
                 }
             }
-            Chip(stringResource(R.string.theme_save)) { vm.saveCustomLook(draft); message = savedMsg }
-            AccentButton(stringResource(R.string.theme_save_apply)) { vm.saveCustomLook(draft, apply = true); message = appliedMsg }
+            if (!fromRepo) Chip(stringResource(R.string.theme_save)) { vm.saveCustomLook(draft); message = savedMsg }
+            AccentButton(stringResource(R.string.theme_save_apply)) {
+                val target = if (fromRepo) ownCopy() else draft
+                vm.saveCustomLook(target, apply = true); draft = target; message = appliedMsg
+            }
         }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -210,8 +216,9 @@ private class Part<T>(
     /** The part's parametric style, offered last (its settings live in the Custom category); `null` for none. */
     custom: T? = null,
 ) {
-    val options: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first } +
-        listOfNotNull(custom?.let { it to R.string.theme_part_custom })
+    /** Presets, each named after the first built-in look (in declaration order) that uses it. */
+    val presets: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first }
+    val custom: Pair<T, Int>? = custom?.let { it to R.string.theme_part_custom }
 }
 
 private val PARTS: List<Part<*>> = listOf(
@@ -230,7 +237,7 @@ private fun PartsControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
         ControlLabel(R.string.theme_start_from)
         CardDesc(stringResource(R.string.theme_start_from_desc))
         ChipRow {
-            TccUiLook.entries.forEach { look ->
+            sortedLooks().forEach { look ->
                 OptionChip(stringResource(look.labelRes), draft.baseLook == look) { onChange(draft.copy(baseLook = look)) }
             }
         }
@@ -251,7 +258,8 @@ private fun <T> PartRow(part: Part<T>, traits: LookTraits, draft: CustomLook, on
     val current = part.of(traits)
     Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
     ChipRow {
-        part.options.forEach { (value, labelRes) ->
+        // Presets alphabetically, then Custom last.
+        (sortedByLabel(part.presets) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
             OptionChip(stringResource(labelRes), current == value) { onChange(part.set(draft, value)) }
         }
     }
@@ -306,7 +314,7 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
             OptionChip(stringResource(font.labelRes), current == ref) { onPick(ref) }
         }
         state.userFonts.forEach { font ->
-            val ref = FontRef.User(font.id, font.displayName)
+            val ref = FontRef.User(font.id, font.displayName, font.fileName)
             OptionChip(font.displayName, current == ref) { onPick(ref) }
         }
     }

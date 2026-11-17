@@ -12,11 +12,22 @@ import jr.brian.commandpannel.ui.theme.UserFontResolver
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-/** A font file the user imported for Theme Studio looks. */
-data class UserFont(val id: String, val displayName: String)
+/**
+ * A font file the user imported for Theme Studio looks. [fileName] is the original file name (`Orbitron.ttf`), which
+ * theme packs use to find the font in `TCP Themes/fonts` on another device.
+ */
+data class UserFont(
+    val id: String,
+    val displayName: String,
+    val fileName: String = "$displayName.ttf",
+    /** Where the font was downloaded from (theme packs), so exported packs can tell others where to get it. */
+    val url: String? = null,
+    val license: String? = null,
+)
 
 /** Why a font import failed; [messageRes] is the user-facing explanation. */
 class FontImportException(@StringRes val messageRes: Int) : Exception()
@@ -38,45 +49,63 @@ object UserFontStore {
     fun all(context: Context): List<UserFont> {
         val arr = runCatching { JSONArray(prefs(context).getString(KEY, "[]")) }.getOrNull() ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
-            arr.optJSONObject(i)?.let { UserFont(it.optString("id"), it.optString("name")) }
+            arr.optJSONObject(i)?.let { o ->
+                val name = o.optString("name")
+                UserFont(
+                    o.optString("id"), name, o.optString("file").ifBlank { "$name.ttf" },
+                    o.optString("url").ifBlank { null }, o.optString("license").ifBlank { null },
+                )
+            }
                 ?.takeIf { it.id.isNotBlank() && file(context, it.id).exists() }
         }
     }
 
     private fun write(context: Context, fonts: List<UserFont>) {
-        val arr = JSONArray().apply { fonts.forEach { put(JSONObject().put("id", it.id).put("name", it.displayName)) } }
+        val arr = JSONArray().apply { fonts.forEach { put(JSONObject().put("id", it.id).put("name", it.displayName).put("file", it.fileName).put("url", it.url).put("license", it.license)) } }
         prefs(context).edit().putString(KEY, arr.toString()).apply()
     }
 
-    /** Copies the font at [uri] into app storage after checking its size and that Android can parse it. */
+    /** Copies the font at [uri] (from the system file picker) into app storage. */
     fun import(context: Context, uri: Uri): Result<UserFont> {
         val resolver = context.contentResolver
+        return runCatching {
+            val fileName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            } ?: (context.getString(R.string.font_default_name) + ".ttf")
+            val stream = resolver.openInputStream(uri) ?: throw FontImportException(R.string.msg_font_unreadable)
+            stream.use { register(context, it, fileName).getOrThrow() }
+        }
+    }
+
+    /**
+     * Stores the font read from [input] as [fileName] after checking its size and that Android can parse it. Used by
+     * the picker import, the `TCP Themes/fonts` folder and font downloads.
+     */
+    fun register(context: Context, input: InputStream, fileName: String, url: String? = null, license: String? = null): Result<UserFont> {
         val id = UUID.randomUUID().toString()
         val dest = file(context, id)
         return runCatching {
-            val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) c.getString(0) else null
-            }?.substringBeforeLast('.')?.take(40) ?: context.getString(R.string.font_default_name)
-            val stream = resolver.openInputStream(uri) ?: throw FontImportException(R.string.msg_font_unreadable)
-            stream.use { input ->
-                dest.outputStream().use { out ->
-                    val buf = ByteArray(16 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        total += n
-                        if (total > MAX_BYTES) throw FontImportException(R.string.msg_font_too_large)
-                        out.write(buf, 0, n)
-                    }
+            dest.outputStream().use { out ->
+                val buf = ByteArray(16 * 1024)
+                var total = 0L
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_BYTES) throw FontImportException(R.string.msg_font_too_large)
+                    out.write(buf, 0, n)
                 }
             }
             // An unparseable file yields the default face rather than throwing on newer APIs.
             val parsed = runCatching { Typeface.createFromFile(dest) }.getOrNull()
             if (parsed == null || parsed == Typeface.DEFAULT) throw FontImportException(R.string.msg_font_invalid)
-            UserFont(id, name).also { write(context, all(context) + it) }
+            UserFont(id, fileName.substringBeforeLast('.').take(40), fileName.take(80), url, license)
+                .also { write(context, all(context) + it) }
         }.onFailure { dest.delete() }
     }
+
+    /** The app-private file holding [id] (for copying fonts out into `TCP Themes/fonts`). */
+    fun fileOf(context: Context, id: String): File = file(context, id)
 
     fun delete(context: Context, id: String) {
         cache.remove(id)
@@ -100,4 +129,8 @@ object UserFontStore {
     /** Finds an installed font by display name (used to re-link fonts in an imported look). */
     fun findByName(context: Context, displayName: String): UserFont? =
         all(context).firstOrNull { it.displayName.equals(displayName, ignoreCase = true) }
+
+    /** Finds an installed font by its original file name (how theme packs reference fonts). */
+    fun findByFileName(context: Context, fileName: String): UserFont? =
+        all(context).firstOrNull { it.fileName.equals(fileName, ignoreCase = true) }
 }

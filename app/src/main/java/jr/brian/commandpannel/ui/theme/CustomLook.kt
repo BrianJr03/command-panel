@@ -64,6 +64,8 @@ data class CustomLook(
     val colors: PinnedColors = PinnedColors(),
     /** Settings for the parts set to their `CUSTOM` style. */
     val custom: CustomRenderParams = CustomRenderParams(),
+    /** The theme repo this look syncs from (`ThemeSources` id), or `null` for the user's own looks. */
+    val source: String? = null,
 ) {
     /** `true` when any part uses the parametric `CUSTOM` style. */
     val usesCustomParts: Boolean
@@ -105,8 +107,8 @@ enum class BundledFont(val family: FontFamily?, @StringRes val labelRes: Int) {
 /** A font choice: a bundled family, or a user-imported file (resolved at runtime; missing files fall back). */
 sealed interface FontRef {
     data class Bundled(val font: BundledFont) : FontRef
-    /** [displayName] lets an imported look re-link to a font of the same name on another device. */
-    data class User(val id: String, val displayName: String) : FontRef
+    /** [fileName] lets a look from a theme pack find the same font file on another device. */
+    data class User(val id: String, val displayName: String, val fileName: String = "$displayName.ttf") : FontRef
 }
 
 enum class LabelCase { NONE, UPPER, LOWER, SNAKE }
@@ -278,6 +280,7 @@ object CustomLookJson {
         putOpt("infoValueScale", look.infoValueScale?.toDouble())
         putOpt("qsLabelFontSize", look.qsLabelFontSize?.toDouble())
         if (look.custom != CustomRenderParams()) put("custom", CustomRenderJson.encode(look.custom))
+        look.source?.let { put("source", it) }
         if (!look.colors.isEmpty) put("colors", JSONObject().apply {
             look.colors.accent?.let { put("accent", it.hex()) }
             look.colors.accent2?.let { put("accent2", it.hex()) }
@@ -335,6 +338,7 @@ object CustomLookJson {
                 )
             } ?: PinnedColors(),
             custom = CustomRenderJson.decode(o.optJSONObject("custom")),
+            source = o.optString("source").ifBlank { null },
         )
     }
 
@@ -357,12 +361,17 @@ object CustomLookJson {
 
     private fun FontRef.toJson(): JSONObject = when (this) {
         is FontRef.Bundled -> JSONObject().put("bundled", font.name)
-        is FontRef.User -> JSONObject().put("user", displayName).put("id", id)
+        is FontRef.User -> JSONObject().put("file", fileName).put("user", displayName).put("id", id)
     }
 
     private fun JSONObject.toFontRef(): FontRef? = when {
         has("bundled") -> enumValueOrNull<BundledFont>(optString("bundled"))?.let { FontRef.Bundled(it) }
-        has("user") -> FontRef.User(optString("id"), optString("user"))
+        // Packs reference user fonts by file name; older exports only had the display name.
+        has("file") || has("user") -> {
+            val file = optString("file")
+            val name = optString("user").ifBlank { file.substringBeforeLast('.') }
+            FontRef.User(optString("id"), name, file.ifBlank { "$name.ttf" })
+        }
         else -> null
     }
 

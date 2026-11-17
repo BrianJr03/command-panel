@@ -25,7 +25,7 @@ object SettingsBackup {
         "replace_stock_assistant", "battery_estimate", "hide_net_speed", "clear_tasks_keep_on_screen",
         "suppress_bottom_tip", "rgb_accent_sync", "qs_enabled_tiles",
         "quick_launch_component", "quick_launch_display",
-        "overlay_look", CustomLookStore.KEY, "companion_follow_look", "nav_bar_order", "quick_launch_show_app",
+        "overlay_look", CustomLookStore.KEY, ThemeSources.KEY, "companion_follow_look", "nav_bar_order", "quick_launch_show_app",
     )
 
     /** Serializes the exported prefs to JSON. Pure, so it is unit-tested. */
