@@ -12,7 +12,7 @@ A user-installable replacement for the AYN Thor's stock bottom-screen assistant
 | Stock assets | Reuse AYN's icons (vectors, `_black` variants) and strings incl. ja/ko/zh locales, from `~/thor-re/DualScreenAssistant/apktool/res/` |
 | Stock coexistence | **Opt-in** "Replace stock assistant" setting, off by default. When on: ephemeral freeze of the stock process, 5000 ms unfreeze window around `SCREEN_OFF`, full restore when turned off or Command Panel is uninstalled |
 | Fork features | Ported from `fork-port/` (Brian's own code only — see `fork-port/PORT_MANIFEST.md`) |
-| Stack | Kotlin, Jetpack Compose, MVVM, Hilt, minSdk 33, targetSdk 36 (matches Jarngreipr) |
+| Stack | Kotlin, Jetpack Compose, MVVM, Hilt; AGP 9.0.1, Kotlin 2.3.10, KSP 2.3.6, Hilt 2.59.2, Compose BOM 2026.02.01, Gradle 9.1.0; minSdk 33, compile/targetSdk 37 (all matching Jarngreipr) |
 | Modules | `:app`, `:probe` (the capability probe from `~/Desktop/Projects/thor-probe`, debug-only, never shipped) |
 
 ## Reference material
@@ -34,9 +34,13 @@ A user-installable replacement for the AYN Thor's stock bottom-screen assistant
 
 ## Phases
 
-### 0. Scaffold
-Gradle project, `:app` + `:probe`, Hilt, Compose, `.debug` variant, CI-less local build/install scripts.
-Import stock vector icons and strings (with locales) into `:app` resources.
+### 0. Scaffold — done 2026-11-16
+Gradle project, `:app` + `:probe`, Hilt, Compose, `.debug` variant, `scripts/dev.sh`.
+Imported from the stock APK: 106 app drawables (with `_black` variants; three apktool-split gradients re-inlined as
+`aapt:attr`), 12 colours (+7 night), 67 strings in 8 locales (`values`, `ja`, `ko`, `zh`, `zh-rCN/HK/MO/TW`), the
+launcher icon. Library resources and RxTool crash strings were left out.
+Verified on the Thor: placeholder screen renders stock icons/strings; `:probe` reproduces the recorded results
+(15 PASS / 3 expected FAIL); 2 unit tests guard the resource import.
 
 ### 1. Privileged layer
 `PServerBinder` client and startup self-grant (appops, `WRITE_SECURE_SETTINGS`, doze whitelist).

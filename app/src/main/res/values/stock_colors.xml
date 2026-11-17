@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <color name="black">#ff000000</color>
+  <color name="dialog_option_icon_color">@color/primaryIconColor</color>
+  <color name="fan_control_bar_background">#8bdedb</color>
+  <color name="fourthColor">#b1b0b0</color>
+  <color name="primaryIconColor">#434343</color>
+  <color name="secondaryColor">#787777</color>
+  <color name="secondaryIconColor">@color/secondaryColor</color>
+  <color name="select_the_icon_detail_color">#ebebeb</color>
+  <color name="temperature_grade_normal">#818184</color>
+  <color name="white">#ffffffff</color>
+  <color name="wifi_state_color_off">#00000000</color>
+  <color name="wifi_state_color_on">@color/black</color>
+</resources>

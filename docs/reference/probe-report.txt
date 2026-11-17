@@ -1,0 +1,47 @@
+Thor Probe report 2026-11-16 22:13:19
+model=AYN Thor fw=Thor_V1.0.0.377_20260206_165408_user
+
+INFO	Environment
+	uid=10255 pkg=jr.brian.thorprobe model=AYN Thor sdk=33 target=35
+PASS	Hidden-API exemptions
+	setHiddenApiExemptions(["L"]) accepted
+PASS	PServerBinder shell
+	id => uid=0(root) gid=0(root) groups=0(root) context=u:r:pservice:s0 ; getenforce => Permissive
+INFO	Self-grant via shell
+	appops set jr.brian.thorprobe SYSTEM_ALERT_WINDOW allow => 
+appops set jr.brian.thorprobe WRITE_SETTINGS allow => 
+pm grant jr.brian.thorprobe android.permission.WRITE_SECURE_SETTINGS => 
+PASS	Settings.System read
+	dual_screen_display_mode=0 screen_focus_lock=1 fan_mode=1 secondary_screen_volume_level=11 performance_mode=0 temp_abxy_layout_mode=1
+PASS	Settings.System write (direct)
+	putInt(vibrate_on=1) ok
+PASS	Settings.System write (shell)
+	settings put system vibrate_on 1 => '' ; readback=1
+PASS	FPS via root (SurfaceFlinger 1013)
+	Result: Parcel(00024f0e    '.O..')
+PASS	setprop via root (touch disable)
+	sys.temp.disabled.touch before='0,0' after='0,0'
+PASS	Fan provider
+	IFanControlProvider txn3 duty=0.24
+PASS	Mapping service (HOME)
+	bindService=true (com.odin.mapping/com.ro.mapping.service.ApiService)
+FAIL	Quickstep bind
+	SecurityException: Not allowed to bind to service Intent { act=android.intent.action.QUICKSTEP_SERVICE pkg=com.android.launcher3 } (recents=com.android.launcher3/com.android.quickstep.RecentsActivity)
+INFO	Bottom display
+	id=4 Screen-2
+PASS	Window: TYPE_APPLICATION_OVERLAY(2038)
+	addView ok on 1240x1080
+FAIL	Window: TYPE_BOOT_PROGRESS(2021)
+	BadTokenException: Unable to add window android.view.ViewRootImpl$W@2fbd3ef -- permission denied for window type 2021
+FAIL	DisplayManager.setBrightness
+	InvocationTargetException: (no message)
+PASS	sysfs temp
+	/sys/devices/virtual/thermal/thermal_zone48/temp => 54500
+PASS	sysfs cpuinfo_cur_freq
+	/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq => 1843200
+PASS	sysfs cur_freq
+	/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq => 401000000
+PASS	sysfs current_now
+	/sys/class/power_supply/battery/current_now => -1726361
+PASS	SurfaceFlinger 1013
+	Result: Parcel(Error: 0xffffffffffffffff "Operation not permitted")
