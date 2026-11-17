@@ -2,7 +2,7 @@
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Command Panel</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
-  <p>The bottom-screen control panel — screen modes, brightness, volume, quick toggles and live hardware telemetry — rebuilt as a normal app you can install yourself, then pushed well past the original with themes, a companion app, and more.</p>
+  <p>The bottom-screen control panel — screen modes, brightness, volume, quick toggles and live hardware telemetry — rebuilt as a normal app you can install yourself, then pushed well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
 </div>
 
 ---
@@ -28,7 +28,39 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 
 > 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See **[GUIDELINE.md](GUIDELINE.md)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
 >
-> 🧩 **No code needed:** the companion's **Themes** section has a **Theme Studio**. Mix parts from any Look, or build one from scratch with Custom parts, shapes, colors and fonts. Looks are shared as `.tcplooks.json` packs through `/sdcard/TCP Themes/` or a GitHub theme repo made from **[theme-template/](theme-template/)**.
+> 🧩 **Prefer no code?** Build your own in the **[Theme Studio](#theme-studio)** right on the device.
+
+---
+
+## Theme Studio
+
+**Design your own overlay look on the device. No code, no rebuild.** The companion's **Themes** section has a full-screen editor with a live preview of the real overlay pinned beside it. Every change shows up immediately, and **Save and apply** restyles the overlay on the spot.
+
+| Build it | Custom parts | Share and follow |
+|:---:|:---:|:---:|
+| ![Theme Studio](assets/theme-studio/studio.png) | ![Custom parts](assets/theme-studio/custom-parts.png) | ![Theme repo](assets/theme-studio/theme-repo.png) |
+
+- **Mix and match.** Start from any of the 17 looks and swap any part from the others: Terminal's ASCII gauges on Aurora Glass cards, Cockpit dials with Jelly tiles, whatever you like. Cards, tiles, gauges, sliders, nav, backdrop and card headers are all interchangeable.
+- **Build from scratch.** Every part has a **Custom** style you design yourself:
+  - Fill (surface, tonal, accent, glass, gradient), opacity, border, hard shadow and glow.
+  - Gauges as rings, arcs, segments or bars, with classic, accent or spectrum colors.
+  - Nav highlights as a pill, underline, block or dot.
+- **Shapes, colors and type:**
+  - Corner style per surface: rounded, square, chamfer, squircle or pill.
+  - Pinned accent, second accent, background and card colors, or follow the system theme. Text stays readable automatically.
+  - Label case and letter spacing.
+  - Effects: glow, scanlines, motion, backdrops.
+- **Your own fonts.** Use any of the bundled fonts, or import your own TTF/OTF files.
+- **Preview every size.** Switch the preview between the Settings and Mode tabs and a **Cards** view that shows each card in its other layouts (2×2 rings, ring strip, two-column TEMP/FAN, small FPS), in dark and light.
+- **Share as packs.**
+  - Export one look or all of them as a `.tcplooks.json` pack into `/sdcard/TCP Themes/`.
+  - The fonts your looks use are copied into `/sdcard/TCP Themes/fonts/`, and a pack can list official download links (for example Google Fonts) so others can fetch fonts they don't have.
+  - Packs dropped into that folder show up with previews, ready to add or use as a starting point.
+- **Follow theme repos.**
+  - Paste a GitHub link and its looks are added; they update when the author pushes changes.
+  - Start your own from the **[tcp-themes template](https://github.com/BrianJr03/tcp-themes)**: press *Use this template*, export your looks into `themes/`, push, and share the link.
+  - The pack format is documented in the template's README.
+- **Gamepad-first**, like the rest of the companion.
 
 ---
 
@@ -46,6 +78,7 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 ### What I added on top
 > The reason to run this instead of the stock app.
 
+- 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
 - 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything.
 - 🧩 **Customizable quick toggles** — enable/disable tiles and **drag-and-drop to reorder** them.
@@ -86,7 +119,9 @@ Signed release builds are produced by CI (`.github/workflows/build-release.yml`)
 
 ## Contributing
 
-The easiest way to contribute is a **new theme (Look)** — one Look re-skins both the overlay and the companion. **[GUIDELINE.md](GUIDELINE.md)** is a full walkthrough (including a ready-to-use AI-agent prompt): the anatomy of a Look, a remix-existing-styles path vs. a new-renderer path, the screenshot workflow, and the gotchas (palette/contrast, font clipping, OFL-fonts-only, runtime stock icons). Please include before/after screenshots of both overlay tabs in your PR. Only contribute fonts/art/code you have the right to ship.
+**Sharing looks doesn't need a PR.** Build them in the [Theme Studio](#theme-studio), publish them in a repo made from the [tcp-themes template](https://github.com/BrianJr03/tcp-themes), and share the link.
+
+To add a **built-in** Look to the app itself, contribute a **new theme (Look)** — one Look re-skins both the overlay and the companion. **[GUIDELINE.md](GUIDELINE.md)** is a full walkthrough (including a ready-to-use AI-agent prompt): the anatomy of a Look, a remix-existing-styles path vs. a new-renderer path, the screenshot workflow, and the gotchas (palette/contrast, font clipping, OFL-fonts-only, runtime stock icons). Please include before/after screenshots of both overlay tabs in your PR. Only contribute fonts/art/code you have the right to ship.
 
 ---
 
