@@ -97,6 +97,31 @@ val LocalCompanionPalette: ProvidableCompositionLocal<CompanionPalette> = static
 /** `true` while the companion follows the overlay look; switches cards / backdrop / type to the look renderers. */
 val LocalCompanionThemed: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }
 
+/** The overlay's palette (theme mode, LED accent, pinned colors) and look spec, as the overlay itself resolves them. */
+@Composable
+internal fun rememberOverlayLook(state: SettingsState): Pair<TccColors, jr.brian.commandpannel.ui.theme.TccLookSpec> {
+    val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+        Configuration.UI_MODE_NIGHT_YES
+    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride).withPinned(state.overlayCustomLook?.colors)
+    val context = LocalContext.current
+    val spec = remember(state.overlayLook, state.overlayCustomLook) {
+        state.overlayCustomLook?.toSpec(UserFontStore.resolver(context)) ?: specForLook(state.overlayLook)
+    }
+    return colors to spec
+}
+
+/**
+ * Draws [content] in the overlay's look and theme, whether or not the companion follows the look (e.g. a quick
+ * toggle's icon in the settings rows, so it matches the overlay and changes with the look).
+ */
+@Composable
+internal fun OverlayLookScope(state: SettingsState, content: @Composable () -> Unit) {
+    val (colors, spec) = rememberOverlayLook(state)
+    TccTheme(colors) {
+        CompositionLocalProvider(LocalTccLookSpec provides spec, content = content)
+    }
+}
+
 /**
  * Themes the companion screen. Off (the default): the companion's own [CompanionPalette.Default] on the stock spec.
  * On: the overlay's look, theme mode and LED accent.
@@ -112,13 +137,7 @@ fun CompanionTheme(state: SettingsState, content: @Composable () -> Unit) {
         )
         return
     }
-    val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-        Configuration.UI_MODE_NIGHT_YES
-    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride).withPinned(state.overlayCustomLook?.colors)
-    val context = LocalContext.current
-    val spec = remember(state.overlayLook, state.overlayCustomLook) {
-        state.overlayCustomLook?.toSpec(UserFontStore.resolver(context)) ?: specForLook(state.overlayLook)
-    }
+    val (colors, spec) = rememberOverlayLook(state)
     TccTheme(colors) {
         val palette = remember(colors) { companionPaletteFrom(colors) }
         CompositionLocalProvider(

@@ -412,6 +412,7 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
         items = state.orderedEnabledTiles,
         description = stringResource(R.string.settings_tile_order_desc),
         label = { jr.brian.commandpannel.system.QuickSettingTileId.fromKey(it)?.let { id -> stringResource(id.labelRes) } ?: it },
+        leading = { key -> jr.brian.commandpannel.system.QuickSettingTileId.fromKey(key)?.let { QuickToggleIcon(state, it) } },
         onCommit = vm::reorderTiles,
         scroll = scroll,
         viewport = viewport,
@@ -422,11 +423,29 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
                 val checked = tile.key in state.enabledTiles
                 FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
+                    QuickToggleIcon(state, tile)
+                    Spacer(Modifier.width(14.dp))
                     Text(stringResource(tile.labelRes), color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
                 }
             }
         }
+    }
+}
+
+/**
+ * A quick toggle's icon as the overlay draws it: the overlay look's tile chrome and tint, and the dark / light art for
+ * its theme, so it changes along with the look. (Its on / off state isn't shown; this is a settings row.)
+ */
+@Composable
+private fun QuickToggleIcon(state: SettingsState, tile: jr.brian.commandpannel.system.QuickSettingTileId) {
+    OverlayLookScope(state) {
+        jr.brian.commandpannel.ui.components.TccIconButton(
+            icon = tile.icon,
+            label = stringResource(tile.labelRes),
+            circleSize = 34.dp,
+            showLabel = false,
+        )
     }
 }
 
@@ -440,6 +459,8 @@ private fun OrderCard(
     description: String,
     label: @Composable (String) -> String,
     note: @Composable (String) -> String? = { null },
+    /** Optional icon drawn before each row's name. */
+    leading: (@Composable (String) -> Unit)? = null,
     onCommit: (List<String>) -> Unit,
     scroll: ScrollState,
     viewport: () -> Rect,
@@ -452,7 +473,7 @@ private fun OrderCard(
         CardDesc(description)
         Spacer(Modifier.height(6.dp))
         Column(verticalArrangement = Arrangement.spacedBy(ORDER_ROW_SPACING)) {
-            reorder.items.forEachIndexed { index, k -> key(k) { OrderRow(index, k, label(k), note(k), reorder) } }
+            reorder.items.forEachIndexed { index, k -> key(k) { OrderRow(index, k, label(k), note(k), reorder, leading?.let { { it(k) } }) } }
         }
     }
 }
@@ -460,7 +481,14 @@ private fun OrderCard(
 private val ORDER_ROW_SPACING = 4.dp
 
 @Composable
-private fun OrderRow(index: Int, key: String, label: String, note: String?, reorder: ReorderListState) {
+private fun OrderRow(
+    index: Int,
+    key: String,
+    label: String,
+    note: String?,
+    reorder: ReorderListState,
+    leading: (@Composable () -> Unit)? = null,
+) {
     val f = focusState()
     val lifted = reorder.isLifted(key)
     val grabbed = reorder.grabbed == key
@@ -526,6 +554,7 @@ private fun OrderRow(index: Int, key: String, label: String, note: String?, reor
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("${index + 1}", color = p.textTertiary, fontSize = 13.sp, style = tccTextStyle(), modifier = Modifier.width(26.dp))
+        leading?.let { it(); Spacer(Modifier.width(12.dp)) }
         Column(Modifier.weight(1f)) {
             Text(lookLabel(label), color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
             if (note != null) Text(note, color = p.textTertiary, fontSize = 12.sp)
