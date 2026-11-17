@@ -73,6 +73,34 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 3. **AYN assets.** Command Panel reuses the stock app's icons and strings. That concerns AYN, not BDSA, and is for
    personal use only.
 
+## 6. Re-audit — 2026-11-17 (after looks / arrange / replay / icon were integrated)
+
+Re-checked the shipped app (`app/src/`) after the big feature ports (16-look system, long-press drag-and-drop
+Arrange mode, Replay Buffer, launcher icon). Findings:
+
+- **No upstream code in the app.** `grep` for `stormpanda` / `betterdualscreenassistant` across `app/src/` → **0 hits**
+  (every ported file was package-renamed; the only `retroid`/`megingiard` hits are descriptive comments in Brian's
+  own files, not code or dependencies).
+- **Provenance.** The ported features' commits are all authored by Brian (`thaballa79@gmail.com`): looks `0335e21`,
+  arrange `a38cef7`, replay `8a37f8f`/`14f0ce1`.
+- **Flagged upstream-origin lines stay out.** The three files the port analysis flagged for upstream-origin lines
+  (`QuickTogglesReorderCard`, `ReplayBufferRepositoryTest`, `SettingsBackupTest`) were **not** ported — the reorder
+  UI, the replay tests, and the backup test in Command Panel are clean-room. A line-by-line scan confirms none of
+  their flagged lines appear in `app/src/`.
+- **Clean-room rewrites of upstream-base code.** The spec/widget base (`TccLookSpec`, `TccLookWidgets`, the overlay
+  widgets), the scoped-path validator (`PrivilegedHelperMain.isValidScopedMediaOutputPath`) and the screen-capture
+  engine (`ReplayCaptureEngine`, upstream's `ScreenRecorderEngine` capture was **not** ported) are Command Panel's
+  own code; only Brian's pure helpers (replay bitrate/path math, ring buffer, renderers) were ported.
+- **Fonts.** The 8 bundled font families are SIL OFL 1.1; `assets/THIRD_PARTY_NOTICES.txt` ships the attribution +
+  full licence alongside them.
+- **Still unpublished / private.** Command Panel has **no git remote** and tracks no binaries/keystore; the fork is
+  **private** (`gh repo view` → `PRIVATE`); no upstream `LICENSE`/`README`/binary is copied into `app/src/`.
+
+**Open item:** `fork-port/` is tracked in Command Panel's local git and its `patches/*.patch` carry upstream base
+lines as diff context (stormpanda's code). This is a local porting artifact only — Command Panel is unpublished, so
+nothing is redistributed — but `fork-port/` must be removed (or git-excluded) before any publication, since the app
+ships from `app/`, not `fork-port/`.
+
 ## Files in this folder
 
 | File | Contents |
