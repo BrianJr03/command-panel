@@ -218,6 +218,9 @@
     <string name="theme_applied">Applied</string>
     <string name="theme_edit">Edit</string>
     <string name="theme_delete">Delete</string>
+    <string name="theme_export">Export</string>
+    <string name="theme_import">Import a look…</string>
+    <string name="theme_share_desc">Share looks as .cplook.json files. Imported fonts aren\'t included, so the person importing needs the same font installed (otherwise the default font is used).</string>
     <string name="theme_delete_confirm">Press again to delete</string>
     <string name="theme_back">Back</string>
     <string name="theme_save">Save</string>
@@ -344,6 +347,11 @@
     <string name="msg_export_failed">Export failed</string>
     <string name="msg_no_backup">No backup found</string>
     <string name="msg_restore_failed">Restore failed</string>
+    <string name="msg_look_exported">Exported %1$s</string>
+    <string name="msg_look_export_failed">Export failed</string>
+    <string name="msg_look_imported">Imported %1$s</string>
+    <string name="msg_look_imported_missing_fonts">Imported %1$s. These fonts aren\'t installed, so the default font is used: %2$s</string>
+    <string name="msg_look_import_failed">That file isn\'t a Command Panel look</string>
     <string name="msg_font_unreadable">Couldn\'t open the font file</string>
     <string name="msg_font_too_large">Font is larger than 5 MB</string>
     <string name="msg_font_invalid">Not a valid TTF or OTF font</string>

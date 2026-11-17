@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,11 +58,29 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         CardDesc(stringResource(R.string.theme_mix_desc))
     }
 
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importLook) }
+    var exporting by remember { mutableStateOf<CustomLook?>(null) }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val look = exporting
+        if (uri != null && look != null) vm.exportLook(look, uri)
+        exporting = null
+    }
+
     SectionHeader(stringResource(R.string.theme_my_looks))
+    Card {
+        CardDesc(stringResource(R.string.theme_share_desc))
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Chip(stringResource(R.string.theme_import)) { importer.launch(LOOK_MIME_TYPES) }
+            state.themeMessage?.let { InfoLine(it) }
+        }
+    }
     if (state.customLooks.isEmpty()) {
         Card { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
     }
-    state.customLooks.forEach { look -> SavedLookCard(look, state, vm, onOpenStudio) }
+    state.customLooks.forEach { look ->
+        SavedLookCard(look, state, vm, onOpenStudio) { exporting = look; exporter.launch(look.fileName()) }
+    }
 
     SectionHeader(stringResource(R.string.theme_builtin))
     Card {
@@ -73,7 +93,13 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
 }
 
 @Composable
-private fun SavedLookCard(look: CustomLook, state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
+private fun SavedLookCard(
+    look: CustomLook,
+    state: SettingsState,
+    vm: SettingsViewModel,
+    onOpenStudio: (CustomLook) -> Unit,
+    onExport: () -> Unit,
+) {
     val active = state.overlayLookRef == look.ref
     var confirmDelete by remember(look.id) { mutableStateOf(false) }
     Card {
@@ -89,6 +115,7 @@ private fun SavedLookCard(look: CustomLook, state: SettingsState, vm: SettingsVi
                         vm.selectLook(look.ref)
                     }
                     Chip(stringResource(R.string.theme_edit)) { onOpenStudio(look) }
+                    Chip(stringResource(R.string.theme_export), onClick = onExport)
                     // Two presses, so a stray A on the gamepad can't wipe a look.
                     Chip(stringResource(if (confirmDelete) R.string.theme_delete_confirm else R.string.theme_delete), selected = confirmDelete) {
                         if (confirmDelete) vm.deleteCustomLook(look.id) else confirmDelete = true
@@ -98,3 +125,9 @@ private fun SavedLookCard(look: CustomLook, state: SettingsState, vm: SettingsVi
         }
     }
 }
+
+private val LOOK_MIME_TYPES = arrayOf("application/json", "text/plain", "application/octet-stream")
+
+/** `My Look.cplook.json`, with characters file pickers reject replaced. */
+private fun CustomLook.fileName(): String = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "look" } + ".cplook.json"
+

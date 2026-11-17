@@ -67,6 +67,8 @@ data class SettingsState(
     val overlayCustomLook: CustomLook? = null,
     val customLooks: List<CustomLook> = emptyList(),
     val userFonts: List<UserFont> = emptyList(),
+    /** Result of the last Theme Studio export / import, shown in the Themes section. */
+    val themeMessage: String? = null,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -189,6 +191,59 @@ class SettingsViewModel @Inject constructor(
     fun deleteFont(id: String) {
         UserFontStore.delete(app, id)
         _state.value = _state.value.copy(userFonts = UserFontStore.all(app))
+    }
+
+    /** Writes [look] as a `.cplook.json` file to [uri] (from the system "create document" picker). */
+    fun exportLook(look: CustomLook, uri: android.net.Uri) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    app.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use {
+                        it.write(jr.brian.commandpannel.ui.theme.CustomLookJson.encode(look).toString(2))
+                    }
+                }.isSuccess
+            }
+            _state.value = _state.value.copy(
+                themeMessage = if (ok) app.getString(R.string.msg_look_exported, look.name) else app.getString(R.string.msg_look_export_failed),
+            )
+        }
+    }
+
+    /**
+     * Imports a look file as a new saved look. User fonts are re-linked by name to fonts installed here; any that
+     * aren't fall back to the default font and are named in the message.
+     */
+    fun importLook(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = app.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+                    jr.brian.commandpannel.ui.theme.CustomLookJson.decode(org.json.JSONObject(text))
+                }.getOrNull()
+            }
+            if (result == null) {
+                _state.value = _state.value.copy(themeMessage = app.getString(R.string.msg_look_import_failed))
+                return@launch
+            }
+            val missing = mutableListOf<String>()
+            fun relink(ref: jr.brian.commandpannel.ui.theme.FontRef?) = when (ref) {
+                is jr.brian.commandpannel.ui.theme.FontRef.User ->
+                    UserFontStore.findByName(app, ref.displayName)?.let { ref.copy(id = it.id, displayName = it.displayName) }
+                        ?: run { missing += ref.displayName; null }
+                else -> ref
+            }
+            val look = result.copy(
+                id = java.util.UUID.randomUUID().toString(),
+                labelFont = relink(result.labelFont),
+                displayFont = relink(result.displayFont),
+            )
+            CustomLookStore.save(prefs, look)
+            refreshLooks()
+            _state.value = _state.value.copy(
+                themeMessage = if (missing.isEmpty()) app.getString(R.string.msg_look_imported, look.name)
+                else app.getString(R.string.msg_look_imported_missing_fonts, look.name, missing.distinct().joinToString()),
+            )
+        }
     }
 
     private fun refreshLooks() {
