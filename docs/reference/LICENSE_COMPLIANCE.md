@@ -59,17 +59,15 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 | §2.3 modified source | **Open item — see §5.** |
 | §3 contributions | No PRs have been opened upstream, so nothing has been licensed to the author under §3. |
 
-## 5. Open items
+## 5. Status / conditions
 
-1. **The fork's source is public.** `BrianJr03/better-dual-screen-assistant` is a public repository that is not a
-   GitHub fork of the official repo and has no PRs upstream. §2.3 allows publishing modified source only "in a public
-   fork of the official repository … solely for the purpose of preparing and submitting a Pull Request" upstream.
-   The fork's README carries a derivation notice and states that no binaries are published, but the repository being
-   public is outside that exception.
-   **Why it is public:** Brian made it public only so Claude Code could read it, because private-repo access had not
-   been set up for the tool. **Planned fix (stated 2026-11-16):** make the repository private again or delete it.
-   Update this item with the date once done.
-2. **Command Panel contains staged fork code** (`fork-port/`) that is the fork's own authorship but was written
+1. **The fork's source — RESOLVED 2026-11-17.** `BrianJr03/better-dual-screen-assistant` was briefly public only so
+   Claude Code could read it (private-repo access was not set up for the tool); it is now **private again**
+   (verified `gh repo view` → `visibility=PRIVATE`), with a local copy kept. No binaries, keystore, `local.properties`
+   or mapping file were ever committed to it, and it has no GitHub releases. This closes the one item that was
+   outside §2.3.
+2. **Command Panel stays unpublished.** It has no git remote (local only) and tracks no binaries/keystore. It contains
+   staged fork code (`fork-port/`) that is the fork's own authorship but was written
    against BDSA's codebase. It stays unpublished until each ported feature has been integrated and its upstream
    dependencies rewritten.
 3. **AYN assets.** Command Panel reuses the stock app's icons and strings. That concerns AYN, not BDSA, and is for
