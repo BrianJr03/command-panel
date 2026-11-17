@@ -18,9 +18,15 @@ import jr.brian.commandpannel.system.SystemSettings.Keys
  *
  * For each single-screen mode it saves and later restores `screen_focus_lock` / `enable_system_key_focus_lock`,
  * sets `sys.temp.disabled.touch` through the root shell, and covers the blanked panel with a black
- * `TYPE_APPLICATION_OVERLAY` window. Stock does not change brightness, so neither do we. Stock covers the top with a
- * `TYPE_BOOT_PROGRESS` window that also hides the status bar; our overlay cover blanks the top's content but the
- * system status bar (a higher-z window) still shows through — covering it fully would need the root helper window.
+ * `TYPE_APPLICATION_OVERLAY` window.
+ *
+ * Stock covers the top with a privileged `TYPE_BOOT_PROGRESS` window that the vendor exempts from its single-screen
+ * dim. Our app-type overlay can't use that window type, and the vendor force-dims any app window on the "off" panel
+ * to alpha 0.8, so the cover alone only dims the screen. To actually black it out we also drop the blanked panel's
+ * backlight to 0 through the root helper — snapshotting both panels' brightness on the dual→single transition (so a
+ * value already pulled down by blanking never overwrites it) and restoring it when dual returns. On the top panel the
+ * system status bar (a higher-z window) still shows through the overlay, but its backlight is off too, so the panel
+ * reads as black.
  */
 class ScreenModeController(
     private val context: Context,
@@ -73,28 +79,69 @@ class ScreenModeController(
         setTouch("0,0")
         removeBottomCover()
         removeTopCover()
+        // Both panels come back on: a normal app window can't stay fully opaque on the Thor's "off" screen (the
+        // vendor force-dims it to 0.8), so the cover is paired with a backlight-off; undo it here.
+        restoreBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
+        restoreBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
         settings.putInt(Keys.FOCUS_LOCK, prefs.getInt("saved_focus_lock", 0))
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt("saved_sys_key_lock", 0))
     }
 
     private fun blankBottom(fromDual: Boolean) {
-        if (fromDual) saveFocusState()
+        if (fromDual) { saveFocusState(); snapshotBrightness() }
         removeTopCover()
         onHideOverlay()
         settings.putInt(Keys.FOCUS_LOCK, 1)
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
         setTouch("0,1")
         showBottomCover()
+        // Cover + backlight-off = genuinely black bottom panel; top panel returns to its saved level.
+        dropBacklight(topology.bottomDisplay)
+        restoreBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
     }
 
     private fun blankTop(fromDual: Boolean) {
-        if (fromDual) saveFocusState()
+        if (fromDual) { saveFocusState(); snapshotBrightness() }
         removeBottomCover()
         onHideOverlay()
         settings.putInt(Keys.FOCUS_LOCK, 2)
         settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
         setTouch("1,0")
         showTopCover()
+        dropBacklight(topology.topDisplay)
+        restoreBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
+    }
+
+    /**
+     * Captures both panels' brightness at the moment we leave dual, so the blanked panel can be restored to the
+     * user's real level later. Taken only on the dual→single transition (not on single↔single switches) so a
+     * value already pulled down by blanking never overwrites the saved one.
+     */
+    private fun snapshotBrightness() {
+        saveBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
+        saveBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
+    }
+
+    private fun saveBrightness(display: android.view.Display?, prefKey: String) {
+        val id = display?.displayId ?: return
+        val current = privileged.getDisplayBrightness(id)
+        if (current != null && current.isFinite() && current > MIN_LIT_BRIGHTNESS) {
+            prefs.edit().putFloat(prefKey, current).apply()
+        }
+    }
+
+    /** Drops a panel's backlight to 0 — a genuinely black screen, since an app cover alone can't beat the vendor dim. */
+    private fun dropBacklight(display: android.view.Display?) {
+        privileged.setDisplayBrightness(display?.displayId ?: return, 0f, false)
+    }
+
+    /** Restores the display to the brightness captured before blanking (defaults to full if nothing was saved). */
+    private fun restoreBrightness(display: android.view.Display?, prefKey: String) {
+        val id = display?.displayId ?: return
+        val saved = prefs.getFloat(prefKey, 1f)
+        if (saved > MIN_LIT_BRIGHTNESS && saved <= 1f) {
+            privileged.setDisplayBrightness(id, saved, false)
+        }
     }
 
     private fun setTouch(value: String) {
@@ -127,7 +174,7 @@ class ScreenModeController(
         val displayContext = context.createDisplayContext(display)
         val wm = displayContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val size = topology.realSize(display)
-        val view = View(displayContext).apply { setBackgroundColor(Color.BLACK) }
+        val view = View(displayContext).apply { setBackgroundColor(android.graphics.Color.BLACK) }
         val lp = WindowManager.LayoutParams(
             size.x, size.y,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -135,8 +182,16 @@ class ScreenModeController(
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE,
-        ).apply { gravity = Gravity.CENTER; fitInsetsTypes = 0 }
-        return runCatching { wm.addView(view, lp) }.map { view }.getOrNull()
+        ).apply {
+            gravity = Gravity.CENTER
+            fitInsetsTypes = 0
+            // Keep the cover fully opaque: no window alpha, no dim-behind — a solid black panel like stock.
+            alpha = 1f
+            dimAmount = 0f
+        }
+        return runCatching { wm.addView(view, lp); view }
+            .onFailure { android.util.Log.w("ScreenModeController", "cover addView failed on display ${display.displayId}", it) }
+            .getOrNull()
     }
 
     private fun removeCover(view: View?) {
@@ -144,5 +199,12 @@ class ScreenModeController(
         runCatching {
             (view.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeViewImmediate(view)
         }
+    }
+
+    private companion object {
+        /** Below this, a saved brightness is treated as "already off" and not used as a restore target. */
+        const val MIN_LIT_BRIGHTNESS = 0.01f
+        const val KEY_BRIGHTNESS_BOTTOM = "saved_brightness_bottom"
+        const val KEY_BRIGHTNESS_TOP = "saved_brightness_top"
     }
 }
