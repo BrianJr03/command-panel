@@ -46,6 +46,8 @@ data class SettingsTabLookSpec(
     val ringTitleBandFraction: Float? = null,
     val ringValueScale: Float = 0.30f,
     val ringUnitScale: Float = 0.13f,
+    /** Multiplier on the TEMP/FAN info-card value size (22sp base); < 1 for wide display fonts. */
+    val infoValueScale: Float = 1f,
     val fpsBadgeShape: Shape = RoundedCornerShape(50),
 )
 
@@ -270,7 +272,8 @@ val Y2kChromeLookSpec: TccLookSpec = StockLookSpec.copy(
     panelCardShape = RoundedCornerShape(aynDp(14f)),
     tile = StockLookSpec.tile.copy(buttonShape = CircleShape),
     slider = StockLookSpec.slider.copy(trackShape = PillShape),
-    settingsTab = StockLookSpec.settingsTab.copy(fpsBadgeShape = PillShape),
+    // Michroma is a wide display font, so the telemetry readouts need smaller sizes to fit.
+    settingsTab = StockLookSpec.settingsTab.copy(fpsBadgeShape = PillShape, ringValueScale = 0.23f, infoValueScale = 0.72f),
     dialog = DialogLookSpec(dialogShape = RoundedCornerShape(aynDp(16f))),
     traits = LookTraits(
         card = CardStyle.CHROME_RIM, tile = TileStyle.CHROME, gauge = GaugeStyle.CHROME_RING,

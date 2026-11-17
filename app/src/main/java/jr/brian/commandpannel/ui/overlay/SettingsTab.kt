@@ -246,7 +246,7 @@ private fun InfoCard(modifier: Modifier, icon: String, iconTint: Color?, title: 
                 Spacer(Modifier.size(6.dp))
                 Text(title, color = colors.tertiary, fontSize = 12.sp)
             }
-            Text(value, color = colors.primary, fontSize = 22.sp, fontWeight = FontWeight.Medium, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
+            Text(value, color = colors.primary, fontSize = (22 * jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current.settingsTab.infoValueScale).sp, fontWeight = FontWeight.Medium, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
         }
     }
 }
