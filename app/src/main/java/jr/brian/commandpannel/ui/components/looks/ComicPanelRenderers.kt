@@ -331,9 +331,8 @@ internal object ComicPanelNav : LookNavRenderer {
         val lc = p.lookColors
         return Modifier.drawWithCache {
             val box = tile.navTileSize.toPx()
-            val top = tile.compactTopGap.toPx()
             val burst = burstPath(Size(box, box), 1.1f, this).apply {
-                translate(Offset((size.width - box) / 2f, top))
+                translate(Offset((size.width - box) / 2f, (size.height - box) / 2f))
             }
             val stroke = Stroke(BurstInk.toPx(), join = StrokeJoin.Miter)
             onDrawBehind {

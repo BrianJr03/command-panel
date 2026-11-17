@@ -275,12 +275,11 @@ internal object Y2kChromeNav : LookNavRenderer {
     override val highlightShape: Shape = RoundedCornerShape(aynDp(16f))
 
     override fun highlight(p: LookPaint): Modifier {
-        val tile = p.spec.tile
         val lc = p.lookColors
         return Modifier.drawWithCache {
             val w = aynDp(56f).toPx()
             val h = aynDp(32f).toPx()
-            val cy = (tile.compactTopGap + tile.navTileSize / 2f).toPx()
+            val cy = size.height / 2f
             val topLeft = Offset((size.width - w) / 2f, cy - h / 2f)
             val foil = foilBrush(lc, Size(w, h), topLeft)
             onDrawBehind { drawRoundRect(foil, topLeft, Size(w, h), CornerRadius(h / 2f, h / 2f)) }

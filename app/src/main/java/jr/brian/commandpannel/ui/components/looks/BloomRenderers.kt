@@ -268,12 +268,11 @@ internal object BloomNav : LookNavRenderer {
     override val highlightShape: Shape = RoundedCornerShape(aynDp(16f))
 
     override fun highlight(p: LookPaint): Modifier {
-        val tile = p.spec.tile
         val pill = lerp(p.lookColors.bloomContainerHigh, p.colors.accent, 0.30f)
         return Modifier.drawBehind {
             val w = aynDp(56f).toPx()
             val h = aynDp(32f).toPx()
-            val cy = (tile.compactTopGap + tile.navTileSize / 2f).toPx()
+            val cy = size.height / 2f
             drawRoundRect(
                 color = pill,
                 topLeft = Offset((size.width - w) / 2f, cy - h / 2f),
