@@ -10,6 +10,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import jr.brian.commandpannel.system.UserFontStore
+import jr.brian.commandpannel.ui.theme.toSpec
+import jr.brian.commandpannel.ui.theme.withPinned
 import jr.brian.commandpannel.ui.theme.LOOK_LINE_CONTRAST
 import jr.brian.commandpannel.ui.theme.LOOK_TEXT_CONTRAST
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
@@ -110,11 +114,15 @@ fun CompanionTheme(state: SettingsState, content: @Composable () -> Unit) {
     }
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
-    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride)
+    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride).withPinned(state.overlayCustomLook?.colors)
+    val context = LocalContext.current
+    val spec = remember(state.overlayLook, state.overlayCustomLook) {
+        state.overlayCustomLook?.toSpec(UserFontStore.resolver(context)) ?: specForLook(state.overlayLook)
+    }
     TccTheme(colors) {
         val palette = remember(colors) { companionPaletteFrom(colors) }
         CompositionLocalProvider(
-            LocalTccLookSpec provides specForLook(state.overlayLook),
+            LocalTccLookSpec provides spec,
             LocalCompanionPalette provides palette,
             LocalCompanionThemed provides true,
             content = content,

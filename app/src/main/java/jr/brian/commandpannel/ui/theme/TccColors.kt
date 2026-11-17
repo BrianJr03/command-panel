@@ -29,6 +29,8 @@ data class TccColors(
     val isDark: Boolean,
     /** Error / danger accent (Cockpit red-zone, etc.). */
     val error: Color = Color(0xFFF64646),
+    /** Pinned second accent (Theme Studio); `null` derives it from [accent] in [resolveLookColors]. */
+    val accent2: Color? = null,
 ) {
     // Aliases so the ported look renderers (written against the fork's palette) read naturally.
     val panelBackgroundSelected: Color get() = panelBackgroundSelect

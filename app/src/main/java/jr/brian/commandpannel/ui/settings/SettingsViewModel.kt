@@ -15,6 +15,11 @@ import jr.brian.commandpannel.system.QuickLaunch
 import jr.brian.commandpannel.system.QuickLaunchApp
 import jr.brian.commandpannel.system.QuickLaunchDisplay
 import jr.brian.commandpannel.system.SystemSettings
+import jr.brian.commandpannel.system.CustomLookStore
+import jr.brian.commandpannel.system.UserFont
+import jr.brian.commandpannel.system.UserFontStore
+import jr.brian.commandpannel.ui.theme.CustomLook
+import jr.brian.commandpannel.ui.theme.LookRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +58,14 @@ data class SettingsState(
     /** Nav bar button keys in display order. */
     val navOrder: List<String> = jr.brian.commandpannel.system.NavBarButton.entries.map { it.key },
     val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
+    /** The base look of the active selection (the look itself for built-ins). */
     val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    /** What `overlay_look` points at: a built-in look or a saved Theme Studio look. */
+    val overlayLookRef: LookRef = LookRef.BuiltIn(jr.brian.commandpannel.ui.theme.TccUiLook.AUTO),
+    /** The active Theme Studio look, or null when a built-in look is selected. */
+    val overlayCustomLook: CustomLook? = null,
+    val customLooks: List<CustomLook> = emptyList(),
+    val userFonts: List<UserFont> = emptyList(),
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -97,7 +109,11 @@ class SettingsViewModel @Inject constructor(
         quickLaunchComponent = QuickLaunch.savedComponent(getApplication()),
         navOrder = jr.brian.commandpannel.system.NavBarButton.ordered(prefs.getString("nav_bar_order", null)).map { it.key },
         overlayLayout = jr.brian.commandpannel.system.OverlayLayout.decode(prefs.getString("overlay_layout", null)),
-        overlayLook = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
+        overlayLook = CustomLookStore.resolve(prefs).first,
+        overlayLookRef = CustomLookStore.selected(prefs),
+        overlayCustomLook = CustomLookStore.resolve(prefs).second,
+        customLooks = CustomLookStore.all(prefs),
+        userFonts = UserFontStore.all(getApplication()),
         replayEnabled = prefs.getBoolean("replay_enabled", false),
         replayWindowSeconds = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayWindowSeconds(prefs.getInt("replay_window_seconds", 30)),
@@ -139,9 +155,49 @@ class SettingsViewModel @Inject constructor(
         }, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
     }
 
-    fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) {
-        prefs.edit().putString("overlay_look", look.name).apply()
-        _state.value = _state.value.copy(overlayLook = look)
+    fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) = selectLook(LookRef.BuiltIn(look))
+
+    /** Applies a built-in or saved look to the overlay (and the companion when it follows the look). */
+    fun selectLook(ref: LookRef) {
+        CustomLookStore.select(prefs, ref)
+        refreshLooks()
+    }
+
+    /** Saves (inserts or replaces) a Theme Studio look; the overlay restyles live if it is the active one. */
+    fun saveCustomLook(look: CustomLook, apply: Boolean = false) {
+        CustomLookStore.save(prefs, look)
+        if (apply) CustomLookStore.select(prefs, look.ref)
+        refreshLooks()
+    }
+
+    fun deleteCustomLook(id: String) {
+        CustomLookStore.delete(prefs, id)
+        refreshLooks()
+    }
+
+    /** Imports a TTF/OTF picked with the system file picker; reports the outcome through [onResult]. */
+    fun importFont(uri: android.net.Uri, onResult: (Result<UserFont>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { UserFontStore.import(app, uri) }
+            _state.value = _state.value.copy(userFonts = UserFontStore.all(app))
+            onResult(result)
+        }
+    }
+
+    /** Deletes an imported font; looks that used it fall back to the default font. */
+    fun deleteFont(id: String) {
+        UserFontStore.delete(app, id)
+        _state.value = _state.value.copy(userFonts = UserFontStore.all(app))
+    }
+
+    private fun refreshLooks() {
+        val (base, custom) = CustomLookStore.resolve(prefs)
+        _state.value = _state.value.copy(
+            overlayLook = base,
+            overlayLookRef = CustomLookStore.selected(prefs),
+            overlayCustomLook = custom,
+            customLooks = CustomLookStore.all(prefs),
+        )
     }
 
     private fun updateLayout(transform: (jr.brian.commandpannel.system.OverlayLayout) -> jr.brian.commandpannel.system.OverlayLayout) {

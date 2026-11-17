@@ -54,6 +54,8 @@ data class OverlayUiState(
     val tilePage: Int = 0,
     val layout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
     val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    /** The active Theme Studio look (overrides on top of [look]), or null for a built-in look. */
+    val customLook: jr.brian.commandpannel.ui.theme.CustomLook? = null,
     /** When set, overrides the overlay palette accent with the Thor's ambient-LED color (fork feature, inverted). */
     val accentOverride: Int? = null,
     /** The nav tab to open on (persisted across overlay open/close, like the stock `current_navigation_interface_name`). */

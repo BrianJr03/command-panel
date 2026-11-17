@@ -802,7 +802,7 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         CardDesc(stringResource(R.string.settings_overlay_look_desc))
         Spacer(Modifier.height(6.dp))
         jr.brian.commandpannel.ui.theme.TccUiLook.entries.forEach { look ->
-            RadioRow(stringResource(look.labelRes), state.overlayLook == look) { vm.setLook(look) }
+            RadioRow(stringResource(look.labelRes), state.overlayLookRef == jr.brian.commandpannel.ui.theme.LookRef.BuiltIn(look)) { vm.setLook(look) }
         }
     }
     SwitchCard(

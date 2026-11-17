@@ -126,6 +126,7 @@ class SettingsRepository(
         val focus = settings.getInt(Keys.FOCUS_LOCK, 0)
         val peak = settings.getFloat(Keys.PEAK_REFRESH, 60f)
         val themeMode = settings.getInt(Keys.THEME_MODE, 4)
+        val activeLook = CustomLookStore.resolve(prefs)
         _uiState.update {
             it.copy(
                 accentOverride = readAccentOverride(),
@@ -151,7 +152,8 @@ class SettingsRepository(
                     audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
                 tiles = buildTiles(mode, focus),
                 layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
-                look = jr.brian.commandpannel.ui.theme.TccUiLook.fromKey(prefs.getString("overlay_look", null)),
+                look = activeLook.first,
+                customLook = activeLook.second,
                 navTab = readNavTab(),
             )
         }

@@ -223,6 +223,10 @@
     <string name="msg_export_failed">Export failed</string>
     <string name="msg_no_backup">No backup found</string>
     <string name="msg_restore_failed">Restore failed</string>
+    <string name="msg_font_unreadable">Couldn\'t open the font file</string>
+    <string name="msg_font_too_large">Font is larger than 5 MB</string>
+    <string name="msg_font_invalid">Not a valid TTF or OTF font</string>
+    <string name="font_default_name">Font</string>
     <plurals name="msg_restored_settings">
         <item quantity="one">Restored %1$d setting</item>
         <item quantity="other">Restored %1$d settings</item>
