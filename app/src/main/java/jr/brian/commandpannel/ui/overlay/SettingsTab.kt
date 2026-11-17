@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -56,8 +57,7 @@ fun SettingsTab(
             OverlayCardId.FRAME_RATE -> FrameRatePanel(state, actions, m)
             OverlayCardId.QUICK_TILES -> QuickTilesPanel(state, onTile, m)
             OverlayCardId.RINGS -> RingsCard(state, m)
-            OverlayCardId.TEMP -> InfoCard(m, icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
-            OverlayCardId.FAN -> InfoCard(m, icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+            OverlayCardId.TEMP -> TempFanCard(state, m)
             else -> Unit
         }
     }
@@ -66,42 +66,28 @@ fun SettingsTab(
 @Composable
 private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     val colors = LocalTccColors.current
+    val displayStyle = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle()
     TccCard(modifier) {
-        Column(
-            Modifier.fillMaxSize().padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            androidx.compose.foundation.layout.Box(
-                Modifier.noRippleClickable { actions.toggleRefreshRate() },
-            ) { FrameRatePill(state.is120Hz) }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("${state.fps}", color = colors.primary, fontSize = 46.sp, fontWeight = FontWeight.Bold, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
-                Text(" FPS", color = colors.primary, fontSize = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
+        // Tapping the whole card toggles the refresh rate; the rate shows as a small Hz label in the top-left corner
+        // (same text style as the FPS counter) to save space. In a big/tall card the counter grows to fill it.
+        BoxWithConstraints(Modifier.fillMaxSize().noRippleClickable { actions.toggleRefreshRate() }.padding(14.dp)) {
+            val big = maxHeight > maxWidth * 0.52f
+            val numberSp = if (big) 76.sp else 46.sp
+            val fpsSp = if (big) 24.sp else 15.sp
+            val hzSp = if (big) 22.sp else 16.sp
+            Text(
+                if (state.is120Hz) "120Hz" else "60Hz",
+                color = colors.primary,
+                fontSize = hzSp,
+                fontWeight = FontWeight.Bold,
+                style = displayStyle,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.Bottom) {
+                Text("${state.fps}", color = colors.primary, fontSize = numberSp, fontWeight = FontWeight.Bold, maxLines = 1, style = displayStyle)
+                Text(" FPS", color = colors.primary, fontSize = fpsSp, modifier = Modifier.padding(bottom = if (big) 14.dp else 10.dp))
             }
-            Text("CURRENT FPS", color = colors.panelText, fontSize = 11.sp)
         }
-    }
-}
-
-/** The "60/120 FPS MODE" pill (stock `bg_60/bg_120_frame_rate_mode` gradients), rendered in Compose. */
-@Composable
-private fun FrameRatePill(is120: Boolean) {
-    // Single flat fill (no gradient, no fade) so the pill reads as a solid filled badge.
-    val fill = if (is120) Color(0xFFD11AFF) else Color(0xFF1BBDDE)
-    Box(
-        modifier = Modifier
-            .size(width = 150.dp, height = 34.dp)
-            .clip(RoundedCornerShape(17.dp))
-            .background(fill),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            if (is120) "120 FPS MODE" else "60 FPS MODE",
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-        )
     }
 }
 
@@ -153,36 +139,101 @@ private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mod
 
 @Composable
 private fun RingsCard(state: OverlayUiState, modifier: Modifier) {
+    val cpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", m) }
+    val gpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", m) }
+    val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", m) }
+    val ram: @Composable (Modifier) -> Unit = { m -> RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", m) }
     TccCard(modifier) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 15.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", Modifier.weight(1f).fillMaxHeight())
-            RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", Modifier.weight(1f).fillMaxHeight())
-            RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
-            RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
+        BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            // In a tall/square card (e.g. moved to its own big slot) fill the space with a 2x2 grid; a wide strip stays 1x4.
+            if (maxHeight > maxWidth * 0.52f) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        cpu(Modifier.weight(1f).fillMaxHeight()); gpu(Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pwr(Modifier.weight(1f).fillMaxHeight()); ram(Modifier.weight(1f).fillMaxHeight())
+                    }
+                }
+            } else {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    cpu(Modifier.weight(1f).fillMaxHeight()); gpu(Modifier.weight(1f).fillMaxHeight())
+                    pwr(Modifier.weight(1f).fillMaxHeight()); ram(Modifier.weight(1f).fillMaxHeight())
+                }
+            }
         }
     }
 }
 
+/** Combined TEMP + FAN readings in one card, so the hardware strip is a single row (frees height for quick tiles).
+ *  Adapts like the rings: stacked rows in a compact strip, two side-by-side stat columns in a tall/big card. */
 @Composable
-private fun InfoCard(modifier: Modifier, icon: String, iconTint: Color?, title: String, value: String) {
-    val colors = LocalTccColors.current
+private fun TempFanCard(state: OverlayUiState, modifier: Modifier) {
     TccCard(modifier) {
-        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceEvenly) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = rememberStockPainter(icon),
-                    contentDescription = title,
-                    colorFilter = stockIconColorFilter(iconTint ?: colors.tertiary),
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.size(6.dp))
-                Text(title, color = colors.tertiary, fontSize = 12.sp)
+        BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            if (maxHeight > maxWidth * 0.52f) {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatBlock(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
+                    StatBlock(icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+                }
+            } else {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+                    InfoRow(icon = "ic_temp", iconTint = TempColors.forCelsius(state.tempC), title = "TEMP", value = "${state.tempC}℃")
+                    InfoRow(icon = "ic_fan_normal", iconTint = null, title = "FAN", value = "${state.fanPercent}%")
+                }
             }
-            Text(value, color = colors.primary, fontSize = (22 * jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current.settingsTab.infoValueScale).sp, fontWeight = FontWeight.Medium, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
         }
+    }
+}
+
+/** One stat as a vertical block (icon + label on top, big value below) — the tall-card form of a temp/fan reading. */
+@Composable
+private fun RowScope.StatBlock(icon: String, iconTint: Color?, title: String, value: String) {
+    val colors = LocalTccColors.current
+    Column(
+        Modifier.weight(1f).fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = rememberStockPainter(icon),
+                contentDescription = title,
+                colorFilter = stockIconColorFilter(iconTint ?: colors.tertiary),
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.size(6.dp))
+            Text(title, color = colors.tertiary, fontSize = 13.sp)
+        }
+        Text(
+            value,
+            color = colors.primary,
+            fontSize = (28 * jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current.settingsTab.infoValueScale).sp,
+            fontWeight = FontWeight.Medium,
+            style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle(),
+        )
+    }
+}
+
+@Composable
+private fun InfoRow(icon: String, iconTint: Color?, title: String, value: String) {
+    val colors = LocalTccColors.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painter = rememberStockPainter(icon),
+            contentDescription = title,
+            colorFilter = stockIconColorFilter(iconTint ?: colors.tertiary),
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(title, color = colors.tertiary, fontSize = 12.sp)
+        Spacer(Modifier.weight(1f))
+        Text(
+            value,
+            color = colors.primary,
+            fontSize = (20 * jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current.settingsTab.infoValueScale).sp,
+            fontWeight = FontWeight.Medium,
+            style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle(),
+        )
     }
 }

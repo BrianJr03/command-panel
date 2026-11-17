@@ -23,22 +23,22 @@ class OverlayLayoutTest {
 
     @Test
     fun `swap same-span settings cards`() {
-        val tf = default.applyDrop(OverlayCardId.TEMP, card(OverlayCardId.FAN))
-        assertEquals(GridCell(2, 1), tf.settingsCells[OverlayCardId.TEMP])
-        assertEquals(GridCell(2, 0), tf.settingsCells[OverlayCardId.FAN])
-
         val fq = default.applyDrop(OverlayCardId.FRAME_RATE, card(OverlayCardId.QUICK_TILES))
         assertEquals(GridCell(0, 1), fq.settingsCells[OverlayCardId.FRAME_RATE])
         assertEquals(GridCell(0, 0), fq.settingsCells[OverlayCardId.QUICK_TILES])
-        assertEquals(default.settingsCells[OverlayCardId.RINGS], fq.settingsCells[OverlayCardId.RINGS]) // untouched
+
+        val tr = default.applyDrop(OverlayCardId.TEMP, card(OverlayCardId.RINGS))
+        assertEquals(GridCell(1, 1), tr.settingsCells[OverlayCardId.TEMP])
+        assertEquals(GridCell(1, 0), tr.settingsCells[OverlayCardId.RINGS])
+        assertEquals(GridCell(0, 0), tr.settingsCells[OverlayCardId.FRAME_RATE]) // untouched
     }
 
     @Test
     fun `move HALF to an empty cell leaves a gap`() {
         val r = default.applyDrop(OverlayCardId.TEMP, empty(OverlayCardGroup.SETTINGS_TAB, 3, 0))
         assertEquals(GridCell(3, 0), r.settingsCells[OverlayCardId.TEMP])
-        assertFalse(r.settingsCells.values.contains(GridCell(2, 0))) // old slot is now an empty gap
-        assertEquals(GridCell(2, 1), r.settingsCells[OverlayCardId.FAN]) // partner stays put
+        assertFalse(r.settingsCells.values.contains(GridCell(1, 0))) // old slot is now a gap
+        assertEquals(GridCell(1, 1), r.settingsCells[OverlayCardId.RINGS]) // partner stays put
         assertTrue(OverlayLayout.isValid(OverlayCardGroup.SETTINGS_TAB, r.settingsCells))
     }
 
@@ -48,20 +48,14 @@ class OverlayLayoutTest {
         assertEquals(GridCell(1, 0), r.modeCells[OverlayCardId.MODE_BUTTONS])
         assertEquals(GridCell(0, 0), r.modeCells[OverlayCardId.BRIGHTNESS])
         assertEquals(GridCell(0, 1), r.modeCells[OverlayCardId.VOLUME])
-
-        val s = default.applyDrop(OverlayCardId.RINGS, card(OverlayCardId.TEMP))
-        assertEquals(GridCell(2, 0), s.settingsCells[OverlayCardId.RINGS])
-        assertEquals(GridCell(1, 0), s.settingsCells[OverlayCardId.TEMP])
-        assertEquals(GridCell(1, 1), s.settingsCells[OverlayCardId.FAN])
-        assertEquals(GridCell(0, 0), s.settingsCells[OverlayCardId.FRAME_RATE]) // other row untouched
     }
 
     @Test
     fun `move FULL to a free row works, onto an occupied row is a no-op`() {
-        val moved = default.applyDrop(OverlayCardId.RINGS, empty(OverlayCardGroup.SETTINGS_TAB, 5, 0))
-        assertEquals(GridCell(5, 0), moved.settingsCells[OverlayCardId.RINGS])
+        val moved = default.applyDrop(OverlayCardId.MODE_BUTTONS, empty(OverlayCardGroup.MODE_TAB, 5, 0))
+        assertEquals(GridCell(5, 0), moved.modeCells[OverlayCardId.MODE_BUTTONS])
 
-        assertSame(default, default.applyDrop(OverlayCardId.RINGS, empty(OverlayCardGroup.SETTINGS_TAB, 0, 0)))
+        assertSame(default, default.applyDrop(OverlayCardId.MODE_BUTTONS, empty(OverlayCardGroup.MODE_TAB, 1, 0)))
     }
 
     @Test
@@ -75,9 +69,10 @@ class OverlayLayoutTest {
     @Test
     fun `layout stays valid after a sequence of drops`() {
         val r = default
-            .applyDrop(OverlayCardId.TEMP, card(OverlayCardId.FAN))
-            .applyDrop(OverlayCardId.RINGS, card(OverlayCardId.FRAME_RATE))
+            .applyDrop(OverlayCardId.TEMP, card(OverlayCardId.RINGS))
+            .applyDrop(OverlayCardId.FRAME_RATE, card(OverlayCardId.QUICK_TILES))
             .applyDrop(OverlayCardId.BRIGHTNESS, card(OverlayCardId.VOLUME))
+            .applyDrop(OverlayCardId.MODE_BUTTONS, card(OverlayCardId.BRIGHTNESS))
         assertTrue(OverlayLayout.isValid(OverlayCardGroup.MODE_TAB, r.modeCells))
         assertTrue(OverlayLayout.isValid(OverlayCardGroup.SETTINGS_TAB, r.settingsCells))
     }
@@ -123,23 +118,22 @@ class OverlayLayoutTest {
 
     @Test
     fun `decode rejects overlapping cells and misplaced FULL cards`() {
-        val duplicate = "v=2;settings=frame_rate:0:0,quick_tiles:0:0,rings:1:0,temp:2:0,fan:2:1"
+        val duplicate = "v=2;settings=frame_rate:0:0,quick_tiles:0:0,temp:1:0,rings:1:1"
         assertEquals(OverlayLayout.DEFAULT_SETTINGS_CELLS, OverlayLayout.decode(duplicate).settingsCells)
 
-        val fullAtCol1 = "v=2;settings=frame_rate:0:0,quick_tiles:0:1,rings:1:1,temp:2:0,fan:2:1"
-        assertEquals(OverlayLayout.DEFAULT_SETTINGS_CELLS, OverlayLayout.decode(fullAtCol1).settingsCells)
+        // MODE_BUTTONS is FULL, so it must sit at col 0 — col 1 is invalid and reverts the mode tab.
+        val fullAtCol1 = "v=2;mode=mode_buttons:0:1,brightness:1:0,volume:1:1"
+        assertEquals(OverlayLayout.DEFAULT_MODE_CELLS, OverlayLayout.decode(fullAtCol1).modeCells)
     }
 
     @Test
     fun `isValid rejects a FULL card sharing its row`() {
         val bad = mapOf(
-            OverlayCardId.FRAME_RATE to GridCell(0, 0),
-            OverlayCardId.QUICK_TILES to GridCell(0, 1),
-            OverlayCardId.RINGS to GridCell(0, 0), // shares row 0 with the halves (also duplicate cell)
-            OverlayCardId.TEMP to GridCell(2, 0),
-            OverlayCardId.FAN to GridCell(2, 1),
+            OverlayCardId.MODE_BUTTONS to GridCell(0, 0), // FULL
+            OverlayCardId.BRIGHTNESS to GridCell(0, 1),   // shares row 0 with the FULL card
+            OverlayCardId.VOLUME to GridCell(1, 0),
         )
-        assertFalse(OverlayLayout.isValid(OverlayCardGroup.SETTINGS_TAB, bad))
+        assertFalse(OverlayLayout.isValid(OverlayCardGroup.MODE_TAB, bad))
         assertNull(default.cells(OverlayCardGroup.NAV_BAR)[OverlayCardId.NAV_BAR])
     }
 }

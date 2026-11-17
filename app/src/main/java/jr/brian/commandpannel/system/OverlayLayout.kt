@@ -20,11 +20,10 @@ enum class OverlayCardId(
     MODE_BUTTONS("mode_buttons", OverlayCardGroup.MODE_TAB, CardSpan.FULL, 0.46f),
     BRIGHTNESS("brightness", OverlayCardGroup.MODE_TAB, CardSpan.HALF, 0.54f),
     VOLUME("volume", OverlayCardGroup.MODE_TAB, CardSpan.HALF, 0.54f),
-    FRAME_RATE("frame_rate", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.50f),
-    QUICK_TILES("quick_tiles", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.50f),
-    TEMP("temp", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.26f),
-    FAN("fan", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.26f),
-    RINGS("rings", OverlayCardGroup.SETTINGS_TAB, CardSpan.FULL, 0.24f),
+    FRAME_RATE("frame_rate", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.38f),
+    QUICK_TILES("quick_tiles", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.70f),
+    TEMP("temp", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.30f),
+    RINGS("rings", OverlayCardGroup.SETTINGS_TAB, CardSpan.HALF, 0.30f),
     NAV_BAR("nav_bar", OverlayCardGroup.NAV_BAR);
 
     companion object {
@@ -147,9 +146,8 @@ data class OverlayLayout(
         val DEFAULT_SETTINGS_CELLS = mapOf(
             OverlayCardId.FRAME_RATE to GridCell(0, 0),
             OverlayCardId.QUICK_TILES to GridCell(0, 1),
-            OverlayCardId.RINGS to GridCell(1, 0),
-            OverlayCardId.TEMP to GridCell(2, 0),
-            OverlayCardId.FAN to GridCell(2, 1),
+            OverlayCardId.TEMP to GridCell(1, 0),
+            OverlayCardId.RINGS to GridCell(1, 1),
         )
         val DEFAULT = OverlayLayout()
 
