@@ -71,10 +71,18 @@ mapping service or an accessibility key hook (as Brian's Mjolnir does for HOME).
 **Coexistence note:** the stock overlay (type 2021) renders above ours (2038) when both are up — stock suppression
 (phase 5) is what resolves this.
 
-### 3. Stock UI 1:1
-Status bar, Mode tab, Settings tab, nav bar, dialogs, both stock palettes (Light / Pure Black, `tcc_theme_mode`),
-sizes derived from display height exactly as stock (`0.065h`, `0.135h`, 1.148 aspect clamp). Built as addressable
-cards so Arrange mode (fork feature 3) drops in later. Check each screen against `device/shots/`.
+### 3. Stock UI 1:1 — done 2026-11-16
+Overlay rebuilt in Compose from the stock layout: `TccColors` (Light + Pure Black palettes verbatim from the
+decompiled themes, `LocalTccColors`), `StockIcon` resolver (dark uses the `_black` variants), `OverlayRoot`
+(status bar / active tab / nav bar), `StatusBar`, `ModeTab` (screen-mode buttons, brightness + volume cards),
+`SettingsTab` (frame-rate pill + FPS, 2×4 quick tiles with page dots, TEMP/FAN cards, CPU/GPU/PWR/RAM rings),
+`NavBar` (Mode/Task/Settings), and reusable `TccCard`, `TccIconButton`, `RingGauge`, `TccSliderRow`, `BatteryIcon`.
+Driven by `OverlayUiState` sample values that match the stock screenshots (phase 4 feeds it live state). Wired into
+`AssistantService`'s `OverlayHost` in place of the placeholder.
+Verified on the Thor: both tabs render as a faithful match of `device/shots/` (status bar, frame-rate pill, the ten
+stock tiles with the active purple glow, ring colours, TEMP/FAN, mode buttons with the dual-screen highlight,
+brightness/volume sliders, nav labels). 3 new unit tests. Frame-rate pill is drawn in Compose (its stock drawable is
+a gradient shape, not a vector). Dialogs, pager swipe, theme switching and live data are phase 4.
 
 ### 4. Stock features
 - Screen modes 0/1/2: cover windows, touch disable, focus-lock + system-key-lock + pin-mode save/restore, tip dialog

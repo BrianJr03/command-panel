@@ -15,8 +15,8 @@ import android.os.IBinder
 import android.util.Log
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.overlay.OverlayHost
-import jr.brian.commandpannel.overlay.OverlayPlaceholder
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.privileged.RootHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +63,7 @@ class AssistantService : Service() {
     override fun onCreate() {
         super.onCreate()
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-        overlay = OverlayHost(this) { dismiss -> OverlayPlaceholder(dismiss) }
+        overlay = OverlayHost(this) { _ -> OverlayRoot() }
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
             isBottomBlanked = { false }, // real blanking arrives in phase 4
