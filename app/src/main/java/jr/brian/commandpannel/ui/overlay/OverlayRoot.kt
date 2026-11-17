@@ -1,7 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,36 +14,41 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.TccColors
 import jr.brian.commandpannel.ui.theme.TccTheme
 
 /**
- * Root of the bottom-screen overlay (`TccView` / `main_layout`): a vertical stack of the status bar, the active tab,
- * and the nav bar over the theme's primary background. Phase 3 renders the stock layout from sample [OverlayUiState];
- * phase 4 feeds it live state and wires the controls.
+ * Root of the bottom-screen overlay. Picks the palette from `tcc_theme_mode` (1 = follow system night, 3 = light,
+ * else pure black), then stacks the status bar, the active tab, and the nav bar over the theme background.
  */
 @Composable
 fun OverlayRoot(
     state: OverlayUiState = OverlayUiState(),
-    colors: TccColors = TccColors.PureBlack,
+    actions: OverlayActions = OverlayActions.None,
     initialTab: OverlayTab = OverlayTab.SETTINGS,
 ) {
+    val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+        Configuration.UI_MODE_NIGHT_YES
+    val colors = when (state.themeMode) {
+        3 -> TccColors.Light
+        1 -> if (nightActive) TccColors.PureBlack else TccColors.Light
+        else -> TccColors.PureBlack
+    }
     TccTheme(colors) {
         val bg = LocalTccColors.current.primaryBackground
         var tab by remember { mutableStateOf(initialTab) }
-        Column(
-            modifier = Modifier.fillMaxSize().background(bg),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().background(bg)) {
             Spacer(Modifier.height(15.dp))
             StatusBar(state)
             Column(
                 modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
             ) {
                 when (tab) {
-                    OverlayTab.MODE -> ModeTab(state, Modifier.fillMaxSize())
-                    OverlayTab.SETTINGS -> SettingsTab(state, Modifier.fillMaxSize())
+                    OverlayTab.MODE -> ModeTab(state, actions, Modifier.fillMaxSize())
+                    OverlayTab.SETTINGS -> SettingsTab(state, actions, Modifier.fillMaxSize())
                 }
             }
             NavBar(

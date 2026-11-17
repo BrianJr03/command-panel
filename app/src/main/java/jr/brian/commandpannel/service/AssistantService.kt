@@ -14,8 +14,11 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import jr.brian.commandpannel.R
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.privileged.RootHelper
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +46,7 @@ class AssistantService : Service() {
     private lateinit var overlay: OverlayHost
     private lateinit var keyguard: KeyguardManager
     private lateinit var machine: AynButtonMachine
+    private lateinit var repository: SettingsRepository
 
     private val aynReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -63,7 +67,11 @@ class AssistantService : Service() {
     override fun onCreate() {
         super.onCreate()
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-        overlay = OverlayHost(this) { _ -> OverlayRoot() }
+        repository = SettingsRepository(applicationContext, privileged)
+        overlay = OverlayHost(this) { _ ->
+            val state by repository.uiState.collectAsState()
+            OverlayRoot(state = state, actions = repository)
+        }
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
             isBottomBlanked = { false }, // real blanking arrives in phase 4
@@ -75,7 +83,10 @@ class AssistantService : Service() {
 
         startAsForeground()
         registerAynReceiver()
-        scope.launch { privileged.initialize(applicationContext) }
+        scope.launch {
+            privileged.initialize(applicationContext)
+            repository.start(scope)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -89,6 +100,7 @@ class AssistantService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(aynReceiver) }
+        repository.stop()
         overlay.destroy()
         scope.cancel()
         super.onDestroy()

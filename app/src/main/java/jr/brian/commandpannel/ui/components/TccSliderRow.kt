@@ -1,6 +1,8 @@
 package jr.brian.commandpannel.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -12,9 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +35,7 @@ fun TccSliderRow(
     iconBase: String,
     modifier: Modifier = Modifier,
     dimmed: Boolean = false,
+    onChange: (fraction: Float, committed: Boolean) -> Unit = { _, _ -> },
 ) {
     val colors = LocalTccColors.current
     Row(
@@ -48,7 +51,26 @@ fun TccSliderRow(
             maxLines = 2,
             modifier = Modifier.width(44.dp),
         )
-        Box(modifier = Modifier.weight(1f).height(40.dp)) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(40.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        onChange((offset.x / size.width).coerceIn(0f, 1f), true)
+                    }
+                }
+                .pointerInput(Unit) {
+                    var last = fraction
+                    detectDragGestures(
+                        onDrag = { change, _ ->
+                            last = (change.position.x / size.width).coerceIn(0f, 1f)
+                            onChange(last, false)
+                        },
+                        onDragEnd = { onChange(last, true) },
+                    )
+                },
+        ) {
             val fillAlpha = if (dimmed) 0.38f else 1f
             Canvas(Modifier.fillMaxWidth().height(40.dp)) {
                 val r = CornerRadius(15.dp.toPx())

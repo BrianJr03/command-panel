@@ -1,6 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,18 +41,18 @@ import jr.brian.commandpannel.ui.theme.TempColors
  * telemetry row across the bottom 30%.
  */
 @Composable
-fun SettingsTab(state: OverlayUiState, modifier: Modifier = Modifier) {
+fun SettingsTab(state: OverlayUiState, actions: OverlayActions, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().weight(0.70f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FrameRatePanel(state, Modifier.weight(0.40f).fillMaxHeight())
-            QuickTilesPanel(state, Modifier.weight(0.60f).fillMaxHeight())
+            FrameRatePanel(state, actions, Modifier.weight(0.40f).fillMaxHeight())
+            QuickTilesPanel(state, actions, Modifier.weight(0.60f).fillMaxHeight())
         }
         HardwareRow(state, Modifier.fillMaxWidth().weight(0.30f))
     }
 }
 
 @Composable
-private fun FrameRatePanel(state: OverlayUiState, modifier: Modifier) {
+private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     val colors = LocalTccColors.current
     TccCard(modifier) {
         Column(
@@ -59,7 +60,9 @@ private fun FrameRatePanel(state: OverlayUiState, modifier: Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            FrameRatePill(state.is120Hz)
+            androidx.compose.foundation.layout.Box(
+                Modifier.clickable { actions.toggleRefreshRate() },
+            ) { FrameRatePill(state.is120Hz) }
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("${state.fps}", color = colors.primary, fontSize = 64.sp, fontWeight = FontWeight.Bold)
                 Text(" FPS", color = colors.primary, fontSize = 20.sp, modifier = Modifier.padding(bottom = 10.dp))
@@ -98,7 +101,7 @@ private fun FrameRatePill(is120: Boolean) {
 }
 
 @Composable
-private fun QuickTilesPanel(state: OverlayUiState, modifier: Modifier) {
+private fun QuickTilesPanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
     val colors = LocalTccColors.current
     val page = state.tiles.take(8)
     TccCard(modifier) {
@@ -117,6 +120,7 @@ private fun QuickTilesPanel(state: OverlayUiState, modifier: Modifier) {
                         active = tile.active,
                         labelSize = 12.sp,
                         iconInset = 16.dp,
+                        onClick = { actions.onTileClick(tile.id) },
                     )
                 }
             }
@@ -158,10 +162,10 @@ private fun HardwareRow(state: OverlayUiState, modifier: Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RingGauge(0.58f, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(0.70f, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(0.30f, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
-                RingGauge(0.62f, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
+                RingGauge(state.cpuFraction, RingColors.Cpu, "CPU", "%.2f".format(state.cpuGhz), "GHz", Modifier.weight(1f).fillMaxHeight())
+                RingGauge(state.gpuFraction, RingColors.Gpu, "GPU", "${state.gpuMhz}", "MHz", Modifier.weight(1f).fillMaxHeight())
+                RingGauge(state.powerFraction, RingColors.Pwr, "PWR", "%.2f".format(state.powerW), "W", Modifier.weight(1f).fillMaxHeight())
+                RingGauge(state.ramFraction, RingColors.Ram, "RAM", "%.2f".format(state.ramGb), "GB", Modifier.weight(1f).fillMaxHeight())
             }
         }
     }

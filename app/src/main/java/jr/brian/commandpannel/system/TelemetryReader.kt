@@ -1,0 +1,56 @@
+package jr.brian.commandpannel.system
+
+/**
+ * Pure parsing/formatting for the hardware telemetry the stock Settings tab shows, split out so it is unit-tested
+ * without a device. Raw unit → display rules come straight from the teardown (NOTES.md §6).
+ */
+object TelemetryReader {
+
+    /** Thermal zone millidegrees → °C; stock divides by 1000 when the raw value is out of the −30..250 range. */
+    fun parseTempC(raw: String): Int? {
+        val v = raw.trim().toDoubleOrNull() ?: return null
+        val c = if (v in -30.0..250.0) v else v / 1000.0
+        return c.toInt()
+    }
+
+    /** CPU `cpuinfo_cur_freq` is kHz; prime-core clock shown in GHz. */
+    fun kHzToGhz(raw: String): Float? = raw.trim().toLongOrNull()?.let { it / 1_000_000f }
+
+    /** GPU `cur_freq` is Hz; shown in MHz. */
+    fun hzToMhz(raw: String): Int? = raw.trim().toLongOrNull()?.let { (it / 1_000_000L).toInt() }
+
+    fun fraction(cur: String, max: String): Float? {
+        val c = cur.trim().toDoubleOrNull() ?: return null
+        val m = max.trim().toDoubleOrNull() ?: return null
+        if (m <= 0.0) return null
+        return (c / m).toFloat().coerceIn(0f, 1f)
+    }
+
+    /** Net battery/system power in watts: current(µA) × voltage(µV), each scaled to base units. */
+    fun powerWatts(currentNowUa: String, voltageNowUv: String): Float? {
+        val i = currentNowUa.trim().toDoubleOrNull() ?: return null
+        val v = voltageNowUv.trim().toDoubleOrNull() ?: return null
+        return ((i / 1_000_000.0) * (v / 1_000_000.0)).toFloat()
+    }
+
+    /** Power ring fraction over the stock bidirectional −20..25 W scale. */
+    fun powerFraction(watts: Float): Float = ((watts - (-20f)) / (25f - (-20f))).coerceIn(0f, 1f)
+
+    /** Frame counter out of `service call SurfaceFlinger 1013` output, e.g. "Result: Parcel(00024f0e …)". */
+    fun parseSurfaceFlingerFrames(output: String): Long? {
+        val idx = output.indexOf("Parcel(")
+        if (idx < 0) return null
+        val hex = output.substring(idx + 7)
+            .takeWhile { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+            .take(8)
+        // A valid frame-counter parcel is exactly 8 hex chars; "Parcel(Error: …)" is not one.
+        return if (hex.length == 8) hex.toLongOrNull(16) else null
+    }
+
+    /** FPS from two frame-counter samples; capped at the panel's refresh rate. */
+    fun fps(deltaFrames: Long, deltaMs: Long, cap: Int): Int {
+        if (deltaMs <= 0 || deltaFrames < 0) return 0
+        val raw = Math.ceil(deltaFrames * 1000.0 / deltaMs).toInt()
+        return raw.coerceIn(0, cap)
+    }
+}

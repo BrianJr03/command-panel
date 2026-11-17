@@ -27,10 +27,15 @@ data class OverlayUiState(
     val tempC: Int = 60,
     val fanPercent: Int = 24,
     val cpuGhz: Float = 1.84f,
+    val cpuFraction: Float = 0.58f,
     val gpuMhz: Int = 401,
+    val gpuFraction: Float = 0.70f,
     val powerW: Float = -4.0f,
+    val powerFraction: Float = 0.30f,
     val ramGb: Float = 7.0f,
+    val ramFraction: Float = 0.62f,
 
+    val themeMode: Int = 4,          // tcc_theme_mode: 1 system, 3 light, 4 dark
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
 )

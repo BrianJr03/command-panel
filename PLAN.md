@@ -84,15 +84,29 @@ stock tiles with the active purple glow, ring colours, TEMP/FAN, mode buttons wi
 brightness/volume sliders, nav labels). 3 new unit tests. Frame-rate pill is drawn in Compose (its stock drawable is
 a gradient shape, not a vector). Dialogs, pager swipe, theme switching and live data are phase 4.
 
-### 4. Stock features
-- Screen modes 0/1/2: cover windows, touch disable, focus-lock + system-key-lock + pin-mode save/restore, tip dialog
-  before "top only", keyguard handling, crash/exit recovery.
-- Brightness sliders (temporary while dragging, commit on release, per display), dual slider.
-- Volume: top `STREAM_MUSIC`, bottom `secondary_screen_volume_level`, volume-key overflow rule.
-- 60/120 Hz toggle, FPS counter.
-- Hardware row: temp (colour thresholds), fan, CPU/GPU/PWR/RAM rings.
-- 10 quick tiles + option dialogs (performance-dependent fan options, focus tile only in dual mode).
-- Clean Memory (tile and clock tap).
+### 4. Stock features — in progress (data layer + core controls done 2026-11-16)
+
+Done and verified on the Thor:
+- `SystemSettings` (typed vendor-key access: reads via resolver, writes via root shell), `FanProvider` binder,
+  `TelemetryReader` (pure, tested) + `TelemetryMonitor` (1.5 s poll of sysfs temp/cpu/gpu/power, RAM, fan, and
+  SurfaceFlinger FPS via root), and `SettingsRepository` (reactive `StateFlow<OverlayUiState>` over settings
+  observers + telemetry + battery + clock + audio + net/wifi/bt; implements `OverlayActions`).
+- Overlay now shows **live** data: clock, net speed, battery + charging, FPS, TEMP/FAN, CPU/GPU/PWR/RAM rings, and
+  tile titles/active states derived from the real settings (e.g. "Smart Mode", "Top screen").
+- Working controls: screen-mode select (writes `dual_screen_display_mode`), brightness sliders (temporary while
+  dragging via the helper, commit on release, per display + dual), volume sliders (top `STREAM_MUSIC`, bottom
+  `secondary_screen_volume_level`), 60/120 Hz toggle (writes `min`/`peak_refresh_rate`), instant-toggle tiles
+  (vibration, charging separation, force landscape). Verified: pill 60↔120 and vibration 1↔0 write through and the
+  UI reacts.
+
+Remaining (next sub-step):
+- Modal option dialogs for Focus / Performance / Fan (perf-dependent options + custom speed) / Controller / Theme,
+  and the Ambient LED broadcast toggle.
+- Screen-mode blanking: bottom/top cover windows, `sys.temp.disabled.touch`, focus-lock + system-key-lock + pin-mode
+  save/restore, the "Only top screen" tip dialog, keyguard handling, crash/exit recovery (top cover needs the
+  helper's type-2021 window).
+- Quick-tile pager swipe (page 2), Clean Memory full exclusion logic (currently a blunt root kill), volume-key
+  overflow rule, theme switching applied live.
 
 ### 5. Stock coexistence (opt-in)
 "Replace stock assistant" setting. Suppression sequence, 5000 ms `SCREEN_OFF` unfreeze (fork feature 14), restore

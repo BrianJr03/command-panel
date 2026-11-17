@@ -1,0 +1,114 @@
+package jr.brian.commandpannel.system
+
+import android.app.ActivityManager
+import android.content.Context
+import jr.brian.commandpannel.privileged.PrivilegedAccess
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.io.File
+
+/** Live hardware readings for the Settings tab. */
+data class Telemetry(
+    val tempC: Int = 0,
+    val fanPercent: Int = 0,
+    val cpuGhz: Float = 0f,
+    val cpuFraction: Float = 0f,
+    val gpuMhz: Int = 0,
+    val gpuFraction: Float = 0f,
+    val powerW: Float = 0f,
+    val powerFraction: Float = 0.5f,
+    val ramGb: Float = 0f,
+    val ramFraction: Float = 0f,
+    val fps: Int = 0,
+)
+
+/**
+ * Polls the stock telemetry sources every [intervalMs] while started: sysfs nodes read directly (the probe showed
+ * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS via the root
+ * shell (`service call SurfaceFlinger 1013`, which the app's uid is refused but root allows).
+ */
+class TelemetryMonitor(
+    private val context: Context,
+    private val privileged: PrivilegedAccess,
+    private val refreshRateCap: () -> Int,
+    private val intervalMs: Long = 1500L,
+) {
+    private companion object {
+        const val TEMP = "/sys/devices/virtual/thermal/thermal_zone48/temp"
+        const val CPU_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq"
+        const val CPU_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq"
+        const val GPU_CUR = "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"
+        const val GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"
+        const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
+        const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
+    }
+
+    private val _state = MutableStateFlow(Telemetry())
+    val state: StateFlow<Telemetry> = _state.asStateFlow()
+
+    private var job: Job? = null
+    private var lastFrames: Long? = null
+    private var lastFrameTime: Long = 0L
+
+    fun start(scope: CoroutineScope) {
+        if (job?.isActive == true) return
+        job = scope.launch {
+            while (isActive) {
+                _state.value = sample()
+                delay(intervalMs)
+            }
+        }
+    }
+
+    fun stop() {
+        job?.cancel(); job = null
+    }
+
+    private fun read(path: String): String = runCatching { File(path).readText() }.getOrDefault("")
+
+    private fun sample(): Telemetry {
+        val tempC = TelemetryReader.parseTempC(read(TEMP)) ?: 0
+        val cpuGhz = TelemetryReader.kHzToGhz(read(CPU_CUR)) ?: 0f
+        val cpuFrac = TelemetryReader.fraction(read(CPU_CUR), read(CPU_MAX)) ?: 0f
+        val gpuMhz = TelemetryReader.hzToMhz(read(GPU_CUR)) ?: 0
+        val gpuFrac = TelemetryReader.fraction(read(GPU_CUR), read(GPU_MAX)) ?: 0f
+        val watts = TelemetryReader.powerWatts(read(CURRENT_NOW), read(VOLTAGE_NOW)) ?: 0f
+
+        val mem = ActivityManager.MemoryInfo()
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(mem)
+        val usedBytes = (mem.totalMem - mem.availMem).toFloat()
+        val ramGb = usedBytes / 1_000_000_000f
+        val ramFrac = (usedBytes / mem.totalMem.toFloat()).coerceIn(0f, 1f)
+
+        val fan = FanProvider.dutyPercent() ?: _state.value.fanPercent
+        val fps = sampleFps()
+
+        return Telemetry(
+            tempC = tempC,
+            fanPercent = fan,
+            cpuGhz = cpuGhz, cpuFraction = cpuFrac,
+            gpuMhz = gpuMhz, gpuFraction = gpuFrac,
+            powerW = watts, powerFraction = TelemetryReader.powerFraction(watts),
+            ramGb = ramGb, ramFraction = ramFrac,
+            fps = fps,
+        )
+    }
+
+    private fun sampleFps(): Int {
+        val out = privileged.shell("service call SurfaceFlinger 1013") ?: return _state.value.fps
+        val frames = TelemetryReader.parseSurfaceFlingerFrames(out) ?: return _state.value.fps
+        val now = System.nanoTime() / 1_000_000L
+        val prev = lastFrames
+        val prevTime = lastFrameTime
+        lastFrames = frames
+        lastFrameTime = now
+        if (prev == null) return _state.value.fps
+        return TelemetryReader.fps(frames - prev, now - prevTime, refreshRateCap())
+    }
+}
