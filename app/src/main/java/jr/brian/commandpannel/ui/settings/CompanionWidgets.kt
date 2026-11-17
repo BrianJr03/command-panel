@@ -475,3 +475,29 @@ internal fun Modifier.bringIntoViewOnFocus(): Modifier {
         .bringIntoViewRequester(requester)
         .onFocusChanged { if (it.hasFocus) scope.launch { requester.bringIntoView() } }
 }
+
+/**
+ * Lets the D-pad reach the ends of a scrolling pane. Up / Down move focus as usual; when there's nothing further in
+ * that direction (the move fails), the pane scrolls to its very top / bottom instead of doing nothing, so headings and
+ * other non-focusable content above the first control (or below the last) still come into view. Other keys and
+ * Left / Right are untouched.
+ */
+@Composable
+internal fun Modifier.scrollToEdgesWhenFocusLeaves(scroll: androidx.compose.foundation.ScrollState): Modifier {
+    val scope = rememberCoroutineScope()
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    // onKeyEvent (not preview) runs after the focused control had its chance, so controls that use the D-pad
+    // themselves (reorder lists, text fields while editing) keep working.
+    return onKeyEvent { e ->
+        val direction = when (e.key) {
+            Key.DirectionUp -> androidx.compose.ui.focus.FocusDirection.Up
+            Key.DirectionDown -> androidx.compose.ui.focus.FocusDirection.Down
+            else -> return@onKeyEvent false
+        }
+        if (e.type == KeyEventType.KeyDown && !focusManager.moveFocus(direction)) {
+            scope.launch { scroll.animateScrollTo(if (direction == androidx.compose.ui.focus.FocusDirection.Up) 0 else scroll.maxValue) }
+        }
+        // Handled here (moved or scrolled), so the default navigation doesn't move focus a second time.
+        true
+    }
+}

@@ -161,6 +161,9 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight()
                 .onGloballyPositioned { viewport.value = it.boundsInRoot() }
+                // Up past the first control scrolls to the top (section title, the active look, …); Down past the
+                // last scrolls to the end.
+                .scrollToEdgesWhenFocusLeaves(scroll)
                 .verticalScroll(scroll)
                 .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
