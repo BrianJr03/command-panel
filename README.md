@@ -2,7 +2,7 @@
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Command Panel</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
-  <p>The bottom-screen control panel — screen modes, brightness, volume, quick toggles and live hardware telemetry — rebuilt as a normal app you can install yourself, then pushed well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
+  <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick toggles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
 </div>
 
 ---
