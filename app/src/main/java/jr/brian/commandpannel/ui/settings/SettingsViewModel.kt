@@ -146,14 +146,10 @@ class SettingsViewModel @Inject constructor(
     fun toggleQuarters() = updateLayout { it.copy(settingsQuarterOrder = it.settingsQuarterOrder.reversed()) }
     fun resetLayout() = updateLayout { jr.brian.commandpannel.system.OverlayLayout.DEFAULT }
 
+    /** Toggles the inverted sync: when on, the Thor ambient-LED colour becomes the overlay accent. */
     fun setRgbAccentSync(enable: Boolean) {
         prefs.edit().putBoolean("rgb_accent_sync", enable).apply()
-        val pct = (settings.getFloat(SystemSettings.Keys.LED_BRIGHTNESS, 0.5f).coerceIn(0f, 1f) * 100).toInt()
-        if (enable) {
-            ThorRgbController.applyAccent(ThorRgbController.accentForThemeMode(_state.value.themeMode), pct)
-        } else {
-            ThorRgbController.applySnapshot(ThorRgbController.readSystemSnapshot(app))
-        }
+        // The overlay repository reads the LED colour on the next refresh (its pref listener fires here).
         _state.value = _state.value.copy(rgbAccentSync = enable)
     }
 

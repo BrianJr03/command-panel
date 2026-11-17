@@ -496,8 +496,9 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         }
     }
     SwitchCard(
-        "Sync Stick LEDs to Theme",
-        "Mirror the overlay theme's accent colour onto the AYN Thor's joystick LEDs.",
+        "Accent from Ambient LED",
+        "Use the colour you set for the Thor's Ambient LED as the overlay's accent — so the overlay theme follows " +
+            "your joystick LED colour.",
         state.rgbAccentSync, vm::setRgbAccentSync,
     )
 }

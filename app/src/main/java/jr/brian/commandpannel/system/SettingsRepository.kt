@@ -58,6 +58,7 @@ class SettingsRepository(
         Keys.DISPLAY_MODE, Keys.FOCUS_LOCK, Keys.PERFORMANCE_MODE, Keys.FAN_MODE, Keys.CONTROLLER_STYLE,
         Keys.CHARGING_SEPARATION, Keys.VIBRATE_ON, Keys.FORCE_LANDSCAPE, Keys.JOYSTICK_LIGHT, Keys.THEME_MODE,
         Keys.SECONDARY_VOLUME, Keys.DUAL_BRIGHTNESS, Keys.PEAK_REFRESH, Keys.SCREEN_BRIGHTNESS,
+        jr.brian.commandpannel.privileged.ThorRgbController.PICKER_COLOR_KEY,
     )
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) = refreshFromSettings()
@@ -120,9 +121,9 @@ class SettingsRepository(
         val focus = settings.getInt(Keys.FOCUS_LOCK, 0)
         val peak = settings.getFloat(Keys.PEAK_REFRESH, 60f)
         val themeMode = settings.getInt(Keys.THEME_MODE, 4)
-        applyRgbIfEnabled(themeMode)
         _uiState.update {
             it.copy(
+                accentOverride = readAccentOverride(),
                 displayMode = mode,
                 focusLockTitle = focusTitle(focus),
                 focusLock = focus,
@@ -430,12 +431,15 @@ class SettingsRepository(
         settings.putInt(key, if (cur == 0) 1 else 0)
     }
 
-    /** Mirror the overlay theme accent onto the Thor's stick LEDs when the fork sync is enabled. */
-    private fun applyRgbIfEnabled(themeMode: Int) {
-        if (!prefs.getBoolean("rgb_accent_sync", false)) return
-        val pct = (settings.getFloat(Keys.LED_BRIGHTNESS, 0.5f).coerceIn(0f, 1f) * 100).toInt()
-        jr.brian.commandpannel.privileged.ThorRgbController.applyAccent(
-            jr.brian.commandpannel.privileged.ThorRgbController.accentForThemeMode(themeMode), pct
-        )
+    /**
+     * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED colour becomes the
+     * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
+     */
+    private fun readAccentOverride(): Int? {
+        if (!prefs.getBoolean("rgb_accent_sync", false)) return null
+        val snapshot = jr.brian.commandpannel.privileged.ThorRgbController.readSystemSnapshot(context)
+        val argb = snapshot.leftArgb
+        if (argb == 0) return null
+        return argb or 0xFF000000.toInt()
     }
 }
