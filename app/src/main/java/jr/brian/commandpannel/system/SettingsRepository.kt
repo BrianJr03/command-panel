@@ -410,6 +410,15 @@ class SettingsRepository(
         QuickLaunch.launch(context)
     }
 
+    override fun launchCompanion() {
+        runCatching {
+            context.startActivity(
+                Intent(context, jr.brian.commandpannel.MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            )
+        }
+    }
+
     private fun toggleIntKey(key: String, default: Int) {
         val cur = settings.getInt(key, default)
         settings.putInt(key, if (cur == 0) 1 else 0)

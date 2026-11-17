@@ -2,7 +2,7 @@ package jr.brian.commandpannel.ui.overlay
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +40,7 @@ fun BottomTipDialog(onConfirm: (dontShowAgain: Boolean) -> Unit, onDismiss: () -
     val colors = LocalTccColors.current
     var dontShow by remember { mutableStateOf(false) }
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xBB000000)).clickable(onClick = onDismiss),
+        modifier = Modifier.fillMaxSize().background(Color(0xBB000000)).noRippleClickable(onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -48,7 +48,7 @@ fun BottomTipDialog(onConfirm: (dontShowAgain: Boolean) -> Unit, onDismiss: () -
                 .widthIn(min = 300.dp, max = 400.dp)
                 .clip(RoundedCornerShape(15.dp))
                 .background(colors.dialogBg)
-                .clickable(enabled = false) {}
+                .noRippleClickable(enabled = false) {}
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -58,7 +58,7 @@ fun BottomTipDialog(onConfirm: (dontShowAgain: Boolean) -> Unit, onDismiss: () -
             Spacer(Modifier.size(16.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { dontShow = !dontShow },
+                modifier = Modifier.noRippleClickable { dontShow = !dontShow },
             ) {
                 Box(
                     modifier = Modifier
@@ -78,12 +78,12 @@ fun BottomTipDialog(onConfirm: (dontShowAgain: Boolean) -> Unit, onDismiss: () -
                 Text(
                     stringResource(android.R.string.cancel),
                     color = colors.secondary, fontSize = 16.sp,
-                    modifier = Modifier.clickable(onClick = onDismiss).padding(8.dp),
+                    modifier = Modifier.noRippleClickable(onClick = onDismiss).padding(8.dp),
                 )
                 Text(
                     stringResource(android.R.string.ok),
                     color = colors.accent, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onConfirm(dontShow) }.padding(8.dp),
+                    modifier = Modifier.noRippleClickable { onConfirm(dontShow) }.padding(8.dp),
                 )
             }
         }

@@ -27,6 +27,9 @@ interface OverlayActions {
     fun setSuppressBottomTip(suppress: Boolean)
     fun quickLaunch()
 
+    /** Opens the Command Panel companion settings app (on the top screen). */
+    fun launchCompanion()
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}
@@ -48,5 +51,6 @@ interface OverlayActions {
         override fun cleanMemory() {}
         override fun setSuppressBottomTip(suppress: Boolean) {}
         override fun quickLaunch() {}
+        override fun launchCompanion() {}
     }
 }

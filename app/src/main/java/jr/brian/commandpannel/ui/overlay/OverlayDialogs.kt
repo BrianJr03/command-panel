@@ -3,7 +3,7 @@ package jr.brian.commandpannel.ui.overlay
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +61,7 @@ fun OverlayDialogLayer(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xBB000000))
-            .clickable(onClick = onDismiss),
+            .noRippleClickable(onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
         val colors = LocalTccColors.current
@@ -70,7 +70,7 @@ fun OverlayDialogLayer(
                 .width(330.dp)
                 .clip(RoundedCornerShape(15.dp))
                 .background(colors.dialogBg)
-                .clickable(enabled = false) {}
+                .noRippleClickable(enabled = false) {}
                 .padding(vertical = 16.dp, horizontal = 20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
@@ -99,7 +99,7 @@ private fun OptionRow(option: DialogOption, selected: Boolean, onClick: () -> Un
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .noRippleClickable(onClick = onClick)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

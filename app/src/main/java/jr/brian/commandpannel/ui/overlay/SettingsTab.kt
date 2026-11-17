@@ -1,7 +1,7 @@
 package jr.brian.commandpannel.ui.overlay
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,7 +86,7 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             androidx.compose.foundation.layout.Box(
-                Modifier.clickable { actions.toggleRefreshRate() },
+                Modifier.noRippleClickable { actions.toggleRefreshRate() },
             ) { FrameRatePill(state.is120Hz) }
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("${state.fps}", color = colors.primary, fontSize = 46.sp, fontWeight = FontWeight.Bold)

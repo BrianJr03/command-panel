@@ -67,6 +67,7 @@ fun OverlayRoot(
                 onMode = { tab = OverlayTab.MODE },
                 onLaunch = { actions.quickLaunch() },
                 onSettings = { tab = OverlayTab.SETTINGS },
+                onApp = { actions.launchCompanion() },
             )
         }
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP

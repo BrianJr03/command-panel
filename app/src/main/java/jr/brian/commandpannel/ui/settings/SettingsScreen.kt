@@ -1,8 +1,11 @@
 package jr.brian.commandpannel.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import jr.brian.commandpannel.ui.components.noRippleClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +29,6 @@ import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewAgenda
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -35,6 +36,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,20 +45,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Companion settings screen on the top display. A modern two-pane console: an icon nav rail on the left and the
- * selected category's cards on the right. The companion chrome uses its own [Palette] (decoupled from the overlay
- * theme) so it always reads as a polished dark UI.
+ * Companion settings screen on the top display. A modern, fully gamepad-navigable two-pane console: an icon nav rail
+ * on the left (D-pad up/down moves between sections and auto-switches them) and the selected category's cards on the
+ * right (D-pad traverses the items, A activates). Focused items brighten and scale up. Uses its own [Palette],
+ * decoupled from the overlay theme, so it always reads as a polished dark UI.
  */
 
-/** Companion design tokens — a calm, modern dark palette with a vivid violet accent. */
 private object Palette {
     val Bg = Color(0xFF0D0E12)
     val Rail = Color(0xFF0A0B0E)
@@ -78,14 +90,31 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, "Check the privileged access layer"),
 }
 
+// ---- gamepad focus plumbing ----
+
+@Composable
+private fun focusState(): MutableState<Boolean> = remember { mutableStateOf(false) }
+
+/** Makes a node focusable, reports focus into [focused], and fires [onActivate] on A / center / enter. */
+private fun Modifier.focusControl(focused: MutableState<Boolean>, onActivate: () -> Unit): Modifier =
+    onFocusChanged { focused.value = it.isFocused }
+        .onKeyEvent { e ->
+            if (e.type == KeyEventType.KeyDown &&
+                (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter || e.key == Key.ButtonA)
+            ) { onActivate(); true } else false
+        }
+        .focusable()
+
 @Composable
 fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
     var nav by remember { mutableStateOf(NavItem.GENERAL) }
+    val scroll = rememberScrollState()
+    LaunchedEffect(nav) { scroll.scrollTo(0) }
     Row(Modifier.fillMaxSize().background(Palette.Bg).systemBarsPadding()) {
         NavRail(nav) { nav = it }
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
-                .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 40.dp),
+            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll)
+                .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(nav.category.title, color = Palette.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -103,6 +132,8 @@ fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
     Column(
         modifier = Modifier.width(248.dp).fillMaxHeight().background(Palette.Rail).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -115,23 +146,34 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Command Panel", color = Palette.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("AYN Thor companion", color = Palette.TextTertiary, fontSize = 11.sp)
+                Text("Settings", color = Palette.TextTertiary, fontSize = 11.sp)
             }
         }
         NavItem.entries.forEach { item ->
             val on = item == selected
+            val f = focusState()
+            val scale by animateFloatAsState(if (f.value) 1.04f else 1f, label = "navScale")
+            val bg by animateColorAsState(
+                when { f.value -> Palette.SurfaceHigh; on -> Palette.AccentSoft; else -> Color.Transparent },
+                label = "navBg",
+            )
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
-                    .background(if (on) Palette.AccentSoft else Color.Transparent)
-                    .clickable { onSelect(item) }
+                modifier = Modifier.fillMaxWidth()
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .clip(RoundedCornerShape(13.dp)).background(bg)
+                    .then(if (f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(13.dp)) else Modifier)
+                    .then(if (item == NavItem.GENERAL) Modifier.focusRequester(firstFocus) else Modifier)
+                    .onFocusChanged { if (it.isFocused) onSelect(item) }
+                    .focusControl(f) { onSelect(item) }
+                    .noRippleClickable { onSelect(item) }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(item.icon, null, tint = if (on) Palette.Accent else Palette.TextSecondary, modifier = Modifier.size(20.dp))
+                Icon(item.icon, null, tint = if (on || f.value) Palette.Accent else Palette.TextSecondary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(13.dp))
                 Text(
                     item.category.title,
-                    color = if (on) Palette.TextPrimary else Palette.TextSecondary,
+                    color = if (on || f.value) Palette.TextPrimary else Palette.TextSecondary,
                     fontSize = 15.sp,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                 )
@@ -140,8 +182,9 @@ private fun NavRail(selected: NavItem, onSelect: (NavItem) -> Unit) {
     }
 }
 
-// ---- shared modern building blocks ----
+// ---- shared building blocks ----
 
+/** A plain visual container (not a focus target); its rows are the focus targets. */
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     Column(
@@ -167,8 +210,28 @@ private fun CardTitle(text: String) = Text(text, color = Palette.TextPrimary, fo
 private fun CardDesc(text: String) = Text(text, color = Palette.TextSecondary, fontSize = 13.sp)
 
 @Composable
+private fun InfoLine(text: String, tone: Color = Palette.TextSecondary) = Text(text, color = tone, fontSize = 12.sp)
+
+/** A focusable surface that brightens + scales when focused and fires [onActivate] on A/center. */
+@Composable
+private fun FocusCard(onActivate: () -> Unit, content: @Composable () -> Unit) {
+    val f = focusState()
+    val scale by animateFloatAsState(if (f.value) 1.015f else 1f, label = "cardScale")
+    val bg by animateColorAsState(if (f.value) Palette.SurfaceHigh else Palette.Surface, label = "cardBg")
+    Column(
+        Modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .focusControl(f, onActivate)
+            .clip(RoundedCornerShape(18.dp)).background(bg)
+            .border(if (f.value) 2.dp else 1.dp, if (f.value) Palette.Accent else Palette.Border, RoundedCornerShape(18.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) { content() }
+}
+
+@Composable
 private fun SwitchCard(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Card {
+    FocusCard(onActivate = { onChange(!checked) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 CardTitle(title)
@@ -193,14 +256,35 @@ private fun AccentSwitch(checked: Boolean, onChange: (Boolean) -> Unit) = Switch
     ),
 )
 
+/** A focusable selectable row (brightens + scales when focused). */
+@Composable
+private fun FocusRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    val f = focusState()
+    val scale by animateFloatAsState(if (f.value) 1.015f else 1f, label = "rowScale")
+    val bg by animateColorAsState(
+        when { f.value -> Palette.SurfaceHigh; selected -> Palette.AccentSoft; else -> Color.Transparent },
+        label = "rowBg",
+    )
+    Row(
+        Modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(12.dp)).background(bg)
+            .then(if (f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(12.dp)) else Modifier)
+            .focusControl(f, onClick)
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
 @Composable
 private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
-            .background(if (selected) Palette.SurfaceHigh else Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    FocusRow(selected, onClick) {
         Text(label, color = if (selected) Palette.TextPrimary else Palette.TextSecondary, fontSize = 15.sp, modifier = Modifier.weight(1f))
         RadioButton(
             selected = selected,
@@ -210,40 +294,38 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** A focusable action button. */
 @Composable
-private fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) = Button(
-    onClick = onClick,
-    enabled = enabled,
-    colors = ButtonDefaults.buttonColors(
-        containerColor = Palette.Accent,
-        contentColor = Color.White,
-        disabledContainerColor = Palette.SurfaceHigh,
-        disabledContentColor = Palette.TextTertiary,
-    ),
-    shape = RoundedCornerShape(12.dp),
-) { Text(text, fontWeight = FontWeight.SemiBold) }
+private fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val f = focusState()
+    val scale by animateFloatAsState(if (f.value) 1.05f else 1f, label = "btnScale")
+    val bg = when { !enabled -> Palette.SurfaceHigh; f.value -> Color(0xFF9488FF); else -> Palette.Accent }
+    Box(
+        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(12.dp)).background(bg)
+            .then(if (f.value) Modifier.border(1.5.dp, Color.White, RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 20.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = if (enabled) Color.White else Palette.TextTertiary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+}
 
-/** Small pill used for discrete choices (replay window, reorder arrows). */
+/** A focusable compact pill (replay window, reorder arrows). */
 @Composable
 private fun Chip(text: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val bg = if (selected) Palette.AccentSoft else Palette.SurfaceHigh
-    val fg = when {
-        !enabled -> Palette.TextTertiary
-        selected -> Palette.Accent
-        else -> Palette.TextSecondary
-    }
+    val f = focusState()
+    val scale by animateFloatAsState(if (f.value) 1.08f else 1f, label = "chipScale")
+    val bg = when { !enabled -> Palette.Surface; f.value -> Palette.AccentSoft; selected -> Palette.AccentSoft; else -> Palette.SurfaceHigh }
+    val fg = when { !enabled -> Palette.TextTertiary; selected || f.value -> Palette.Accent; else -> Palette.TextSecondary }
     Box(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(bg)
-            .then(if (selected) Modifier.border(1.dp, Palette.Accent, RoundedCornerShape(10.dp)) else Modifier)
-            .clickable(enabled = enabled, onClick = onClick)
+        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(10.dp)).background(bg)
+            .then(if (selected || f.value) Modifier.border(1.5.dp, Palette.Accent, RoundedCornerShape(10.dp)) else Modifier)
+            .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
 }
-
-@Composable
-private fun InfoLine(text: String, tone: Color = Palette.TextSecondary) =
-    Text(text, color = tone, fontSize = 12.sp)
 
 // ---- General ----
 
@@ -357,11 +439,7 @@ private fun AppPicker(state: SettingsState, vm: SettingsViewModel) {
     } else {
         Card {
             state.apps.forEach { app ->
-                Text(
-                    app.label, color = Palette.TextPrimary, fontSize = 16.sp,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                        .clickable { vm.pickApp(app.component) }.padding(horizontal = 10.dp, vertical = 12.dp),
-                )
+                RadioRow(app.label, selected = false) { vm.pickApp(app.component) }
             }
         }
     }
@@ -388,9 +466,10 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel) {
         SectionHeader(cat.title)
         Card {
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                val checked = tile.key in state.enabledTiles
+                FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
                     Text(tile.label, color = Palette.TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    AccentSwitch(tile.key in state.enabledTiles) { vm.setTileEnabled(tile.key, it) }
+                    AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
                 }
             }
         }

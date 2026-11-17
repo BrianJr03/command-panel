@@ -1,6 +1,5 @@
 package jr.brian.commandpannel.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,7 +68,7 @@ fun TccIconButton(
     // Column-highlight nav styles draw the selection around the whole item and show a bare icon.
     val columnHighlight = isNav && navRenderer.columnHighlight
 
-    val base = if (onClick != null) modifier.clickable { onClick() } else modifier
+    val base = if (onClick != null) modifier.noRippleClickable { onClick() } else modifier
 
     val iconTint = if (columnHighlight) navRenderer.iconTint(paint, active)
     else lookTileIconTint(spec, colors, lookColors, active, index)

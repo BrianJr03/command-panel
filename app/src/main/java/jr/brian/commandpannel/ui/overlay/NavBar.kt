@@ -9,8 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
 import jr.brian.commandpannel.ui.components.TccCard
 import jr.brian.commandpannel.ui.components.TccIconButton
+import jr.brian.commandpannel.ui.components.TileIcon
 
 /** Stock bottom navigation bar: Mode, Task, Settings. (Stock's hidden "app manage" button is not shown.) */
 @Composable
@@ -22,6 +25,7 @@ fun NavBar(
     onTask: () -> Unit = {},
     onLaunch: () -> Unit = {},
     onSettings: () -> Unit = {},
+    onApp: () -> Unit = {},
 ) {
     TccCard(modifier) {
         Row(
@@ -36,6 +40,10 @@ fun NavBar(
                 TccIconButton("ic_app_manage", "Launch", circleSize = 44.dp, variant = nav, index = 2, onClick = onLaunch)
             }
             TccIconButton("ic_system_set", "Settings", circleSize = 44.dp, active = activeTab == OverlayTab.SETTINGS, variant = nav, index = 3, onClick = onSettings)
+            TccIconButton(
+                icon = TileIcon.Vector(Icons.Filled.OpenInNew),
+                label = "App", circleSize = 44.dp, variant = nav, index = 4, onClick = onApp,
+            )
         }
     }
 }
