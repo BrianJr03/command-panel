@@ -179,6 +179,12 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
             RadioRow(label, state.themeMode == mode) { vm.setThemeMode(mode) }
         }
     }
+    SwitchCard(
+        title = "Sync Stick LEDs to Theme",
+        description = "Mirror the overlay theme's accent colour onto the AYN Thor's joystick LEDs.",
+        checked = state.rgbAccentSync,
+        onChange = vm::setRgbAccentSync,
+    )
 }
 
 @Composable

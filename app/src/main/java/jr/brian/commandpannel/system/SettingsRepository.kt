@@ -106,6 +106,7 @@ class SettingsRepository(
         val focus = settings.getInt(Keys.FOCUS_LOCK, 0)
         val peak = settings.getFloat(Keys.PEAK_REFRESH, 60f)
         val themeMode = settings.getInt(Keys.THEME_MODE, 4)
+        applyRgbIfEnabled(themeMode)
         _uiState.update {
             it.copy(
                 displayMode = mode,
@@ -306,5 +307,14 @@ class SettingsRepository(
     private fun toggleIntKey(key: String, default: Int) {
         val cur = settings.getInt(key, default)
         settings.putInt(key, if (cur == 0) 1 else 0)
+    }
+
+    /** Mirror the overlay theme accent onto the Thor's stick LEDs when the fork sync is enabled. */
+    private fun applyRgbIfEnabled(themeMode: Int) {
+        if (!prefs.getBoolean("rgb_accent_sync", false)) return
+        val pct = (settings.getFloat(Keys.LED_BRIGHTNESS, 0.5f).coerceIn(0f, 1f) * 100).toInt()
+        jr.brian.commandpannel.privileged.ThorRgbController.applyAccent(
+            jr.brian.commandpannel.privileged.ThorRgbController.accentForThemeMode(themeMode), pct
+        )
     }
 }

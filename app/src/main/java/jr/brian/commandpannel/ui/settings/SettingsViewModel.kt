@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.ThorRgbController
 import android.content.ComponentName
 import jr.brian.commandpannel.service.AssistantService
 import jr.brian.commandpannel.system.QuickLaunch
@@ -31,6 +32,7 @@ data class SettingsState(
     val batteryEstimate: Boolean = false,
     val hideNetSpeed: Boolean = false,
     val themeMode: Int = 4,              // tcc_theme_mode
+    val rgbAccentSync: Boolean = false,
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
     val appPickerOpen: Boolean = false,
@@ -58,9 +60,21 @@ class SettingsViewModel @Inject constructor(
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
+        rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
     )
+
+    fun setRgbAccentSync(enable: Boolean) {
+        prefs.edit().putBoolean("rgb_accent_sync", enable).apply()
+        val pct = (settings.getFloat(SystemSettings.Keys.LED_BRIGHTNESS, 0.5f).coerceIn(0f, 1f) * 100).toInt()
+        if (enable) {
+            ThorRgbController.applyAccent(ThorRgbController.accentForThemeMode(_state.value.themeMode), pct)
+        } else {
+            ThorRgbController.applySnapshot(ThorRgbController.readSystemSnapshot(app))
+        }
+        _state.value = _state.value.copy(rgbAccentSync = enable)
+    }
 
     fun openAppPicker() {
         _state.value = _state.value.copy(appPickerOpen = true)
