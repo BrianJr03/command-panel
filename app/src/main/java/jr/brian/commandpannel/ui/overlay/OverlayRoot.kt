@@ -2,6 +2,7 @@ package jr.brian.commandpannel.ui.overlay
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,24 +41,35 @@ fun OverlayRoot(
     TccTheme(colors) {
         val bg = LocalTccColors.current.primaryBackground
         var tab by remember { mutableStateOf(initialTab) }
-        Column(modifier = Modifier.fillMaxSize().background(bg)) {
-            Spacer(Modifier.height(15.dp))
-            StatusBar(state)
-            Column(
-                modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
-            ) {
-                when (tab) {
-                    OverlayTab.MODE -> ModeTab(state, actions, Modifier.fillMaxSize())
-                    OverlayTab.SETTINGS -> SettingsTab(state, actions, Modifier.fillMaxSize())
+        var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
+
+        // Modal tiles open a dialog; instant tiles run their action.
+        val onTile: (String) -> Unit = { id ->
+            val d = dialogForTile(id)
+            if (d != null) dialog = d else actions.onTileClick(id)
+        }
+
+        Box(Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().background(bg)) {
+                Spacer(Modifier.height(15.dp))
+                StatusBar(state)
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
+                ) {
+                    when (tab) {
+                        OverlayTab.MODE -> ModeTab(state, actions, Modifier.fillMaxSize())
+                        OverlayTab.SETTINGS -> SettingsTab(state, actions, onTile, Modifier.fillMaxSize())
+                    }
                 }
+                NavBar(
+                    activeTab = tab,
+                    modifier = Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 15.dp),
+                    onMode = { tab = OverlayTab.MODE },
+                    onSettings = { tab = OverlayTab.SETTINGS },
+                )
+                Spacer(Modifier.height(12.dp))
             }
-            NavBar(
-                activeTab = tab,
-                modifier = Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 15.dp),
-                onMode = { tab = OverlayTab.MODE },
-                onSettings = { tab = OverlayTab.SETTINGS },
-            )
-            Spacer(Modifier.height(12.dp))
+            OverlayDialogLayer(dialog, state, actions, onDismiss = { dialog = OverlayDialogKind.NONE })
         }
     }
 }

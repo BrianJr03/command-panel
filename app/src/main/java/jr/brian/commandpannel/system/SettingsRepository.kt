@@ -105,6 +105,11 @@ class SettingsRepository(
             it.copy(
                 displayMode = mode,
                 focusLockTitle = focusTitle(focus),
+                focusLock = focus,
+                performanceMode = settings.getInt(Keys.PERFORMANCE_MODE, 0),
+                fanMode = settings.getInt(Keys.FAN_MODE, 1),
+                fanSpeed = settings.getInt(Keys.FAN_SPEED, 25000),
+                controllerStyle = settings.getInt(Keys.CONTROLLER_STYLE, 1),
                 is120Hz = peak >= 90f,
                 themeMode = themeMode,
                 bottomVolume = settings.getInt(Keys.SECONDARY_VOLUME, 7) / 15f,
@@ -242,18 +247,47 @@ class SettingsRepository(
             "vibration" -> toggleIntKey(Keys.VIBRATE_ON, default = 1)
             "charging_sep" -> toggleIntKey(Keys.CHARGING_SEPARATION, default = 0)
             "force_landscape" -> toggleIntKey(Keys.FORCE_LANDSCAPE, default = 0)
+            "ambient_led" -> toggleAmbientLight()
             "clear_memory" -> cleanMemory()
-            // focus_lock, performance, fan, controller, theme, ambient_led → modal dialogs (next sub-step)
+            // focus_lock, performance, fan, controller, theme → modal dialogs (handled in the overlay)
         }
+    }
+
+    override fun setFocusLock(value: Int) = settings.putInt(Keys.FOCUS_LOCK, value)
+
+    override fun setPerformance(value: Int) {
+        settings.putInt(Keys.PERFORMANCE_MODE, value)
+        // Stock interlock: High performance (2) forces the fan out of Off (0) into Smart (4).
+        if (value == 2 && settings.getInt(Keys.FAN_MODE, 1) == 0) settings.putInt(Keys.FAN_MODE, 4)
+    }
+
+    override fun setFanMode(value: Int) = settings.putInt(Keys.FAN_MODE, value)
+    override fun setFanSpeed(value: Int) = settings.putInt(Keys.FAN_SPEED, value)
+
+    override fun setControllerStyle(value: Int) {
+        settings.putInt(Keys.CONTROLLER_STYLE, value)
+        when (value) {
+            0 -> { settings.putInt(Keys.FLIP_BUTTON_LAYOUT, 1); settings.putInt(Keys.NO_CREATE_GAMEPAD, 0) } // Xbox
+            2 -> { settings.putInt(Keys.FLIP_BUTTON_LAYOUT, 0); settings.putInt(Keys.NO_CREATE_GAMEPAD, 1) } // disable
+            else -> { settings.putInt(Keys.FLIP_BUTTON_LAYOUT, 0); settings.putInt(Keys.NO_CREATE_GAMEPAD, 0) } // Odin
+        }
+    }
+
+    override fun setThemeMode(value: Int) = settings.putInt(Keys.THEME_MODE, value)
+
+    override fun toggleAmbientLight() {
+        val show = privileged.shell("getprop sys.light.curr.is.show")?.trim()
+        val isOn = show == "1" || show == "true"
+        privileged.shell("am broadcast -a com.ro.external.request.light.adj.action --ez isShow ${!isOn}")
+    }
+
+    override fun cleanMemory() {
+        // Full stock exclusion logic is a later refinement; the root kill is the core action.
+        privileged.shell("am kill-all")
     }
 
     private fun toggleIntKey(key: String, default: Int) {
         val cur = settings.getInt(key, default)
         settings.putInt(key, if (cur == 0) 1 else 0)
-    }
-
-    private fun cleanMemory() {
-        // Full stock exclusion logic is a later refinement; the root kill is the core action.
-        privileged.shell("am kill-all")
     }
 }

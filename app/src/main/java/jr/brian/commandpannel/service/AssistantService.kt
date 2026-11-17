@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.privileged.RootHelper
@@ -47,6 +48,7 @@ class AssistantService : Service() {
     private lateinit var keyguard: KeyguardManager
     private lateinit var machine: AynButtonMachine
     private lateinit var repository: SettingsRepository
+    private lateinit var screenMode: ScreenModeController
 
     private val aynReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -68,17 +70,18 @@ class AssistantService : Service() {
         super.onCreate()
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
+        screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
         overlay = OverlayHost(this) { _ ->
             val state by repository.uiState.collectAsState()
             OverlayRoot(state = state, actions = repository)
         }
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
-            isBottomBlanked = { false }, // real blanking arrives in phase 4
+            isBottomBlanked = { screenMode.isBottomBlanked() },
             onToggleOverlay = { overlay.toggle() },
             onHideOverlay = { overlay.hide() },
-            onBlankBottom = { overlay.hide() }, // placeholder until phase 4
-            onWakeBottom = { }, // placeholder until phase 4
+            onBlankBottom = { repository.selectMode(1) },
+            onWakeBottom = { repository.selectMode(0) },
         )
 
         startAsForeground()
@@ -86,6 +89,7 @@ class AssistantService : Service() {
         scope.launch {
             privileged.initialize(applicationContext)
             repository.start(scope)
+            screenMode.start()
         }
     }
 
@@ -101,6 +105,7 @@ class AssistantService : Service() {
     override fun onDestroy() {
         runCatching { unregisterReceiver(aynReceiver) }
         repository.stop()
+        screenMode.stop()
         overlay.destroy()
         scope.cancel()
         super.onDestroy()

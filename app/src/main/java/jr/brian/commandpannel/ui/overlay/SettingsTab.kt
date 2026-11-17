@@ -41,11 +41,16 @@ import jr.brian.commandpannel.ui.theme.TempColors
  * telemetry row across the bottom 30%.
  */
 @Composable
-fun SettingsTab(state: OverlayUiState, actions: OverlayActions, modifier: Modifier = Modifier) {
+fun SettingsTab(
+    state: OverlayUiState,
+    actions: OverlayActions,
+    onTile: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().weight(0.70f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FrameRatePanel(state, actions, Modifier.weight(0.40f).fillMaxHeight())
-            QuickTilesPanel(state, actions, Modifier.weight(0.60f).fillMaxHeight())
+            QuickTilesPanel(state, onTile, Modifier.weight(0.60f).fillMaxHeight())
         }
         HardwareRow(state, Modifier.fillMaxWidth().weight(0.30f))
     }
@@ -101,7 +106,7 @@ private fun FrameRatePill(is120: Boolean) {
 }
 
 @Composable
-private fun QuickTilesPanel(state: OverlayUiState, actions: OverlayActions, modifier: Modifier) {
+private fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
     val colors = LocalTccColors.current
     val page = state.tiles.take(8)
     TccCard(modifier) {
@@ -120,7 +125,7 @@ private fun QuickTilesPanel(state: OverlayUiState, actions: OverlayActions, modi
                         active = tile.active,
                         labelSize = 12.sp,
                         iconInset = 16.dp,
-                        onClick = { actions.onTileClick(tile.id) },
+                        onClick = { onTile(tile.id) },
                     )
                 }
             }

@@ -99,14 +99,21 @@ Done and verified on the Thor:
   (vibration, charging separation, force landscape). Verified: pill 60↔120 and vibration 1↔0 write through and the
   UI reacts.
 
-Remaining (next sub-step):
-- Modal option dialogs for Focus / Performance / Fan (perf-dependent options + custom speed) / Controller / Theme,
-  and the Ambient LED broadcast toggle.
-- Screen-mode blanking: bottom/top cover windows, `sys.temp.disabled.touch`, focus-lock + system-key-lock + pin-mode
-  save/restore, the "Only top screen" tip dialog, keyguard handling, crash/exit recovery (top cover needs the
-  helper's type-2021 window).
-- Quick-tile pager swipe (page 2), Clean Memory full exclusion logic (currently a blunt root kill), volume-key
-  overflow rule, theme switching applied live.
+Part 2 done and verified on the Thor (2026-11-16):
+- Modal option dialogs (`OverlayDialogs`): Focus / Performance / Fan (perf-dependent options) / Controller / Theme,
+  rendered over a scrim with the stock icons and a radio check; each writes through and the UI reacts (verified
+  Performance 0→1→0). Ambient LED broadcast toggle and Clean Memory wired. Theme change applies the palette live
+  (`OverlayRoot` picks from `tcc_theme_mode`).
+- `ScreenModeController`: observes `dual_screen_display_mode` and applies the stock blanking — focus-lock +
+  system-key-lock save/restore, `sys.temp.disabled.touch` via root, and a black cover window on the bottom display.
+  Verified: mode 1 → touch `0,1`, focus 1, bottom fully black; mode 0 → restored. AYN long-press (blank) / press
+  (wake) are wired to it.
+
+Remaining (part 3):
+- Top-screen cover for mode 2 (needs the helper's type-2021 window; currently applies focus + touch only), the
+  "Only top screen" tip dialog, keyguard handling and crash/exit recovery, the vendor pin-screen-mode save/restore.
+- Quick-tile pager swipe to page 2, the Fan custom-speed slider, Clean Memory exclusion logic (currently a blunt
+  root kill), the volume-key overflow rule.
 
 ### 5. Stock coexistence (opt-in)
 "Replace stock assistant" setting. Suppression sequence, 5000 ms `SCREEN_OFF` unfreeze (fork feature 14), restore

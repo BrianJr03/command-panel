@@ -14,6 +14,11 @@ data class OverlayUiState(
 
     val displayMode: Int = 0,        // 0 dual, 1 top only, 2 bottom only
     val focusLockTitle: String = "Top screen",
+    val focusLock: Int = 1,          // screen_focus_lock
+    val performanceMode: Int = 0,
+    val fanMode: Int = 1,            // 0/1/4/5/6
+    val fanSpeed: Int = 25000,
+    val controllerStyle: Int = 1,    // temp_abxy_layout_mode
 
     val dualBrightness: Float = 0.5f,
     val topBrightness: Float = 0.5f,

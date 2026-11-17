@@ -14,6 +14,15 @@ interface OverlayActions {
     fun toggleRefreshRate()
     fun onTileClick(id: String)
 
+    fun setFocusLock(value: Int)
+    fun setPerformance(value: Int)
+    fun setFanMode(value: Int)
+    fun setFanSpeed(value: Int)
+    fun setControllerStyle(value: Int)
+    fun setThemeMode(value: Int)
+    fun toggleAmbientLight()
+    fun cleanMemory()
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}
@@ -23,5 +32,13 @@ interface OverlayActions {
         override fun setBottomVolume(fraction: Float, committed: Boolean) {}
         override fun toggleRefreshRate() {}
         override fun onTileClick(id: String) {}
+        override fun setFocusLock(value: Int) {}
+        override fun setPerformance(value: Int) {}
+        override fun setFanMode(value: Int) {}
+        override fun setFanSpeed(value: Int) {}
+        override fun setControllerStyle(value: Int) {}
+        override fun setThemeMode(value: Int) {}
+        override fun toggleAmbientLight() {}
+        override fun cleanMemory() {}
     }
 }
