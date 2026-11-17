@@ -130,9 +130,14 @@ Remaining (robustness): restore stock on *ungraceful* app death and on uninstall
 root helper survives app death but doesn't yet restore stock); crash-loop circuit breaker. The real toggle UI lands
 in the phase-6 settings screen (today it's driven by the service action).
 
-### 6. Companion settings screen (top display)
-Stock has none (its activity is disabled). Needed to host the fork features' settings. Gamepad-navigable two-pane
-screen in Command Panel's own code, with sticky section labels (fork feature 13).
+### 6. Companion settings screen (top display) — done 2026-11-16
+`SettingsScreen` (two-pane: category rail + content) with `SettingsViewModel`. General category hosts the
+**Replace Stock Assistant** switch (drives `StockCoexistence` via the service) and an overlay-preview button;
+Appearance sets the overlay theme (`tcc_theme_mode`); Diagnostics runs the privileged-layer check. Replaces the
+phase-1 diagnostics-only screen; themed with the overlay's `TccColors`.
+Verified on the Thor: two-pane renders, categories switch, diagnostics all pass (helper uid=0).
+Remaining: full gamepad navigation + sticky section labels (fork feature 13, arrives with the Megingiard-style
+framework in phase 7); the fork features' own settings get added here as each is ported.
 
 ### 7. Fork features, in this order
 Each is repackaged from `fork-port/`, upstream-origin lines rewritten, tests ported.

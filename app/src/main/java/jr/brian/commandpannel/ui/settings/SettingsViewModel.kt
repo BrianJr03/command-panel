@@ -1,0 +1,92 @@
+package jr.brian.commandpannel.ui.settings
+
+import android.app.Application
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.SystemSettings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+enum class SettingsCategory(val title: String) {
+    GENERAL("General"),
+    APPEARANCE("Appearance"),
+    DIAGNOSTICS("Diagnostics"),
+}
+
+data class SettingsState(
+    val replaceStock: Boolean = false,
+    val themeMode: Int = 4,              // tcc_theme_mode
+    val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
+    val diagnosticsRunning: Boolean = false,
+)
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    app: Application,
+    private val privileged: PrivilegedAccess,
+) : AndroidViewModel(app) {
+
+    private val prefs = app.getSharedPreferences("command_panel", Application.MODE_PRIVATE)
+    private val settings = SystemSettings(app.contentResolver, privileged)
+
+    private val _state = MutableStateFlow(load())
+    val state: StateFlow<SettingsState> = _state.asStateFlow()
+
+    private fun load() = SettingsState(
+        replaceStock = prefs.getBoolean("replace_stock_assistant", false),
+        themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
+    )
+
+    fun refresh() {
+        _state.value = _state.value.copy(
+            replaceStock = prefs.getBoolean("replace_stock_assistant", false),
+            themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
+        )
+    }
+
+    fun setReplaceStock(enable: Boolean) {
+        AssistantService.start(getApplication())
+        getApplication<Application>().startService(
+            Intent(getApplication(), AssistantService::class.java)
+                .setAction(AssistantService.ACTION_SET_REPLACE_STOCK)
+                .putExtra(AssistantService.EXTRA_ENABLE, enable)
+        )
+        _state.value = _state.value.copy(replaceStock = enable)
+    }
+
+    fun setThemeMode(mode: Int) {
+        settings.putInt(SystemSettings.Keys.THEME_MODE, mode)
+        _state.value = _state.value.copy(themeMode = mode)
+    }
+
+    fun showOverlay() {
+        AssistantService.start(getApplication())
+        getApplication<Application>().startService(
+            Intent(getApplication(), AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY)
+        )
+    }
+
+    fun runDiagnostics() {
+        if (_state.value.diagnosticsRunning) return
+        _state.value = _state.value.copy(diagnosticsRunning = true, diagnostics = emptyList())
+        viewModelScope.launch {
+            val r = privileged.initialize(getApplication())
+            _state.value = _state.value.copy(
+                diagnosticsRunning = false,
+                diagnostics = buildList {
+                    add("Hidden-API exemptions" to r.hiddenApi)
+                    add("PServerBinder root shell" to r.rootShell)
+                    add("Root helper connected" to r.helper)
+                    r.helperIdentity?.let { add(it to true) }
+                },
+            )
+        }
+    }
+}
