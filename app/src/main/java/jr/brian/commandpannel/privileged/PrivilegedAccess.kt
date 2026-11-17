@@ -92,6 +92,10 @@ class PrivilegedAccess @Inject constructor() {
         RootHelper.binder?.let { runCatching { it.stopTaskFps() } }
     }
 
+    /** SurfaceFlinger's global composite counter straight over the helper binder; null without the helper. */
+    fun surfaceFlingerFrameCount(): Long? =
+        RootHelper.binder?.let { h -> runCatching { h.surfaceFlingerFrameCount() }.getOrNull()?.takeIf { it >= 0 } }
+
     /**
      * Arms or disarms the helper's stock recovery: when armed and this app goes away for good (uninstall,
      * force-stop, a crash it doesn't come back from), the helper restores the stock assistant before exiting.

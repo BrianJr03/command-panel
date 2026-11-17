@@ -33,8 +33,9 @@ data class Telemetry(
  * Polls the stock telemetry sources every [intervalMs] while started: sysfs nodes read directly (the probe showed
  * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS from two sources:
  * the game task on the top display through the root helper's task FPS callback (frames that task actually
- * presented), falling back to the root shell's global composite counter (`service call SurfaceFlinger 1013`, which
- * the app's uid is refused but root allows) when no game is up or the helper is down.
+ * presented), falling back to SurfaceFlinger's global composite counter when no game is up. That counter is
+ * transaction 1013, which the app's uid is refused but root allows; it is read over the helper binder, or with
+ * `service call` through the root shell when the helper is down.
  */
 class TelemetryMonitor(
     private val context: Context,
@@ -113,8 +114,10 @@ class TelemetryMonitor(
     }
 
     private fun sampleGlobalFps(cap: Int): Int {
-        val out = privileged.shell("service call SurfaceFlinger 1013") ?: return _state.value.fps
-        val frames = TelemetryReader.parseSurfaceFlingerFrames(out) ?: return _state.value.fps
+        // The helper's direct binder transaction is sub-millisecond; the shell fallback forks `sh` + `service`.
+        val frames = privileged.surfaceFlingerFrameCount()
+            ?: privileged.shell("service call SurfaceFlinger 1013")?.let(TelemetryReader::parseSurfaceFlingerFrames)
+            ?: return _state.value.fps
         val now = System.nanoTime() / 1_000_000L
         val prev = lastFrames
         val prevTime = lastFrameTime
