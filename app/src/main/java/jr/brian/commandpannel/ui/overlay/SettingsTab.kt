@@ -100,7 +100,7 @@ private fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modif
                 Modifier.noRippleClickable { actions.toggleRefreshRate() },
             ) { FrameRatePill(state.is120Hz) }
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("${state.fps}", color = colors.primary, fontSize = 46.sp, fontWeight = FontWeight.Bold)
+                Text("${state.fps}", color = colors.primary, fontSize = 46.sp, fontWeight = FontWeight.Bold, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
                 Text(" FPS", color = colors.primary, fontSize = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
             }
             Text("CURRENT FPS", color = colors.panelText, fontSize = 11.sp)
@@ -246,7 +246,7 @@ private fun InfoCard(modifier: Modifier, icon: String, iconTint: Color?, title: 
                 Spacer(Modifier.size(6.dp))
                 Text(title, color = colors.tertiary, fontSize = 12.sp)
             }
-            Text(value, color = colors.primary, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text(value, color = colors.primary, fontSize = 22.sp, fontWeight = FontWeight.Medium, style = jr.brian.commandpannel.ui.theme.tccDisplayTextStyle())
         }
     }
 }
