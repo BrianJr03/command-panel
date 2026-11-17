@@ -136,6 +136,7 @@ fun CardStyle.renderer(): LookCardRenderer = when (this) {
     CardStyle.INK_PANEL -> ComicPanelCard
     CardStyle.CHROME_RIM -> Y2kChromeCard
     CardStyle.HAIRLINE -> EInkCard
+    CardStyle.CUSTOM -> CustomCard
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -192,6 +193,7 @@ fun TileStyle.renderer(): LookTileRenderer = when (this) {
     TileStyle.STARBURST -> ComicPanelTile
     TileStyle.CHROME -> Y2kChromeTile
     TileStyle.INK_OUTLINE -> EInkTile
+    TileStyle.CUSTOM -> CustomTile
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -241,6 +243,7 @@ fun GaugeStyle.renderer(): LookGaugeRenderer = when (this) {
     GaugeStyle.PIE -> ComicPanelGauge
     GaugeStyle.CHROME_RING -> Y2kChromeGauge
     GaugeStyle.DITHER_BAR -> EInkGauge
+    GaugeStyle.CUSTOM -> CustomGauge
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -295,6 +298,7 @@ fun SliderStyle.renderer(): LookSliderRenderer = when (this) {
     SliderStyle.INK -> ComicPanelSlider
     SliderStyle.CHROME -> Y2kChromeSlider
     SliderStyle.DITHER -> EInkSlider
+    SliderStyle.CUSTOM -> CustomSlider
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -347,4 +351,5 @@ fun NavStyle.renderer(): LookNavRenderer = when (this) {
     NavStyle.STARBURST -> ComicPanelNav
     NavStyle.FOIL_PILL -> Y2kChromeNav
     NavStyle.UNDERLINE_ITALIC -> EInkNav
+    NavStyle.CUSTOM -> CustomNav
 }

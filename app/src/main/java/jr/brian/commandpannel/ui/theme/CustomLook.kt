@@ -62,7 +62,14 @@ data class CustomLook(
     val infoValueScale: Float? = null,
     val qsLabelFontSize: Float? = null,
     val colors: PinnedColors = PinnedColors(),
+    /** Settings for the parts set to their `CUSTOM` style. */
+    val custom: CustomRenderParams = CustomRenderParams(),
 ) {
+    /** `true` when any part uses the parametric `CUSTOM` style. */
+    val usesCustomParts: Boolean
+        get() = card == CardStyle.CUSTOM || tile == TileStyle.CUSTOM || gauge == GaugeStyle.CUSTOM ||
+            slider == SliderStyle.CUSTOM || nav == NavStyle.CUSTOM
+
     val ref: LookRef get() = LookRef.Custom(id)
 }
 
@@ -198,6 +205,7 @@ fun CustomLook.toSpec(fonts: UserFontResolver = UserFontResolver.None): TccLookS
         ),
         dialog = DialogLookSpec(dialogShape = dialogShape?.toShape() ?: base.dialog.dialogShape),
         traits = traits,
+        custom = if (usesCustomParts) custom else null,
     )
 }
 
@@ -269,6 +277,7 @@ object CustomLookJson {
         putOpt("ringUnitScale", look.ringUnitScale?.toDouble())
         putOpt("infoValueScale", look.infoValueScale?.toDouble())
         putOpt("qsLabelFontSize", look.qsLabelFontSize?.toDouble())
+        if (look.custom != CustomRenderParams()) put("custom", CustomRenderJson.encode(look.custom))
         if (!look.colors.isEmpty) put("colors", JSONObject().apply {
             look.colors.accent?.let { put("accent", it.hex()) }
             look.colors.accent2?.let { put("accent2", it.hex()) }
@@ -325,6 +334,7 @@ object CustomLookJson {
                     panel = it.colorOrNull("panel"),
                 )
             } ?: PinnedColors(),
+            custom = CustomRenderJson.decode(o.optJSONObject("custom")),
         )
     }
 

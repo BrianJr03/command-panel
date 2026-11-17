@@ -49,6 +49,11 @@ import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.overlay.OverlayTab
 import jr.brian.commandpannel.ui.theme.BundledFont
 import jr.brian.commandpannel.ui.theme.CustomLook
+import jr.brian.commandpannel.ui.theme.NavStyle
+import jr.brian.commandpannel.ui.theme.SliderStyle
+import jr.brian.commandpannel.ui.theme.GaugeStyle
+import jr.brian.commandpannel.ui.theme.TileStyle
+import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.FontRef
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
@@ -127,6 +132,7 @@ internal fun ThemeStudioScreen(
                 val update: (CustomLook) -> Unit = { draft = it }
                 when (category) {
                     StudioCategory.PARTS -> PartsControls(draft, update)
+                    StudioCategory.CUSTOM -> CustomPartControls(draft, update)
                     StudioCategory.FONTS -> FontControls(draft, state, vm, onMessage = { message = it }, onChange = update)
                     StudioCategory.SHAPES -> ShapeControls(draft, update)
                     StudioCategory.COLORS -> ColorControls(draft, update)
@@ -161,6 +167,7 @@ private val PREVIEW_WIDTH = 360.dp
 
 private enum class StudioCategory(@StringRes val titleRes: Int) {
     PARTS(R.string.theme_cat_parts),
+    CUSTOM(R.string.theme_cat_custom),
     FONTS(R.string.theme_cat_fonts),
     SHAPES(R.string.theme_cat_shapes),
     COLORS(R.string.theme_cat_colors),
@@ -200,16 +207,19 @@ private class Part<T>(
     @StringRes val titleRes: Int,
     val of: (LookTraits) -> T,
     val set: (CustomLook, T) -> CustomLook,
+    /** The part's parametric style, offered last (its settings live in the Custom category); `null` for none. */
+    custom: T? = null,
 ) {
-    val options: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first }
+    val options: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first } +
+        listOfNotNull(custom?.let { it to R.string.theme_part_custom })
 }
 
 private val PARTS: List<Part<*>> = listOf(
-    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }),
-    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }),
-    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }),
-    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }),
-    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }),
+    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }, CardStyle.CUSTOM),
+    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }, TileStyle.CUSTOM),
+    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM),
+    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM),
+    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM),
     Part(R.string.theme_part_backdrop, { it.backdrop }, { l, v -> l.copy(backdrop = v) }),
     Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }),
 )

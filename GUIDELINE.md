@@ -31,6 +31,13 @@ Each enum value maps (in `ui/components/looks/LookRenderers.kt`, via the `.rende
 
 ---
 
+### Users can also build Looks in the app (Theme Studio)
+
+The companion's **Themes** section has a Theme Studio. It saves user-made looks as `CustomLook` overrides on a base Look (`ui/theme/CustomLook.kt`), selected with `overlay_look = "custom:<id>"`. It needs no code changes, so reach for it before adding a built-in Look. Things to keep in mind when you change the Look system:
+
+- Every style enum has a `CUSTOM` value backed by `ui/components/looks/CustomRenderers.kt` and its settings in `CustomRenderParams`. New renderer interface methods need a Custom implementation too. A new trait or spec field that users should control needs a matching `CustomLook` field, a line in `toSpec()`, JSON in `CustomLookJson`, and a Theme Studio control.
+- Don't branch on `spec.look == ...` for visuals. A custom look keeps its base Look's id, so checks like that leak the base look's behavior into every custom look built on it (this already broke custom card shapes on the Auto base once).
+
 ## 2. Quick start: add a Level‑1 Look
 
 1. **Enum** — in `LookStyle.kt`, add a value to `TccUiLook` and a `label` case:

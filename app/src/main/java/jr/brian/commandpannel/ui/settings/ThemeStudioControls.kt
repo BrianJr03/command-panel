@@ -28,7 +28,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.noRippleClickable
+import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.CustomLook
+import jr.brian.commandpannel.ui.theme.CustomRenderParams
+import jr.brian.commandpannel.ui.theme.FillKind
+import jr.brian.commandpannel.ui.theme.GaugeColorMode
+import jr.brian.commandpannel.ui.theme.GaugeKind
+import jr.brian.commandpannel.ui.theme.GaugeStyle
+import jr.brian.commandpannel.ui.theme.LineRole
+import jr.brian.commandpannel.ui.theme.NavIndicator
+import jr.brian.commandpannel.ui.theme.NavStyle
+import jr.brian.commandpannel.ui.theme.SliderStyle
+import jr.brian.commandpannel.ui.theme.TileStyle
 import jr.brian.commandpannel.ui.theme.LabelCase
 import jr.brian.commandpannel.ui.theme.PinnedColors
 import jr.brian.commandpannel.ui.theme.ShapeDef
@@ -337,4 +348,119 @@ internal enum class ValueUnit(@StringRes val res: Int) {
             PERCENT -> (v * 100).roundToInt().toString()
         },
     )
+}
+
+// ---- Custom parts ----
+
+private val FillKind.labelRes: Int get() = when (this) {
+    FillKind.SURFACE -> R.string.theme_fill_surface
+    FillKind.TONAL -> R.string.theme_fill_tonal
+    FillKind.ACCENT -> R.string.theme_fill_accent
+    FillKind.GLASS -> R.string.theme_fill_glass
+    FillKind.GRADIENT -> R.string.theme_fill_gradient
+    FillKind.NONE -> R.string.theme_fill_none
+}
+
+private val LineRole.labelRes: Int get() = when (this) {
+    LineRole.SUBTLE -> R.string.theme_line_subtle
+    LineRole.TEXT -> R.string.theme_line_text
+    LineRole.ACCENT -> R.string.theme_line_accent
+    LineRole.ACCENT2 -> R.string.theme_line_accent2
+}
+
+private val GaugeKind.labelRes: Int get() = when (this) {
+    GaugeKind.RING -> R.string.theme_gauge_ring
+    GaugeKind.ARC -> R.string.theme_gauge_arc
+    GaugeKind.SEGMENTS -> R.string.theme_gauge_segments
+    GaugeKind.BAR -> R.string.theme_gauge_bar
+}
+
+private val GaugeColorMode.labelRes: Int get() = when (this) {
+    GaugeColorMode.CLASSIC -> R.string.theme_gauge_colors_classic
+    GaugeColorMode.ACCENT -> R.string.theme_gauge_colors_accent
+    GaugeColorMode.SPECTRUM -> R.string.theme_gauge_colors_spectrum
+}
+
+private val NavIndicator.labelRes: Int get() = when (this) {
+    NavIndicator.PILL -> R.string.theme_nav_pill
+    NavIndicator.UNDERLINE -> R.string.theme_nav_underline
+    NavIndicator.BLOCK -> R.string.theme_nav_block
+    NavIndicator.DOT -> R.string.theme_nav_dot
+}
+
+/**
+ * Settings for the parametric `CUSTOM` parts. A part that isn't set to Custom shows a shortcut that switches it, so
+ * this category doubles as the "build it from scratch" entry point.
+ */
+@Composable
+internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
+    val c = draft.custom
+    fun update(next: CustomRenderParams) = onChange(draft.copy(custom = next))
+
+    CustomBlock(R.string.theme_part_cards, draft.card == CardStyle.CUSTOM, { onChange(draft.copy(card = CardStyle.CUSTOM)) }) {
+        val k = c.card
+        EnumRow(R.string.theme_custom_fill, FillKind.entries, k.fill, { it.labelRes }) { update(c.copy(card = k.copy(fill = it))) }
+        Stepper(R.string.theme_custom_opacity, k.fillOpacity, 0f, 1f, 0.1f, ValueUnit.PERCENT) { update(c.copy(card = k.copy(fillOpacity = it))) }
+        Stepper(R.string.theme_custom_border_width, k.borderWidth, 0f, 6f, 0.5f, ValueUnit.DP) { update(c.copy(card = k.copy(borderWidth = it))) }
+        if (k.borderWidth > 0f) EnumRow(R.string.theme_custom_border_color, LineRole.entries, k.border, { it.labelRes }) { update(c.copy(card = k.copy(border = it))) }
+        Stepper(R.string.theme_custom_shadow, k.shadow, 0f, 12f, 1f, ValueUnit.DP) { update(c.copy(card = k.copy(shadow = it))) }
+        BoolRow(R.string.theme_effect_glow, k.glow) { update(c.copy(card = k.copy(glow = it))) }
+    }
+    CustomBlock(R.string.theme_part_tiles, draft.tile == TileStyle.CUSTOM, { onChange(draft.copy(tile = TileStyle.CUSTOM)) }) {
+        val k = c.tile
+        EnumRow(R.string.theme_custom_fill, FillKind.entries, k.fill, { it.labelRes }) { update(c.copy(tile = k.copy(fill = it))) }
+        EnumRow(R.string.theme_custom_selected_fill, FillKind.entries, k.selectedFill, { it.labelRes }) { update(c.copy(tile = k.copy(selectedFill = it))) }
+        Stepper(R.string.theme_custom_border_width, k.borderWidth, 0f, 6f, 0.5f, ValueUnit.DP) { update(c.copy(tile = k.copy(borderWidth = it))) }
+        if (k.borderWidth > 0f) EnumRow(R.string.theme_custom_border_color, LineRole.entries, k.border, { it.labelRes }) { update(c.copy(tile = k.copy(border = it))) }
+        BoolRow(R.string.theme_custom_selected_glow, k.glow) { update(c.copy(tile = k.copy(glow = it))) }
+    }
+    CustomBlock(R.string.theme_part_gauges, draft.gauge == GaugeStyle.CUSTOM, { onChange(draft.copy(gauge = GaugeStyle.CUSTOM)) }) {
+        val k = c.gauge
+        EnumRow(R.string.theme_custom_gauge_shape, GaugeKind.entries, k.kind, { it.labelRes }) { update(c.copy(gauge = k.copy(kind = it))) }
+        Stepper(R.string.theme_custom_thickness, k.thickness, 0.02f, 0.2f, 0.01f, ValueUnit.PERCENT) { update(c.copy(gauge = k.copy(thickness = it))) }
+        BoolRow(R.string.theme_custom_round_caps, k.roundCaps) { update(c.copy(gauge = k.copy(roundCaps = it))) }
+        EnumRow(R.string.theme_custom_gauge_colors, GaugeColorMode.entries, k.colors, { it.labelRes }) { update(c.copy(gauge = k.copy(colors = it))) }
+        BoolRow(R.string.theme_effect_glow, k.glow) { update(c.copy(gauge = k.copy(glow = it))) }
+    }
+    CustomBlock(R.string.theme_part_sliders, draft.slider == SliderStyle.CUSTOM, { onChange(draft.copy(slider = SliderStyle.CUSTOM)) }) {
+        val k = c.slider
+        EnumRow(R.string.theme_custom_track, FillKind.entries, k.track, { it.labelRes }) { update(c.copy(slider = k.copy(track = it))) }
+        EnumRow(R.string.theme_custom_fill, FillKind.entries.filter { it != FillKind.NONE }, k.fill, { it.labelRes }) { update(c.copy(slider = k.copy(fill = it))) }
+        Stepper(R.string.theme_custom_border_width, k.borderWidth, 0f, 6f, 0.5f, ValueUnit.DP) { update(c.copy(slider = k.copy(borderWidth = it))) }
+        if (k.borderWidth > 0f) EnumRow(R.string.theme_custom_border_color, LineRole.entries, k.border, { it.labelRes }) { update(c.copy(slider = k.copy(border = it))) }
+        BoolRow(R.string.theme_custom_thumb, k.thumb) { update(c.copy(slider = k.copy(thumb = it))) }
+    }
+    CustomBlock(R.string.theme_part_nav, draft.nav == NavStyle.CUSTOM, { onChange(draft.copy(nav = NavStyle.CUSTOM)) }) {
+        EnumRow(R.string.theme_custom_nav_indicator, NavIndicator.entries, c.nav.indicator, { it.labelRes }) {
+            update(c.copy(nav = c.nav.copy(indicator = it)))
+        }
+    }
+}
+
+/** One part's custom settings, or a one-press switch to Custom when the part uses a preset. */
+@Composable
+private fun CustomBlock(@StringRes titleRes: Int, active: Boolean, onUseCustom: () -> Unit, content: @Composable () -> Unit) {
+    Card {
+        CardTitle(stringResource(titleRes))
+        if (active) content() else {
+            CardDesc(stringResource(R.string.theme_custom_inactive))
+            Spacer(Modifier.width(4.dp))
+            Chip(stringResource(R.string.theme_custom_use), onClick = onUseCustom)
+        }
+    }
+}
+
+@Composable
+private fun <E> EnumRow(@StringRes titleRes: Int, values: List<E>, current: E, label: (E) -> Int, onPick: (E) -> Unit) {
+    ControlLabel(titleRes)
+    ChipRow { values.forEach { v -> OptionChip(stringResource(label(v)), v == current) { onPick(v) } } }
+}
+
+@Composable
+private fun BoolRow(@StringRes titleRes: Int, value: Boolean, onPick: (Boolean) -> Unit) {
+    ControlLabel(titleRes)
+    ChipRow {
+        OptionChip(stringResource(R.string.theme_on), value) { onPick(true) }
+        OptionChip(stringResource(R.string.theme_off), !value) { onPick(false) }
+    }
 }

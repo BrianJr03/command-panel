@@ -104,4 +104,20 @@ class CustomLookTest {
         assertTrue(palette.isDark)
         assertTrue(palette.panelBackground.contrastRatio(palette.primaryBackground) >= 1.15f)
     }
+
+    @Test
+    fun `custom part params round trip and only reach the spec when a part is Custom`() {
+        val params = jr.brian.commandpannel.ui.theme.CustomRenderParams(
+            card = jr.brian.commandpannel.ui.theme.CustomCardParams(
+                fill = jr.brian.commandpannel.ui.theme.FillKind.GRADIENT, borderWidth = 2f, shadow = 4f, glow = true,
+            ),
+            gauge = jr.brian.commandpannel.ui.theme.CustomGaugeParams(kind = jr.brian.commandpannel.ui.theme.GaugeKind.BAR, thickness = 0.1f),
+            nav = jr.brian.commandpannel.ui.theme.CustomNavParams(jr.brian.commandpannel.ui.theme.NavIndicator.BLOCK),
+        )
+        val look = CustomLook(id = "c", name = "c", custom = params)
+        assertNull(look.toSpec().custom)
+        val custom = look.copy(card = CardStyle.CUSTOM)
+        assertEquals(params, custom.toSpec().custom)
+        assertEquals(custom, CustomLookJson.decodeList(CustomLookJson.encodeList(listOf(custom))).single())
+    }
 }
