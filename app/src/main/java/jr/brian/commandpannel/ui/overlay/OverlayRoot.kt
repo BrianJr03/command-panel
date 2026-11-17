@@ -17,7 +17,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.Alignment
+import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
+import jr.brian.commandpannel.ui.overlay.arrange.ArrangeToolbar
+import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
+import jr.brian.commandpannel.ui.overlay.arrange.arrangeContentArea
+import jr.brian.commandpannel.ui.overlay.arrange.longPressToArrange
+import jr.brian.commandpannel.ui.overlay.arrange.rememberArrangeController
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.TccColors
 import jr.brian.commandpannel.ui.theme.TccTheme
@@ -45,6 +53,7 @@ fun OverlayRoot(
       ) {
         val spec = jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current
         val lookColors = jr.brian.commandpannel.ui.theme.tccLookColors()
+        val arrange = rememberArrangeController(state.layout) { actions.setOverlayLayout(it) }
         var tab by remember { mutableStateOf(initialTab) }
         var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
         var showBottomTip by remember { mutableStateOf(false) }
@@ -60,35 +69,56 @@ fun OverlayRoot(
         }
 
         val navBar: @Composable () -> Unit = {
-            NavBar(
-                activeTab = tab,
-                modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 15.dp),
-                quickLaunchLabel = state.quickLaunchLabel,
-                onMode = { tab = OverlayTab.MODE },
-                onLaunch = { actions.quickLaunch() },
-                onSettings = { tab = OverlayTab.SETTINGS },
-                onApp = { actions.launchCompanion() },
-            )
+            ArrangeableCard(OverlayCardId.NAV_BAR, arrange, Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 15.dp)) {
+                NavBar(
+                    activeTab = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    quickLaunchLabel = state.quickLaunchLabel,
+                    onMode = { tab = OverlayTab.MODE },
+                    onLaunch = { actions.quickLaunch() },
+                    onSettings = { tab = OverlayTab.SETTINGS },
+                    onApp = { actions.launchCompanion() },
+                )
+            }
         }
-        val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
+        // The nav bar always sits at the top of the overlay, never along the bottom edge.
+        val navAtTop = true
         Box(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize()
-                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors),
+                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors)
+                    .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))
                 StatusBar(state)
                 if (navAtTop) { Spacer(Modifier.height(8.dp)); navBar() }
                 Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp)
+                        .arrangeContentArea(arrange),
                 ) {
                     when (tab) {
-                        OverlayTab.MODE -> ModeTab(state, actions, onRequestMode, Modifier.fillMaxSize())
-                        OverlayTab.SETTINGS -> SettingsTab(state, actions, onTile, Modifier.fillMaxSize())
+                        OverlayTab.MODE -> ModeTab(state, actions, onRequestMode, arrange, Modifier.fillMaxSize())
+                        OverlayTab.SETTINGS -> SettingsTab(state, actions, onTile, arrange, Modifier.fillMaxSize())
                     }
                 }
                 if (!navAtTop) navBar()
                 Spacer(Modifier.height(12.dp))
+            }
+            if (arrange.isArranging) {
+                Box(Modifier.fillMaxSize().padding(top = 44.dp), contentAlignment = Alignment.TopCenter) {
+                    ArrangeToolbar(
+                        hint = "Drag to rearrange",
+                        tabLabels = listOf("Mode", "Settings"),
+                        activeTab = if (tab == OverlayTab.MODE) 0 else 1,
+                        onSelectTab = { tab = if (it == 0) OverlayTab.MODE else OverlayTab.SETTINGS },
+                        resetLabel = "Reset",
+                        isResetEnabled = !state.layout.isDefault,
+                        onReset = { arrange.reset() },
+                        doneLabel = "Done",
+                        onDone = { arrange.exit() },
+                        modifier = Modifier.wrapContentHeight(),
+                    )
+                }
             }
             OverlayDialogLayer(dialog, state, actions, onDismiss = { dialog = OverlayDialogKind.NONE })
             if (showBottomTip) {

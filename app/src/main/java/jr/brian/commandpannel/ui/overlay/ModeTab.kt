@@ -11,33 +11,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.ui.components.TccCard
 import jr.brian.commandpannel.ui.components.TccIconButton
 import jr.brian.commandpannel.ui.components.TccSliderRow
+import jr.brian.commandpannel.ui.overlay.arrange.ArrangeController
+import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
+import jr.brian.commandpannel.ui.overlay.arrange.arrangeLayer
 
 /**
- * Stock Mode tab: a screen-mode panel on top, then a brightness card and a volume card side by side.
+ * Stock Mode tab: a screen-mode panel on top, then a brightness card and a volume card side by side. Each card is
+ * wrapped in an [ArrangeableCard] so it can be dragged in Arrange mode (long-press the overlay).
  */
 @Composable
 fun ModeTab(
     state: OverlayUiState,
     actions: OverlayActions,
     onRequestMode: (Int) -> Unit,
+    arrange: ArrangeController,
     modifier: Modifier = Modifier,
 ) {
     val layout = state.layout
-    // Arrange mode: the slider row can be placed above the mode panel (rows keep their own weights), and the
-    // brightness/volume halves can be swapped.
-    val modePanel: @Composable (Modifier) -> Unit = { m -> ScreenModePanel(state, onRequestMode, m) }
+    val modePanel: @Composable (Modifier) -> Unit = { m ->
+        ArrangeableCard(OverlayCardId.MODE_BUTTONS, arrange, m) { ScreenModePanel(state, onRequestMode, Modifier.fillMaxSize()) }
+    }
     val sliderRow: @Composable (Modifier) -> Unit = { m ->
-        Row(m, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(m.arrangeLayer(arrange, listOf(OverlayCardId.BRIGHTNESS, OverlayCardId.VOLUME)), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             for (card in layout.modeHalfOrder) {
-                when (card) {
-                    jr.brian.commandpannel.system.OverlayCardId.BRIGHTNESS ->
-                        BrightnessCard(state, actions, Modifier.weight(1f).fillMaxHeight())
-                    jr.brian.commandpannel.system.OverlayCardId.VOLUME ->
-                        VolumeCard(state, actions, Modifier.weight(1f).fillMaxHeight())
-                    else -> Unit
+                ArrangeableCard(card, arrange, Modifier.weight(1f).fillMaxHeight()) {
+                    when (card) {
+                        OverlayCardId.BRIGHTNESS -> BrightnessCard(state, actions, Modifier.fillMaxSize())
+                        OverlayCardId.VOLUME -> VolumeCard(state, actions, Modifier.fillMaxSize())
+                        else -> Unit
+                    }
                 }
             }
         }

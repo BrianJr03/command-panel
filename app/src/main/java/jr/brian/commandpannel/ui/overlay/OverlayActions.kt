@@ -30,6 +30,9 @@ interface OverlayActions {
     /** Opens the Command Panel companion settings app (on the top screen). */
     fun launchCompanion()
 
+    /** Persists a new overlay card arrangement (from Arrange mode). */
+    fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout)
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}
@@ -52,5 +55,6 @@ interface OverlayActions {
         override fun setSuppressBottomTip(suppress: Boolean) {}
         override fun quickLaunch() {}
         override fun launchCompanion() {}
+        override fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout) {}
     }
 }

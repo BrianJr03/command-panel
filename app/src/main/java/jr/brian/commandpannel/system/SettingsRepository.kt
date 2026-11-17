@@ -410,6 +410,12 @@ class SettingsRepository(
         QuickLaunch.launch(context)
     }
 
+    override fun setOverlayLayout(layout: OverlayLayout) {
+        prefs.edit().putString("overlay_layout", layout.encode()).apply()
+        // Reflect immediately so the overlay re-renders and the FLIP animation can run.
+        _uiState.update { it.copy(layout = layout) }
+    }
+
     override fun launchCompanion() {
         runCatching {
             context.startActivity(
