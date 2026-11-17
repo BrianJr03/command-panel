@@ -1,6 +1,6 @@
 # Command Panel
 
-User-installable replacement for the AYN Thor's stock bottom-screen assistant, plus Brian's own additions.
+User-installable replacement for the AYN Thor's stock bottom-screen assistant.
 Package `jr.brian.commandpannel`. Personal, non-commercial project.
 
 | Path | Contents |
