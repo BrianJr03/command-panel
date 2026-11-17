@@ -1,0 +1,76 @@
+package jr.brian.commandpannel.service
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+/** Covers the AYN button three-state logic, mirroring the stock assistant's behaviour. */
+class AynButtonMachineTest {
+
+    private class Recorder {
+        var toggles = 0
+        var hides = 0
+        var blanks = 0
+        var wakes = 0
+        var keyguard = false
+        var blanked = false
+        var clock = 0L
+
+        fun machine(debounceMs: Long = 400L) = AynButtonMachine(
+            isKeyguardLocked = { keyguard },
+            isBottomBlanked = { blanked },
+            onToggleOverlay = { toggles++ },
+            onHideOverlay = { hides++ },
+            onBlankBottom = { blanks++ },
+            onWakeBottom = { wakes++ },
+            now = { clock },
+            debounceMs = debounceMs,
+        )
+    }
+
+    private fun down(m: AynButtonMachine, long: Boolean = false) = m.onEvent(down = true, longPress = long)
+    private fun up(m: AynButtonMachine) = m.onEvent(down = false, longPress = false)
+
+    @Test
+    fun shortPress_togglesOverlayOnKeyUpOnly() {
+        val r = Recorder(); val m = r.machine()
+        down(m)
+        assertEquals("key-down must not toggle", 0, r.toggles)
+        up(m)
+        assertEquals(1, r.toggles)
+    }
+
+    @Test
+    fun longPress_hidesAndBlanks_andSwallowsTheFollowingKeyUp() {
+        val r = Recorder(); val m = r.machine()
+        down(m, long = true)
+        assertEquals(1, r.hides)
+        assertEquals(1, r.blanks)
+        up(m)
+        assertEquals("key-up after long press is a no-op", 0, r.toggles)
+        assertEquals(0, r.wakes)
+    }
+
+    @Test
+    fun keyUp_whileBottomBlanked_wakesInsteadOfToggling() {
+        val r = Recorder().apply { blanked = true }; val m = r.machine()
+        up(m)
+        assertEquals(1, r.wakes)
+        assertEquals(0, r.toggles)
+    }
+
+    @Test
+    fun keyUp_onKeyguard_doesNothing() {
+        val r = Recorder().apply { keyguard = true }; val m = r.machine()
+        up(m)
+        assertEquals(0, r.toggles)
+    }
+
+    @Test
+    fun rapidKeyUps_areDebounced() {
+        val r = Recorder(); val m = r.machine(debounceMs = 400L)
+        r.clock = 1000; up(m)
+        r.clock = 1200; up(m) // within 400ms -> ignored
+        r.clock = 1500; up(m) // after 400ms -> toggles
+        assertEquals(2, r.toggles)
+    }
+}

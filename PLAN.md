@@ -55,10 +55,21 @@ service gone after the app is force-stopped; stock assistant untouched. Release 
 Not yet wired: `setDisplayBrightness` exercised for real (used in phase 4), helper auto-respawn on unexpected death
 (added with the foreground service in phase 2).
 
-### 2. Overlay host and input
-Foreground service owns the display-4 overlay and the AYN button state machine
-(`action.tcc.button.key.event`: down no-op, long-press → top only, up → wake or toggle, 400 ms debounce, ignored on
-keyguard). HOME via the mapping service. Volume keys via `action.volume.key.event`.
+### 2. Overlay host and input — done 2026-11-16
+`DisplayTopology` resolves top (0) / bottom (4). `OverlayHost` attaches a `ComposeView` (with
+`OverlayLifecycleOwner` supplying the Lifecycle/ViewModelStore/SavedStateRegistry) to the bottom display's
+`WindowManager` as `TYPE_APPLICATION_OVERLAY` (2038), full real size, no `FLAG_LAYOUT_NO_LIMITS`, 200 ms view-driven
+slide+fade. `AssistantService` is the `specialUse` foreground service: inits the privileged layer, hosts the
+overlay, registers the AYN broadcast dynamically, and runs `AynButtonMachine`. `BootReceiver` starts it on boot.
+`AynButtonMachine` is pure and unit-tested (down no-op, long-press hide+blank + swallow next up, up wakes-if-blanked
+else toggles with stock's debounce guard); blank/wake are no-ops until phase 4.
+Verified on the Thor: service runs; overlay attaches to display 4 at 1240×1080 (no clipping); the Close button
+dismisses by touch; app-action and broadcast show/hide/toggle work; 5 state-machine tests pass.
+**Open:** whether the firmware's own `action.tcc.button.key.event` reaches a user app — needs a physical AYN press
+(an `am broadcast` stand-in did not visibly fire; it may be a protected broadcast). If it doesn't, fall back to the
+mapping service or an accessibility key hook (as Brian's Mjolnir does for HOME). HOME dismiss and volume keys deferred.
+**Coexistence note:** the stock overlay (type 2021) renders above ours (2038) when both are up — stock suppression
+(phase 5) is what resolves this.
 
 ### 3. Stock UI 1:1
 Status bar, Mode tab, Settings tab, nav bar, dialogs, both stock palettes (Light / Pure Black, `tcc_theme_mode`),

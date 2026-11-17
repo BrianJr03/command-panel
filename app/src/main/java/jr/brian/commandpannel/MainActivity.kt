@@ -1,5 +1,6 @@
 package jr.brian.commandpannel
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,22 +26,31 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import jr.brian.commandpannel.service.AssistantService
 import jr.brian.commandpannel.ui.diagnostics.DiagnosticsViewModel
 
 /**
- * Phase 1 host: a Diagnostics screen on the top display that bootstraps the privileged layer and reports each step.
- * This is the companion-settings activity's seed; the real settings UI arrives with the overlay (later phases).
+ * Diagnostics host on the top display: bootstraps the privileged layer, reports each step, and (phase 2) can poke
+ * the overlay on the bottom screen. Seed of the companion-settings activity; the real settings UI arrives later.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DiagnosticsScreen() }
+        AssistantService.start(this)
+        setContent { DiagnosticsScreen(onToggleOverlay = { toggleOverlay() }) }
+    }
+
+    private fun toggleOverlay() {
+        startService(Intent(this, AssistantService::class.java).setAction(AssistantService.ACTION_TOGGLE_OVERLAY))
     }
 }
 
 @Composable
-private fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
+private fun DiagnosticsScreen(
+    onToggleOverlay: () -> Unit,
+    vm: DiagnosticsViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     Column(
         modifier = Modifier
@@ -49,10 +59,13 @@ private fun DiagnosticsScreen(vm: DiagnosticsViewModel = hiltViewModel()) {
             .padding(24.dp),
     ) {
         Text("Command Panel · ${BuildConfig.VERSION_NAME}", color = Color.White, fontSize = 22.sp)
-        Text("Privileged layer diagnostics (phase 1)", color = Color.Gray, fontSize = 13.sp)
+        Text("Diagnostics (phases 1–2)", color = Color.Gray, fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { vm.run() }, enabled = !state.running) {
-            Text(if (state.running) "Running…" else "Run diagnostics")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { vm.run() }, enabled = !state.running) {
+                Text(if (state.running) "Running…" else "Run diagnostics")
+            }
+            Button(onClick = onToggleOverlay) { Text("Toggle overlay") }
         }
         Spacer(Modifier.height(16.dp))
         Column(
