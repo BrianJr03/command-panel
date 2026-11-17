@@ -25,7 +25,15 @@ data class TccColors(
     val lightning: Color,
     val panelText: Color,
     val viewSelectedBg: Color,
+    /** True for pure-black/dark palettes; drives the look-colour derivation. */
+    val isDark: Boolean,
+    /** Error / danger accent (Cockpit red-zone, etc.). */
+    val error: Color = Color(0xFFF64646),
 ) {
+    // Aliases so the ported look renderers (written against the fork's palette) read naturally.
+    val panelBackgroundSelected: Color get() = panelBackgroundSelect
+    val dialogBackground: Color get() = dialogBg
+
     companion object {
         val Light = TccColors(
             primaryBackground = Color(0xFFFFFFFF),
@@ -41,6 +49,7 @@ data class TccColors(
             lightning = Color(0xFF04AD29),
             panelText = Color(0xFF666666),
             viewSelectedBg = Color(0xFF454545),
+            isDark = false,
         )
 
         val PureBlack = TccColors(
@@ -57,9 +66,13 @@ data class TccColors(
             lightning = Color(0xFF03C82E),
             panelText = Color(0xFFFFFFFF),
             viewSelectedBg = Color(0xFF1A1A1A),
+            isDark = true,
         )
     }
 }
+
+/** The fork's look renderers were written against a `TccColorPalette`; in Command Panel that is [TccColors]. */
+typealias TccColorPalette = TccColors
 
 /** Ring gauge colours (hardware panel), from the stock `HardwareInfoDisplayView`. */
 object RingColors {
