@@ -69,12 +69,13 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 2. **Command Panel published publicly — 2026-11-17.** With every ported feature integrated and its upstream
    dependencies rewritten, and with `fork-port/` purged from git history (see §6), Command Panel was pushed to a
    **public** GitHub repo. What is published is the app in `app/` plus project docs — it contains **no BDSA
-   (stormpanda) code**, so BDSA's licence (which governs BDSA's code, not Brian's own) does not restrict it. It does
-   bundle AYN's stock icons/strings (AYN's IP, not BDSA's) and OFL fonts (with notices); publishing those publicly is
-   an accepted decision by the owner (Brian), for personal/non-commercial use. No keystore or signing secret is
-   tracked (`.gitignore` excludes `*.jks`/`*.keystore`/`*.apk`); release signing runs in CI from repo secrets.
-3. **AYN assets.** Command Panel reuses the stock app's icons and strings. That concerns AYN, not BDSA, and is for
-   personal use only.
+   (stormpanda) code**, so BDSA's licence (which governs BDSA's code, not Brian's own) does not restrict it. It ships
+   OFL fonts (with notices) and, as of the same day, **no AYN icon art** (loaded at runtime instead — see §7). No
+   keystore or signing secret is tracked (`.gitignore` excludes `*.jks`/`*.keystore`/`*.apk`); release signing runs
+   in CI from repo secrets.
+3. **AYN assets.** Command Panel's labels are its own functional English. As of 2026-11-17 it **no longer bundles
+   AYN's icon art** — the stock drawables are loaded at runtime from the installed stock app (see §7). This concerns
+   AYN, not BDSA.
 
 ## 6. Re-audit — 2026-11-17 (after looks / arrange / replay / icon were integrated)
 
@@ -104,6 +105,17 @@ context) was first git-excluded, then **purged from all git history** with `git-
 --invert-paths` before the public push (a full-history backup bundle was kept locally). `git log --all -- 'fork-port/*'`
 now returns nothing, so no stormpanda code is present in any published commit; the directory remains on disk as Brian's
 untracked local porting reference.
+
+## 7. AYN icons loaded at runtime, not bundled — 2026-11-17
+
+Command Panel previously bundled ~104 of AYN's stock drawables (`app/src/main/res/drawable/`, base + `_black`
+pairs). Those were **deleted** and are now loaded at runtime from the installed stock app
+(`com.odin.dualscreen.assistant`, a non-removable, world-readable system app on every AYN Thor) via
+`jr.brian.commandpannel.privileged.StockResources` (single chokepoint `rememberStockPainter`). The repo and the APK
+now ship **zero AYN icon art** — only three CP-authored drawables remain (`ic_launcher_background`,
+`ic_launcher_foreground`, `ic_qs_replay_buffer`). If a stock icon can't be read, a neutral CP-owned placeholder is
+shown (never AYN art). This removes AYN-asset redistribution as a concern for the public repo. CP's labels are its
+own functional English (no AYN `strings.xml` is bundled).
 
 ## Files in this folder
 

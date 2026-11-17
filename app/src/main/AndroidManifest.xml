@@ -23,6 +23,11 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Load the stock assistant's drawables at runtime (StockResources) instead of bundling AYN's icon art. -->
+    <queries>
+        <package android:name="com.odin.dualscreen.assistant" />
+    </queries>
+
     <application
         android:name=".CommandPanelApp"
         android:allowBackup="false"
