@@ -24,3 +24,7 @@
 - Wrap scrolling content in `PaddedBringIntoView { ... }` (`ui/settings/CompanionWidgets.kt`), which provides a `PaddedBringIntoViewSpec` through `LocalBringIntoViewSpec` to every nested scrollable, vertical and horizontal. The settings pane and Theme Studio already do this. A new full-screen companion view must wrap its own content, since it doesn't sit inside the settings pane.
 - Also give horizontally scrolling rows some content padding (padding applied after `horizontalScroll`, as `ChipRow` does) so the first and last items aren't clipped at rest.
 - Never put a raw `BasicTextField` / `TextField` in the companion: it traps the D-pad (arrows move the cursor) and B falls through to Back and closes the app. Use `GamepadTextField` (`CompanionWidgets.kt`): focus stops on it, A starts editing, and D-pad up/down or B stop editing.
+
+## Promo videos
+
+- Videos live in a separate private repo, `BrianJr03/command-panel-reveal` (local: `~/Desktop/Projects/command-panel-reveal`). Read its `CLAUDE.md` before starting a new video: it has the decisions, preferences, music edit, capture setup and rendering gotchas from the 60-second reveal.
