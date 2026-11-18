@@ -215,6 +215,16 @@ fun CustomLook.toSpec(fonts: UserFontResolver = UserFontResolver.None): TccLookS
  * Applies [pinned] colors to a palette. A pinned background that flips light/dark re-bases the text roles on the
  * matching stock palette so labels keep their contrast; the panel defaults to a step off the background.
  */
+/**
+ * The full palette for a look: [resolvePalette] for the theme mode, then the look's [pinned] colors, then the
+ * ambient-LED [accentOverride] last, so with the LED→accent sync on the LED color wins over a pinned accent too
+ * (a theme pack's background, panel and second accent are kept). Shared by the overlay, the companion and previews.
+ */
+fun resolveLookPalette(themeMode: Int, nightActive: Boolean, accentOverride: Int?, pinned: PinnedColors?): TccColors {
+    val colors = resolvePalette(themeMode, nightActive, accentOverride = null).withPinned(pinned)
+    return accentOverride?.let { colors.copy(accent = Color(it)) } ?: colors
+}
+
 fun TccColors.withPinned(pinned: PinnedColors?): TccColors {
     if (pinned == null || pinned.isEmpty) return this
     val bg = pinned.background

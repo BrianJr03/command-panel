@@ -19,6 +19,7 @@ import jr.brian.commandpannel.ui.theme.TccUiLook
 import jr.brian.commandpannel.ui.theme.TileStyle
 import jr.brian.commandpannel.ui.theme.contrastRatio
 import jr.brian.commandpannel.ui.theme.resolveLookColors
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import jr.brian.commandpannel.ui.theme.specForLook
 import jr.brian.commandpannel.ui.theme.toSpec
 import jr.brian.commandpannel.ui.theme.withPinned
@@ -119,5 +120,18 @@ class CustomLookTest {
         val custom = look.copy(card = CardStyle.CUSTOM)
         assertEquals(params, custom.toSpec().custom)
         assertEquals(custom, CustomLookJson.decodeList(CustomLookJson.encodeList(listOf(custom))).single())
+    }
+
+    @Test
+    fun ambientLedAccentWinsOverAPinnedAccent() {
+        val pinned = PinnedColors(accent = Color(0xFF00FF00), background = Color(0xFF102030))
+        val led = 0xFFFF0000.toInt()
+
+        val synced = resolveLookPalette(themeMode = 0, nightActive = true, accentOverride = led, pinned = pinned)
+        assertEquals(Color(led), synced.accent)
+        assertEquals(Color(0xFF102030), synced.primaryBackground) // the pack's other pinned colors are kept
+
+        val unsynced = resolveLookPalette(themeMode = 0, nightActive = true, accentOverride = null, pinned = pinned)
+        assertEquals(Color(0xFF00FF00), unsynced.accent)
     }
 }

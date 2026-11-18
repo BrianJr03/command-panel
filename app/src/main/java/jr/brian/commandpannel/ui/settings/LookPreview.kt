@@ -32,10 +32,9 @@ import jr.brian.commandpannel.ui.overlay.RingsCard
 import jr.brian.commandpannel.ui.overlay.TempFanCard
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
 import jr.brian.commandpannel.ui.theme.TccTheme
-import jr.brian.commandpannel.ui.theme.resolvePalette
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import jr.brian.commandpannel.ui.theme.tccLookColors
 import jr.brian.commandpannel.ui.theme.toSpec
-import jr.brian.commandpannel.ui.theme.withPinned
 import jr.brian.commandpannel.ui.overlay.OverlayTab
 import jr.brian.commandpannel.ui.overlay.OverlayUiState
 import jr.brian.commandpannel.ui.theme.CustomLook
@@ -115,7 +114,7 @@ internal fun OverlayLookPreview(
 @Composable
 internal fun CardsLookPreview(state: SettingsState, look: CustomLook, width: Dp, themeMode: Int, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val colors = resolvePalette(themeMode, nightActive = themeMode != 3, state.accentOverride).withPinned(look.colors)
+    val colors = resolveLookPalette(themeMode, nightActive = themeMode != 3, state.accentOverride, look.colors)
     val spec = androidx.compose.runtime.remember(look) { look.toSpec(UserFontStore.resolver(context)) }
     ScaledPreview(width, modifier = modifier) {
         TccTheme(colors) {

@@ -13,7 +13,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import jr.brian.commandpannel.system.UserFontStore
 import jr.brian.commandpannel.ui.theme.toSpec
-import jr.brian.commandpannel.ui.theme.withPinned
 import jr.brian.commandpannel.ui.theme.LOOK_LINE_CONTRAST
 import jr.brian.commandpannel.ui.theme.LOOK_TEXT_CONTRAST
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
@@ -22,7 +21,7 @@ import jr.brian.commandpannel.ui.theme.TccColors
 import jr.brian.commandpannel.ui.theme.TccTheme
 import jr.brian.commandpannel.ui.theme.clampContrast
 import jr.brian.commandpannel.ui.theme.contrastRatio
-import jr.brian.commandpannel.ui.theme.resolvePalette
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import jr.brian.commandpannel.ui.theme.specForLook
 
 /**
@@ -102,7 +101,7 @@ val LocalCompanionThemed: ProvidableCompositionLocal<Boolean> = staticCompositio
 internal fun rememberOverlayLook(state: SettingsState): Pair<TccColors, jr.brian.commandpannel.ui.theme.TccLookSpec> {
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
-    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride).withPinned(state.overlayCustomLook?.colors)
+    val colors = resolveLookPalette(state.themeMode, nightActive, state.accentOverride, state.overlayCustomLook?.colors)
     val context = LocalContext.current
     val spec = remember(state.overlayLook, state.overlayCustomLook) {
         state.overlayCustomLook?.toSpec(UserFontStore.resolver(context)) ?: specForLook(state.overlayLook)

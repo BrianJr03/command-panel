@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.system.UserFontStore
 import jr.brian.commandpannel.ui.theme.toSpec
-import jr.brian.commandpannel.ui.theme.withPinned
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeToolbar
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
@@ -32,7 +31,7 @@ import jr.brian.commandpannel.ui.overlay.arrange.arrangeContentArea
 import jr.brian.commandpannel.ui.overlay.arrange.longPressToArrange
 import jr.brian.commandpannel.ui.overlay.arrange.rememberArrangeController
 import jr.brian.commandpannel.ui.theme.LocalTccColors
-import jr.brian.commandpannel.ui.theme.resolvePalette
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import jr.brian.commandpannel.ui.theme.TccTheme
 
 /**
@@ -46,8 +45,8 @@ fun OverlayRoot(
 ) {
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
-    // When the LED→accent sync is on, the Thor's ambient-LED color becomes the overlay accent.
-    val colors = resolvePalette(state.themeMode, nightActive, state.accentOverride).withPinned(state.customLook?.colors)
+    // When the LED→accent sync is on, the Thor's ambient-LED color becomes the overlay accent, even over a look's own.
+    val colors = resolveLookPalette(state.themeMode, nightActive, state.accentOverride, state.customLook?.colors)
     val context = androidx.compose.ui.platform.LocalContext.current
     val lookSpec = remember(state.look, state.customLook) {
         state.customLook?.toSpec(UserFontStore.resolver(context)) ?: jr.brian.commandpannel.ui.theme.specForLook(state.look)

@@ -197,7 +197,7 @@
     <string name="settings_companion_follow_look">Companion follows overlay look</string>
     <string name="settings_companion_follow_look_desc">Apply the overlay\'s look, theme and accent to this settings screen. Off keeps the default companion style.</string>
     <string name="settings_rgb_accent">Accent from Ambient LED</string>
-    <string name="settings_rgb_accent_desc">Use the color you set for the Thor\'s Ambient LED as the overlay\'s accent — so the overlay theme follows your joystick LED color.</string>
+    <string name="settings_rgb_accent_desc">Use the color you set for the Thor\'s Ambient LED as the overlay\'s accent, even over a look\'s own accent, so the overlay theme follows your joystick LED color.</string>
 
     <!-- Overlay looks (proper names) -->
     <string name="look_auto">Auto (stock)</string>
