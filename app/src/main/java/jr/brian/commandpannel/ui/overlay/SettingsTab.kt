@@ -119,6 +119,7 @@ internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mo
                             active = tile.active,
                             labelSize = 10.sp,
                             showLabel = !state.hideTileLabels,
+                            pressAnimation = true,
                             onClick = { onTile(tile.id) },
                         )
                     }

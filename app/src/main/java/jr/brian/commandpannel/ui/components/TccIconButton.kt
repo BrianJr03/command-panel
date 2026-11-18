@@ -46,8 +46,9 @@ fun TccIconButton(
     variant: TccTileVariant = TccTileVariant.QUICK_SETTING,
     index: Int = 0,
     showLabel: Boolean = true,
+    pressAnimation: Boolean = false,
     onClick: (() -> Unit)? = null,
-) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, showLabel, onClick)
+) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, showLabel, pressAnimation, onClick)
 
 @Composable
 fun TccIconButton(
@@ -62,6 +63,8 @@ fun TccIconButton(
     index: Int = 0,
     /** `false` draws the icon only (the label still names it for accessibility). */
     showLabel: Boolean = true,
+    /** Shrink the button while it's pressed ([pressScale]). */
+    pressAnimation: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = LocalTccColors.current
@@ -74,7 +77,11 @@ fun TccIconButton(
     // Column-highlight nav styles draw the selection around the whole item and show a bare icon.
     val columnHighlight = isNav && navRenderer.columnHighlight
 
-    val base = if (onClick != null) modifier.noRippleClickable { onClick() } else modifier
+    val base = when {
+        onClick == null -> modifier
+        pressAnimation -> modifier.pressScale().noRippleClickable { onClick() }
+        else -> modifier.noRippleClickable { onClick() }
+    }
 
     val iconTint = if (columnHighlight) navRenderer.iconTint(paint, active)
     else lookTileIconTint(spec, colors, lookColors, active, index)
