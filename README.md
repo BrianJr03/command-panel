@@ -84,10 +84,10 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 
 - 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
-- 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything.
+- 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything, with a guided tour of every section on first launch.
 - 🧩 **Customizable tiles** — turn each one on or off and **drag-and-drop to reorder** them.
 - ✋ **Arrange mode** — long-press the overlay to drag-and-drop its cards into any layout.
-- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment.
+- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video.
 - 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
 - 🔋 **Battery time estimate** and an option to **hide the network-speed** readout.
