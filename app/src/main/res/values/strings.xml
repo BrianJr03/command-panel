@@ -109,7 +109,7 @@
     <!-- Companion: categories -->
     <string name="settings_cat_general">General</string>
     <string name="settings_cat_nav_bar">Nav Bar</string>
-    <string name="settings_cat_quick_toggles">Quick Toggles</string>
+    <string name="settings_cat_quick_toggles">Toggles</string>
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_diagnostics">Diagnostics</string>
     <string name="settings_cat_themes">Themes</string>
