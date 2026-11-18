@@ -3,6 +3,7 @@ package jr.brian.commandpannel.ui.settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -44,6 +45,12 @@ import jr.brian.commandpannel.ui.theme.TccUiLook
 internal val OverlayScreenSize = DpSize(538.dp, 468.dp)
 
 /**
+ * The overlay's smallest margin to its cards (the 10 dp above the top row). A preview's corner radius is this, scaled
+ * down with the preview, so the rounding stays in the margin and never clips a card's corner.
+ */
+private val PreviewCornerInset = 10.dp
+
+/**
  * Renders [content] as if on a [design]-sized screen, shrunk to [width]. It lowers the density instead of scaling a
  * bitmap, so text and strokes stay sharp. The preview is display-only: it swallows touches and can't take focus, so
  * gamepad navigation skips over it.
@@ -62,7 +69,7 @@ internal fun ScaledPreview(
     Box(
         modifier
             .size(width, design.height * scale + padding * 2)
-            .clip(cardShape())
+            .clip(RoundedCornerShape(PreviewCornerInset * scale))
             // The miniature overlay has focusable controls of its own. Fencing it in a group that can't be entered
             // keeps D-pad focus from landing on (invisible) controls inside a preview.
             .focusProperties { onEnter = { cancelFocusChange() } }
@@ -79,7 +86,10 @@ internal fun ScaledPreview(
     }
 }
 
-/** A miniature of the real overlay under [look] (or the built-in [base] when [look] is null). */
+/**
+ * A miniature of the real overlay under [look] (or the built-in [base] when [look] is null), without the status bar:
+ * the clock and battery row says nothing about a look.
+ */
 @Composable
 internal fun OverlayLookPreview(
     state: SettingsState,
@@ -102,6 +112,7 @@ internal fun OverlayLookPreview(
                 navOrder = jr.brian.commandpannel.system.NavBarButton.ordered(state.navOrder.joinToString(",")),
                 layout = state.overlayLayout,
             ),
+            showStatusBar = false,
         )
     }
 }

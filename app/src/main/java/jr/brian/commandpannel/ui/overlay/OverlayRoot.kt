@@ -37,11 +37,13 @@ import jr.brian.commandpannel.ui.theme.TccTheme
 /**
  * Root of the bottom-screen overlay. Picks the palette from `tcc_theme_mode` (1 = follow system night, 3 = light,
  * else pure black), then stacks the status bar, the active tab, and the nav bar over the theme background.
+ * [showStatusBar] false leaves out the clock / network / battery row (look previews in the companion).
  */
 @Composable
 fun OverlayRoot(
     state: OverlayUiState = OverlayUiState(),
     actions: OverlayActions = OverlayActions.None,
+    showStatusBar: Boolean = true,
 ) {
     val nightActive = (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
@@ -105,8 +107,8 @@ fun OverlayRoot(
                     .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))
-                StatusBar(state)
-                if (navAtTop) { Spacer(Modifier.height(8.dp)); navBar() }
+                if (showStatusBar) StatusBar(state)
+                if (navAtTop) { if (showStatusBar) Spacer(Modifier.height(8.dp)); navBar() }
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp)
                         .arrangeContentArea(arrange),

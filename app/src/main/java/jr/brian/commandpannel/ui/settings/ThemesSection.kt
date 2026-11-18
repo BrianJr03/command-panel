@@ -70,7 +70,7 @@ internal fun Themes(
     val newName = stringResource(R.string.theme_new_look_name, state.customLooks.size + 1)
     Card(Modifier.tourTarget(TourSpot.ACTIVE_LOOK)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OverlayLookPreview(state, state.overlayLook, state.overlayCustomLook, width = 250.dp, padding = LOOK_PREVIEW_PADDING)
+            OverlayLookPreview(state, state.overlayLook, state.overlayCustomLook, width = 250.dp)
             Spacer(Modifier.width(18.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(lookLabel(stringResource(R.string.theme_active)).uppercase(), color = p.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -242,11 +242,11 @@ private fun SavedLooksDeck(state: SettingsState, onOpen: () -> Unit, modifier: M
                                 scaleX = depth
                                 scaleY = depth
                                 shadowElevation = (10 - i * 3).dp.toPx()
-                                shape = RoundedCornerShape(14.dp)
+                                shape = RoundedCornerShape(5.dp)
                                 clip = false
                             },
                     ) {
-                        OverlayLookPreview(state, look.baseLook, look, width = DECK_PREVIEW_WIDTH, padding = LOOK_PREVIEW_PADDING)
+                        OverlayLookPreview(state, look.baseLook, look, width = DECK_PREVIEW_WIDTH)
                     }
                 }
             }
@@ -284,7 +284,7 @@ internal fun SavedLookCard(
     var confirmDelete by remember(look.id) { mutableStateOf(false) }
     Card(Modifier.bringIntoViewOnFocus()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OverlayLookPreview(state, look.baseLook, look, width = LOOK_PREVIEW_WIDTH, padding = LOOK_PREVIEW_PADDING)
+            OverlayLookPreview(state, look.baseLook, look, width = LOOK_PREVIEW_WIDTH)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 CardTitle(look.name)
@@ -309,9 +309,6 @@ internal fun SavedLookCard(
         }
     }
 }
-
-/** Breathing room around the miniature overlay inside a look's preview. */
-private val LOOK_PREVIEW_PADDING = 6.dp
 
 /** Width of the preview on each saved look and theme-pack card. */
 private val LOOK_PREVIEW_WIDTH = 200.dp
@@ -357,7 +354,7 @@ internal fun FolderPackCard(fp: FolderPack, state: SettingsState, vm: SettingsVi
         if (expanded) pack.looks.forEach { look ->
             Spacer(Modifier.height(6.dp))
             Row(Modifier.bringIntoViewOnFocus(), verticalAlignment = Alignment.CenterVertically) {
-                OverlayLookPreview(state, look.baseLook, look, width = LOOK_PREVIEW_WIDTH, padding = LOOK_PREVIEW_PADDING)
+                OverlayLookPreview(state, look.baseLook, look, width = LOOK_PREVIEW_WIDTH)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(look.name, color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
