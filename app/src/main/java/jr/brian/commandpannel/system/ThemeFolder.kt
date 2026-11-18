@@ -21,6 +21,9 @@ data class FolderPack(val path: String, val pack: LookPack?)
 object ThemeFolder {
     const val ROOT = "/sdcard/TCP Themes"
     const val THEMES = "$ROOT/themes"
+
+    /** [path] as the user's storage shows it: `/sdcard` is a shortcut for `/storage/emulated/0`. */
+    fun displayPath(path: String): String = path.replaceFirst("/sdcard", "/storage/emulated/0")
     const val FONTS = "$ROOT/fonts"
     private const val README = "README.txt"
 

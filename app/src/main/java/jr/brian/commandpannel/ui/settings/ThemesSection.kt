@@ -21,7 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import jr.brian.commandpannel.system.FolderPack
 import jr.brian.commandpannel.system.FontNeeds
@@ -171,6 +173,22 @@ internal fun RepoPacks(state: SettingsState, vm: SettingsViewModel, onOpenStudio
     }
 }
 
+/** A card description with each of [bold] (exact substrings of [text]) set in bold, in the primary text color. */
+@Composable
+private fun CardDescBold(text: String, bold: List<String>) {
+    val emphasis = SpanStyle(fontWeight = FontWeight.Bold, color = p.textPrimary)
+    val annotated = remember(text, bold, emphasis) {
+        buildAnnotatedString {
+            append(text)
+            bold.forEach { part ->
+                val at = text.indexOf(part)
+                if (at >= 0) addStyle(emphasis, at, at + part.length)
+            }
+        }
+    }
+    Text(annotated, color = p.textSecondary, fontSize = 13.sp)
+}
+
 /** More saved looks than this collapse into [SavedLooksDeck]. */
 private const val DECK_THRESHOLD = 3
 
@@ -179,7 +197,10 @@ private const val DECK_THRESHOLD = 3
 internal fun MyLooksHeaderCard(state: SettingsState, vm: SettingsViewModel, modifier: Modifier = Modifier) {
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importLook) }
     Card(modifier) {
-        CardDesc(stringResource(R.string.theme_share_desc, ThemeFolder.THEMES))
+        // The file type and the folder in bold, so the name to look for and where to find it stand out.
+        val ext = jr.brian.commandpannel.ui.theme.LookPackJson.EXTENSION
+        val folder = ThemeFolder.displayPath(ThemeFolder.THEMES)
+        CardDescBold(stringResource(R.string.theme_share_desc, ext, folder), listOf(ext, folder))
         Spacer(Modifier.height(4.dp))
         val allName = stringResource(R.string.theme_export_all_name)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
