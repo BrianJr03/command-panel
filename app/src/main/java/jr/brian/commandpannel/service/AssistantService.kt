@@ -130,7 +130,12 @@ class AssistantService : Service() {
             this,
             content = { _ ->
                 val state by repository.uiState.collectAsState()
-                OverlayRoot(state = state, actions = repository)
+                // Theme Studio's unsaved draft, shown live while it's open.
+                val draft by jr.brian.commandpannel.ui.theme.StudioDraft.look.collectAsState()
+                OverlayRoot(
+                    state = draft?.let { state.copy(look = it.baseLook, customLook = it) } ?: state,
+                    actions = repository,
+                )
             },
             // Onboarding that can't be shown counts as done, so the companion tour isn't left waiting for it.
             onShowFailed = {

@@ -2,6 +2,8 @@ package jr.brian.commandpannel.ui.settings
 
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
@@ -129,7 +131,10 @@ internal fun OverlayLookScope(state: SettingsState, content: @Composable () -> U
 fun CompanionTheme(state: SettingsState, content: @Composable () -> Unit) {
     // One call site for [content] either way: toggling Follow look only changes what's provided. Two branches would make
     // Compose rebuild the whole companion (its NavHost included), dropping the user back on General.
-    val followed = if (state.companionFollowLook) rememberOverlayLook(state) else null
+    // Theme Studio's unsaved draft stands in for the applied look while Studio is open.
+    val draft by jr.brian.commandpannel.ui.theme.StudioDraft.look.collectAsState()
+    val shown = draft?.let { state.copy(overlayLook = it.baseLook, overlayCustomLook = it) } ?: state
+    val followed = if (state.companionFollowLook) rememberOverlayLook(shown) else null
     val colors = followed?.first
     val palette = remember(colors) { colors?.let(::companionPaletteFrom) ?: CompanionPalette.Default }
     CompositionLocalProvider(

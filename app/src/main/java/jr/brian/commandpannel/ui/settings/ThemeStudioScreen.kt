@@ -49,6 +49,10 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.theme.StudioDraft
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.runtime.DisposableEffect
 import jr.brian.commandpannel.ui.components.GamepadButton
 import jr.brian.commandpannel.system.FontImportException
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
@@ -78,7 +82,9 @@ internal fun newCustomLook(name: String, base: TccUiLook) = CustomLook(id = UUID
 
 /**
  * Theme Studio: a full-screen editor for one [CustomLook]. Controls scroll on the left; a live miniature of the
- * overlay stays pinned on the right, so every pick is visible as it's made. B / back closes without saving.
+ * overlay stays pinned on the right, so every pick is visible as it's made. The draft also shows live on the real
+ * overlay (and the companion, when it follows the look) through [StudioDraft]; leaving reverts to the applied look.
+ * Save stores it, Save and apply also applies it. B / back asks before discarding unsaved changes.
  */
 @Composable
 internal fun ThemeStudioScreen(
@@ -97,7 +103,16 @@ internal fun ThemeStudioScreen(
     // Select (−) jumps to the save button, Start (+) to Save and apply; A then presses it.
     val saveFocus = remember { FocusRequester() }
     val applyFocus = remember { FocusRequester() }
-    BackHandler(onBack = onClose)
+    // The version last saved (or opened): Back only asks to discard when the draft differs from it.
+    var lastSaved by remember(initial.id) { mutableStateOf(initial) }
+    var confirmDiscard by remember { mutableStateOf(false) }
+    val dirty = draft != lastSaved
+    val requestClose: () -> Unit = { if (draft != lastSaved) confirmDiscard = true else onClose() }
+    LaunchedEffect(draft) { StudioDraft.look.value = draft }
+    DisposableEffect(Unit) { onDispose { StudioDraft.look.value = null } }
+    // The NavHost's own back handling can run first, so B / Back keys are caught in the key handler below, and this
+    // (for the back gesture) is only enabled while there's something to lose: enabled after the NavHost's, it wins.
+    BackHandler(enabled = dirty) { confirmDiscard = true }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
     val backdrop = if (LocalCompanionThemed.current) {
@@ -106,7 +121,6 @@ internal fun ThemeStudioScreen(
         Modifier.background(p.bg)
     }
     val savedMsg = stringResource(R.string.theme_saved)
-    val appliedMsg = stringResource(R.string.theme_applied)
     PaddedBringIntoView {
     Column(
         Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
@@ -122,6 +136,11 @@ internal fun ThemeStudioScreen(
                     Key.ButtonStart -> { { runCatching { applyFocus.requestFocus() } } }
                     else -> null
                 }
+                // B / Back on release (so the key-up doesn't reach the screen underneath once Studio is gone).
+                if (e.key == Key.ButtonB || e.key == Key.Back || e.key == Key.Escape) {
+                    if (e.type == KeyEventType.KeyUp) requestClose()
+                    return@onPreviewKeyEvent true
+                }
                 if (action != null && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) action()
                 action != null
             }
@@ -129,7 +148,7 @@ internal fun ThemeStudioScreen(
     ) {
         // ---- top bar: back, name, save actions ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Chip(stringResource(R.string.theme_back), onClick = onClose)
+            Chip(stringResource(R.string.theme_back), onClick = requestClose)
             GamepadTextField(
                 value = draft.name,
                 onValueChange = { draft = draft.copy(name = it.take(40)) },
@@ -146,18 +165,19 @@ internal fun ThemeStudioScreen(
                 Box(if (fromRepo) Modifier.focusRequester(saveFocus) else Modifier) {
                     Chip(stringResource(R.string.theme_save_new), glyph = if (fromRepo) GamepadButton.SELECT else null) {
                         val copy = ownCopy()
-                        vm.saveCustomLook(copy); draft = copy; message = savedMsg
+                        vm.saveCustomLook(copy); draft = copy; lastSaved = copy; message = savedMsg
                     }
                 }
             }
             if (!fromRepo) {
                 Box(Modifier.focusRequester(saveFocus)) {
-                    Chip(stringResource(R.string.theme_save), glyph = GamepadButton.SELECT) { vm.saveCustomLook(draft); message = savedMsg }
+                    Chip(stringResource(R.string.theme_save), glyph = GamepadButton.SELECT) { vm.saveCustomLook(draft); lastSaved = draft; message = savedMsg }
                 }
             }
             Box(Modifier.focusRequester(applyFocus)) { AccentButton(stringResource(R.string.theme_save_apply), glyph = GamepadButton.START) {
                 val target = if (fromRepo) ownCopy() else draft
-                vm.saveCustomLook(target, apply = true); draft = target; message = appliedMsg
+                // Done editing: apply it and leave Studio (the overlay now shows the applied look for real).
+                vm.saveCustomLook(target, apply = true); lastSaved = target; onClose()
             } }
         }
         Spacer(Modifier.height(10.dp))
@@ -208,6 +228,39 @@ internal fun ThemeStudioScreen(
             }
         }
     }
+    }
+    if (confirmDiscard) {
+        DiscardChangesDialog(
+            onKeep = { confirmDiscard = false },
+            onDiscard = { confirmDiscard = false; onClose() },
+        )
+    }
+}
+
+/** "Discard your changes?" on Back with unsaved edits. Focus starts on Keep editing, and B keeps editing too. */
+@Composable
+private fun DiscardChangesDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
+    Dialog(onDismissRequest = onKeep, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val keep = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { keep.requestFocus() } }
+        Column(
+            Modifier.width(520.dp)
+                // Opaque base under the look's card (which may be translucent glass), as in the update dialog.
+                .clip(cardShape()).background(p.bg)
+                .companionCard()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(stringResource(R.string.theme_discard_title), color = p.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            CardDesc(stringResource(R.string.theme_discard_body))
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.focusRequester(keep)) {
+                    AccentButton(stringResource(R.string.theme_discard_keep), glyph = GamepadButton.B, onClick = onKeep)
+                }
+                Chip(stringResource(R.string.theme_discard_confirm), onClick = onDiscard)
+            }
+        }
     }
 }
 
