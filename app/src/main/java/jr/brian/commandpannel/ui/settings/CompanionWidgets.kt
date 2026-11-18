@@ -399,6 +399,11 @@ internal fun Chip(
     selected: Boolean = false,
     enabled: Boolean = true,
     glyph: jr.brian.commandpannel.ui.components.GamepadButton? = null,
+    /**
+     * Stays focusable (doing nothing) while disabled. For buttons that disable themselves while focused, like a
+     * stepper's + at its maximum: a node that stops being focusable drops focus to the screen's first control.
+     */
+    focusableWhenDisabled: Boolean = false,
     onClick: () -> Unit,
 ) {
     val f = focusState()
@@ -410,7 +415,13 @@ internal fun Chip(
         Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape).background(bg)
             .then(if (selected || f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
-            .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
+            .then(
+                when {
+                    enabled -> Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick)
+                    focusableWhenDisabled -> Modifier.focusControl(f) {}
+                    else -> Modifier
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {

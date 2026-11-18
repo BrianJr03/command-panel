@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.CustomLook
@@ -305,9 +307,14 @@ private fun Stepper(
     fun snap(v: Float) = ((v / step).roundToInt() * step).coerceIn(min, max)
     ControlLabel(titleRes)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Chip(stringResource(R.string.theme_decrease), enabled = value > min + step / 2) { onChange(snap(value - step)) }
-        Text(unit.format(value), color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(64.dp))
-        Chip(stringResource(R.string.theme_increase), enabled = value < max - step / 2) { onChange(snap(value + step)) }
+        // At a limit the button greys out but keeps focus, so the next press doesn't jump away (to Back).
+        Chip(stringResource(R.string.theme_decrease), enabled = value > min + step / 2, focusableWhenDisabled = true) { onChange(snap(value - step)) }
+        // Centered between − and +; a longer value widens the slot rather than wrapping.
+        Text(
+            unit.format(value), color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.widthIn(min = 64.dp),
+        )
+        Chip(stringResource(R.string.theme_increase), enabled = value < max - step / 2, focusableWhenDisabled = true) { onChange(snap(value + step)) }
         Spacer(Modifier.width(4.dp))
         trailing()
     }
