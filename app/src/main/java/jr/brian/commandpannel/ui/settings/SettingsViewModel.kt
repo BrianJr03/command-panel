@@ -531,7 +531,19 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // The overlay re-themes when the ambient-LED color changes (its settings observer); this keeps the companion in step
+    // when the color is changed elsewhere, e.g. from the overlay's Ambient LED toggle.
+    private val ledColorObserver = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            val sync = _state.value.rgbAccentSync
+            _state.value = _state.value.copy(accentOverride = ThorRgbController.accentOverride(app, sync))
+        }
+    }
+
     init {
+        app.contentResolver.registerContentObserver(
+            android.provider.Settings.System.getUriFor(ThorRgbController.PICKER_COLOR_KEY), false, ledColorObserver,
+        )
         app.registerReceiver(bdsaPackageReceiver, android.content.IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -542,6 +554,7 @@ class SettingsViewModel @Inject constructor(
 
     override fun onCleared() {
         runCatching { app.unregisterReceiver(bdsaPackageReceiver) }
+        app.contentResolver.unregisterContentObserver(ledColorObserver)
         super.onCleared()
     }
 
