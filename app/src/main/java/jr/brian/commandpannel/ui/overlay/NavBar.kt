@@ -55,8 +55,10 @@ fun NavBar(
                     NavBarButton.TASK -> TccIconButton("ic_task_manage", stringResource(R.string.navigation_task_manage_text), circleSize = 44.dp, variant = nav, index = index, onClick = onTask)
                     NavBarButton.LAUNCH -> if (quickLaunchApp != null) {
                         TccIconButton(
+                            // Default inset, like the other buttons: the app icon gets the same box, so it matches their size
+                            // and its label lines up with theirs.
                             icon = TileIcon.App(quickLaunchApp), label = quickLaunchLabel ?: stringResource(R.string.nav_launch), circleSize = 44.dp,
-                            iconInset = 44.dp * 0.14f, variant = nav, index = index, onClick = onLaunch,
+                            variant = nav, index = index, onClick = onLaunch,
                         )
                     } else {
                         TccIconButton("ic_app_manage", stringResource(R.string.nav_launch), circleSize = 44.dp, variant = nav, index = index, onClick = onLaunch)

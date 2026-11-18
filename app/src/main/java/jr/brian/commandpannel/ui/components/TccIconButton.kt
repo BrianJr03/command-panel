@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -110,7 +111,11 @@ fun TccIconButton(
                     contentDescription = label,
                     // App launcher icons keep their own colors.
                     colorFilter = if (icon is TileIcon.App) null else stockIconColorFilter(iconTint),
-                    modifier = imageModifier,
+                    // A launcher icon carries its own transparent margin, so in the nav bar it is scaled up at draw time
+                    // to read as large as the glyph icons; the box (and so the label's position) stays the same.
+                    modifier = if (isNav && icon is TileIcon.App) {
+                        imageModifier.graphicsLayer { scaleX = NAV_APP_ICON_SCALE; scaleY = NAV_APP_ICON_SCALE }
+                    } else imageModifier,
                 )
             }
         }
@@ -127,3 +132,6 @@ fun TccIconButton(
         )
     }
 }
+
+/** Draw scale for an app's launcher icon in the nav bar: its art fills about 85% of what a glyph icon does in the same box. */
+private const val NAV_APP_ICON_SCALE = 1.2f
