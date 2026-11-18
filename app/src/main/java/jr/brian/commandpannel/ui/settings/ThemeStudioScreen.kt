@@ -49,6 +49,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import jr.brian.commandpannel.ui.overlay.arrange.LocalPreviewHighlight
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -234,10 +236,12 @@ internal fun ThemeStudioScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Category bar: each category swaps the controls below; the preview always shows the whole look.
+                // A dot marks the categories where this look differs from its base look.
+                val changed = draft.changedCategories()
                 ChipRow(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { controlsScroll.animateScrollTo(0) } }) {
                     StudioCategory.entries.forEachIndexed { i, c ->
                         Box(if (i == 0) Modifier.focusRequester(firstFocus) else Modifier) {
-                            OptionChip(stringResource(c.titleRes), category == c) { category = c }
+                            OptionChip(stringResource(c.titleRes), category == c, marked = c in changed) { category = c }
                         }
                     }
                 }
@@ -254,6 +258,12 @@ internal fun ThemeStudioScreen(
                     StudioCategory.EFFECTS -> EffectControls(draft, base, update)
                     StudioCategory.FIT -> FitControls(draft, base, update)
                 }
+                }
+                // Parts has its own reset (and Reset everything) in its card.
+                if (category != StudioCategory.PARTS && category in changed) {
+                    Chip(stringResource(R.string.theme_reset_category, stringResource(category.titleRes))) {
+                        draft = draft.resetCategory(category)
+                    }
                 }
             }
             // ---- pinned live preview ----
@@ -346,6 +356,8 @@ private class Part<T>(
     val extras: List<Pair<T, Int>> = emptyList(),
     /** What it edits in the preview (which tab to show, which cards to outline). */
     val studio: StudioPart? = null,
+    /** Whether the look overrides this part (shown as "Changed"). */
+    val isSet: (CustomLook) -> Boolean = { false },
 ) {
     /** Presets, each named after the first built-in look (in declaration order) that uses it. */
     val presets: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first }
@@ -353,11 +365,11 @@ private class Part<T>(
 }
 
 private val PARTS: List<Part<*>> = listOf(
-    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }, CardStyle.CUSTOM, studio = StudioPart.CARDS),
-    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }, TileStyle.CUSTOM, studio = StudioPart.TILES),
-    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM, studio = StudioPart.GAUGES),
-    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM, studio = StudioPart.SLIDERS),
-    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM, studio = StudioPart.NAV),
+    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }, CardStyle.CUSTOM, studio = StudioPart.CARDS, isSet = { it.card != null }),
+    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }, TileStyle.CUSTOM, studio = StudioPart.TILES, isSet = { it.tile != null }),
+    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM, studio = StudioPart.GAUGES, isSet = { it.gauge != null }),
+    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM, studio = StudioPart.SLIDERS, isSet = { it.slider != null }),
+    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM, studio = StudioPart.NAV, isSet = { it.nav != null }),
     Part(
         R.string.theme_part_backdrop, { it.backdrop }, { l, v -> l.copy(backdrop = v) },
         extras = listOf(
@@ -367,8 +379,9 @@ private val PARTS: List<Part<*>> = listOf(
             BackdropStyle.STARFIELD to R.string.theme_backdrop_starfield,
         ),
         studio = StudioPart.BACKDROP,
+        isSet = { it.backdrop != null },
     ),
-    Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }, studio = StudioPart.HEADERS),
+    Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }, studio = StudioPart.HEADERS, isSet = { it.header != null }),
 )
 
 @Composable
@@ -387,8 +400,10 @@ private fun PartsControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
         val traits = draft.toSpec().traits
         PARTS.forEach { part -> PartRow(part, traits, draft, onChange) }
         Spacer(Modifier.height(4.dp))
-        Chip(stringResource(R.string.theme_reset_parts)) {
-            onChange(draft.copy(card = null, tile = null, gauge = null, slider = null, nav = null, backdrop = null, header = null))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Chip(stringResource(R.string.theme_reset_parts)) { onChange(draft.resetCategory(StudioCategory.PARTS)) }
+            // Every category at once, back to the base look (the name stays).
+            if (draft.changedCategories().isNotEmpty()) Chip(stringResource(R.string.theme_reset_all)) { onChange(draft.resetAll()) }
         }
     }
 }
@@ -397,7 +412,10 @@ private fun PartsControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
 private fun <T> PartRow(part: Part<T>, traits: LookTraits, draft: CustomLook, onChange: (CustomLook) -> Unit) {
     val current = part.of(traits)
     Column(Modifier.studioPart(part.studio), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+            if (part.isSet(draft)) InfoLine(stringResource(R.string.theme_changed), p.accent)
+        }
         ChipRow {
             // Presets (and extras) alphabetically, then Custom last.
             (sortedByLabel(part.presets + part.extras) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
@@ -472,7 +490,7 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
  * current choice stays readable while the D-pad moves across a row.
  */
 @Composable
-internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun OptionChip(text: String, selected: Boolean, marked: Boolean = false, onClick: () -> Unit) {
     val f = focusState()
     // Inside a ChipRow, the picked option is where D-pad entry lands and what the row first scrolls to.
     val row = LocalChipRowSelection.current
@@ -493,10 +511,14 @@ internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text, color = if (selected) p.onAccent else if (f.value) p.textPrimary else p.textSecondary,
-            fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, style = tccTextStyle(),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text, color = if (selected) p.onAccent else if (f.value) p.textPrimary else p.textSecondary,
+                fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, style = tccTextStyle(),
+            )
+            // [marked]: something in here differs from the base look.
+            if (marked) Box(Modifier.size(6.dp).clip(CircleShape).background(if (selected) p.onAccent else p.accent))
+        }
     }
 }
 

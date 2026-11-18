@@ -300,6 +300,11 @@
     <string name="theme_font_remove">Remove %1$s</string>
     <string name="theme_font_remove_confirm">Press again to remove %1$s</string>
     <string name="theme_copy_name">%1$s copy</string>
+    <string name="theme_changed">Changed</string>
+    <string name="theme_reset_category">Reset %1$s</string>
+    <string name="theme_reset_all">Reset everything</string>
+    <string name="theme_contrast_text">Text may be hard to read on this panel color.</string>
+    <string name="theme_contrast_accent">The accent barely stands out from the panel.</string>
     <string name="theme_copy_name_n">%1$s copy %2$d</string>
     <string name="theme_preview_settings">Settings</string>
     <string name="theme_preview_mode">Mode</string>

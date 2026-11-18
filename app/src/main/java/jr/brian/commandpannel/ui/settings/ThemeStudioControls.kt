@@ -27,6 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.ui.graphics.compositeOver
+import jr.brian.commandpannel.ui.theme.contrastRatio
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import androidx.compose.foundation.layout.Column
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -163,6 +166,11 @@ private val COLOR_ROLES = listOf(
 internal fun ColorControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
     Card {
         CardDesc(stringResource(R.string.theme_colors_desc))
+        // A pick that makes text or the accent hard to see on the panel gets a gentle warning.
+        val palette = resolveLookPalette(4, nightActive = true, accentOverride = null, pinned = draft.colors)
+        val panel = palette.panelBackground.compositeOver(palette.primaryBackground)
+        if (palette.primary.contrastRatio(panel) < 4.5f) InfoLine(stringResource(R.string.theme_contrast_text), p.danger)
+        if (palette.accent.contrastRatio(panel) < 3f) InfoLine(stringResource(R.string.theme_contrast_accent), p.danger)
         COLOR_ROLES.forEach { role ->
             val current = role.get(draft.colors)
             ControlLabel(role.titleRes)
