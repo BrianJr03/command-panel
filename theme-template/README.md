@@ -73,7 +73,7 @@ Each look starts from a `baseLook` and overrides only what you set. **Keep each 
 | `gauge` | `RING`, `GLOW_RING`, `SEGMENT_METER`, `SEGMENTED_ARC`, `INSET_RING`, `LCD_BAR`, `WAVY_ARC`, `NEON_RING`, `ASCII_BAR`, `NEEDLE_DIAL`, `STICKER_DONUT`, `RULER_BAR`, `CAPSULE`, `PIE`, `CHROME_RING`, `DITHER_BAR`, `CUSTOM` |
 | `slider` | `STOCK`, `PIXEL`, `GLOW_GRADIENT`, `BRUTALIST`, `SEGMENTED`, `GROOVE`, `LCD_SEGMENTS`, `WAVY`, `NEON_TUBE`, `ASCII`, `FADER`, `STICKER`, `RULER`, `GEL`, `INK`, `CHROME`, `DITHER`, `CUSTOM` |
 | `nav` | `TILE`, `GLASS_PILL`, `INK_BLOCK`, `BRACKETS`, `PRESSED`, `LCD_INVERT`, `EXPRESSIVE_PILL`, `NEON_UNDERLINE`, `PROMPT_INVERT`, `LED_SWITCH`, `STICKER`, `HAZARD_UNDERLINE`, `GEL_PILL`, `STARBURST`, `FOIL_PILL`, `UNDERLINE_ITALIC`, `CUSTOM` |
-| `backdrop` | `SOLID`, `AURORA`, `PAPER_DOTS`, `HUD_GRID`, `LCD_PIXEL_GRID`, `SYNTH_GRID`, `HALFTONE`, `GRADIENT_WASH`, `TOPOGRAPHIC`, `HONEYCOMB`, `STARFIELD` (the last four need Command Panel 0.3.1 or later; older versions use the base look's backdrop) |
+| `backdrop` | `SOLID`, `AURORA`, `PAPER_DOTS`, `HUD_GRID`, `LCD_PIXEL_GRID`, `SYNTH_GRID`, `HALFTONE`, `GRADIENT_WASH`, `TOPOGRAPHIC`, `HONEYCOMB`, `STARFIELD` (the last four need Command Panel 0.4.0 or later; older versions use the base look's backdrop) |
 | `header` | `NONE`, `INK_STRIP`, `INDEXED_MONO`, `TITLED_FRAME` |
 | `labelFont` / `displayFont` | `{"bundled": "MONO"}` (one of `DEFAULT`, `CONDENSED`, `CONDENSED_DISPLAY`, `MONO`, `SEGMENT`, `ROUNDED`, `STENCIL`, `COMIC`, `CHROME_WIDE`, `SERIF`) or `{"file": "Orbitron.ttf"}` |
 | `panelCardShape`, `tileShape`, `sliderControlShape`, `sliderTrackShape`, `dialogShape`, `fpsBadgeShape` | `{"kind": "ROUNDED" \| "RECT" \| "CHAMFER" \| "SQUIRCLE" \| "PILL" \| "CIRCLE", "size": 12}` |
