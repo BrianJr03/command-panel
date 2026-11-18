@@ -27,6 +27,9 @@ internal enum class StudioPart(val preview: PreviewKind, val cards: Set<OverlayC
 /** Set while Studio is open: called with the part a focused control edits, or null when focus leaves it. */
 internal val LocalStudioPartFocus = staticCompositionLocalOf<((StudioPart?) -> Unit)?> { null }
 
+/** Puts focus back on the current category's chip, for a control that removes itself when pressed. */
+internal val LocalStudioRefocus = staticCompositionLocalOf<() -> Unit> { {} }
+
 /** Tags a control (or group of them) as editing [part]; null tags nothing. */
 @Composable
 internal fun Modifier.studioPart(part: StudioPart?): Modifier {

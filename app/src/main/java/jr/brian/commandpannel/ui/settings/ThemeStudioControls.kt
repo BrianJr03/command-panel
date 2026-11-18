@@ -176,8 +176,13 @@ internal fun ColorControls(draft: CustomLook, ledColor: Int?, onChange: (CustomL
         // A pick that makes text or the accent hard to see on the panel gets a gentle warning.
         val palette = resolveLookPalette(4, nightActive = true, accentOverride = null, pinned = draft.colors)
         val panel = palette.panelBackground.compositeOver(palette.primaryBackground)
-        if (palette.primary.contrastRatio(panel) < 4.5f) InfoLine(stringResource(R.string.theme_contrast_text), p.danger)
-        if (palette.accent.contrastRatio(panel) < 3f) InfoLine(stringResource(R.string.theme_contrast_accent), p.danger)
+        // Only for the user's own picks: the theme's defaults are left alone.
+        val c = draft.colors
+        val surfacePinned = c.panel != null || c.background != null
+        if (surfacePinned && palette.primary.contrastRatio(panel) < 4.5f) InfoLine(stringResource(R.string.theme_contrast_text), p.danger)
+        if ((c.accent != null || surfacePinned) && palette.accent.contrastRatio(panel) < 3f) {
+            InfoLine(stringResource(R.string.theme_contrast_accent), p.danger)
+        }
         COLOR_ROLES.forEach { role ->
             val current = role.get(draft.colors)
             ControlLabel(role.titleRes)
@@ -541,7 +546,9 @@ private fun CustomBlock(@StringRes titleRes: Int, active: Boolean, onUseCustom: 
         if (active) content() else {
             CardDesc(stringResource(R.string.theme_custom_inactive))
             Spacer(Modifier.width(4.dp))
-            Chip(stringResource(R.string.theme_custom_use), onClick = onUseCustom)
+            // The chip goes away once the part is Custom, so focus moves back to the category bar.
+            val refocus = LocalStudioRefocus.current
+            Chip(stringResource(R.string.theme_custom_use)) { onUseCustom(); refocus() }
         }
     }
 }

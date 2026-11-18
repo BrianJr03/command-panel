@@ -122,7 +122,10 @@ internal fun ThemeStudioScreen(
     }
     var previewMode by remember { mutableStateOf(if (state.themeMode == 3) 3 else 4) }
     val saved = state.customLooks.any { it.id == draft.id }
-    val firstFocus = remember { FocusRequester() }
+    // One per category chip. Controls that vanish while focused (switching category, a Reset or Use custom chip)
+    // would drop focus onto Back, so focus goes back to the current category's chip instead.
+    val categoryFocus = remember { StudioCategory.entries.associateWith { FocusRequester() } }
+    val firstFocus = categoryFocus.getValue(StudioCategory.PARTS)
     // Select (−) jumps to the save button, Start (+) to Save and apply; A then presses it.
     val saveFocus = remember { FocusRequester() }
     val applyFocus = remember { FocusRequester() }
@@ -170,6 +173,12 @@ internal fun ThemeStudioScreen(
     val controlsScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     LaunchedEffect(category) { controlsScroll.scrollTo(0) }
+    val refocusCategory: () -> Unit = {
+        scope.launch {
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { categoryFocus.getValue(category).requestFocus() }
+        }
+    }
 
     val backdrop = if (LocalCompanionThemed.current) {
         Modifier.tccLookBackdrop(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors())
@@ -193,8 +202,8 @@ internal fun ThemeStudioScreen(
                     Key.ButtonX -> { { previewMode = 3 } }
                     Key.ButtonL1 -> { { preview = kinds[Math.floorMod(preview.ordinal - 1, kinds.size)]; previewPinned = true } }
                     Key.ButtonR1 -> { { preview = kinds[(preview.ordinal + 1) % kinds.size]; previewPinned = true } }
-                    Key.ButtonL2 -> { { category = cats[Math.floorMod(category.ordinal - 1, cats.size)] } }
-                    Key.ButtonR2 -> { { category = cats[(category.ordinal + 1) % cats.size] } }
+                    Key.ButtonL2 -> { { category = cats[Math.floorMod(category.ordinal - 1, cats.size)]; refocusCategory() } }
+                    Key.ButtonR2 -> { { category = cats[(category.ordinal + 1) % cats.size]; refocusCategory() } }
                     Key.ButtonThumbLeft -> { { undo() } }
                     Key.ButtonThumbRight -> { { redo() } }
                     Key.ButtonSelect -> { { runCatching { saveFocus.requestFocus() } } }
@@ -280,14 +289,14 @@ internal fun ThemeStudioScreen(
                 val changed = draft.changedCategories()
                 ChipRow(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { controlsScroll.animateScrollTo(0) } }) {
                     StudioCategory.entries.forEachIndexed { i, c ->
-                        Box(if (i == 0) Modifier.focusRequester(firstFocus) else Modifier) {
+                        Box(Modifier.focusRequester(categoryFocus.getValue(c))) {
                             OptionChip(stringResource(c.titleRes), category == c, marked = c in changed) { category = c }
                         }
                     }
                 }
                 val base = draft.baseSpec()
                 val update: (CustomLook) -> Unit = { edit(it) }
-                CompositionLocalProvider(LocalStudioPartFocus provides onFocusPart) {
+                CompositionLocalProvider(LocalStudioPartFocus provides onFocusPart, LocalStudioRefocus provides refocusCategory) {
                 when (category) {
                     StudioCategory.PARTS -> PartsControls(draft, update)
                     StudioCategory.CUSTOM -> CustomPartControls(draft, update)
@@ -303,6 +312,7 @@ internal fun ThemeStudioScreen(
                 if (category != StudioCategory.PARTS && category in changed) {
                     Chip(stringResource(R.string.theme_reset_category, stringResource(category.titleRes))) {
                         edit(draft.resetCategory(category))
+                        refocusCategory()
                     }
                 }
             }
