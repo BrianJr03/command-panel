@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
-  <h1>Command Panel</h1>
+  <h1>Thor Command Panel (TCP)</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
   <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick-setting tiles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
 </div>
@@ -9,16 +9,16 @@
 
 ## Inspiration
 
-Command Panel stands on the shoulders of two projects:
+Thor Command Panel stands on the shoulders of two projects:
 
-- **AYN's stock Dual-Screen Assistant** (`com.odin.dualscreen.assistant`) — the built-in app this replaces. Command Panel rebuilds its layout, behavior and hardware integration so it feels native on the Thor.
-- **[Better Dual Screen Assistant](https://github.com/stormpanda) by stormpanda** — the source-available project that first showed how a normal app can stand in for the system assistant on this hardware. It was studied as **prior art and inspiration** — patterns to learn from, not code to copy. Everything shipped here is either my own work or re-derived from AYN's stock app. See [Upstream & licensing](#upstream--licensing) at the bottom.
+- **AYN's stock Dual-Screen Assistant** (`com.odin.dualscreen.assistant`) — the built-in app this replaces. Thor Command Panel rebuilds its layout, behavior and hardware integration so it feels native on the Thor.
+- **[Better Dual Screen Assistant](https://github.com/stormpanda) by stormpanda** — the source-available project that first showed how a normal app can stand in for the system assistant on this hardware. Everything shipped here is either my own work or re-derived from AYN's stock app. See [Upstream & licensing](#upstream--licensing) at the bottom.
 
 ---
 
 ## Looks
 
-Command Panel ships **16 overlay themes** (plus the stock look) — the whole panel re-skins live, fonts and all. Three favorites:
+Thor Command Panel ships **16 overlay themes** (plus the stock look) — the whole panel re-skins live, fonts and all. Three favorites:
 
 | Aurora Glass | Tactical HUD | Stock |
 |:---:|:---:|:---:|
@@ -75,7 +75,7 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 - **Hardware telemetry** — temperature, fan, and CPU / GPU / power / RAM gauges.
 - **Task** (recent apps) and **Settings** dialogs.
 
-### What I added on top
+### What's added on top
 > The reason to run this instead of the stock app.
 
 - 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
