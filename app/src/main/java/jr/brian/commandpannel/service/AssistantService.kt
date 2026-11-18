@@ -11,8 +11,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import jr.brian.commandpannel.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -20,6 +23,7 @@ import jr.brian.commandpannel.overlay.ExternalDisplayTapWaker
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.BdsaDetector
+import jr.brian.commandpannel.system.Prefs
 import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.system.StockCoexistence
@@ -57,6 +61,7 @@ class AssistantService : Service() {
     private lateinit var tapWaker: ExternalDisplayTapWaker
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
     private lateinit var bdsa: BdsaDetector
+    private val handler = Handler(Looper.getMainLooper())
 
     /**
      * True while Better Dual Screen Assistant, or the other Command Panel build (debug / release), claims the hardware.
@@ -108,6 +113,10 @@ class AssistantService : Service() {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
                 }
+                ACTION_REPLAY_REARM -> scope.launch(Dispatchers.IO) {
+                    val armed = Prefs.of(applicationContext).getBoolean("replay_enabled", false) && replay.rearm()
+                    sendBroadcast(Intent(ACTION_REPLAY_REARMED).setPackage(packageName).putExtra(EXTRA_REPLAY_ARMED, armed))
+                }
                 ACTION_REPLAY_SAVE -> scope.launch(Dispatchers.IO) {
                     val result = replay.save()
                     Log.i(TAG, "replay save: $result")
@@ -146,6 +155,13 @@ class AssistantService : Service() {
             onHideOverlay = { overlay.hide() },
             onBlankBottom = { repository.selectMode(1) },
             onWakeBottom = { repository.selectMode(0) },
+            doublePressEnabled = { Prefs.of(applicationContext).getBoolean(PREF_DOUBLE_PRESS_REPLAY, false) },
+            onDoublePress = ::onAynDoublePress,
+            schedule = { ms, block ->
+                val r = Runnable(block)
+                handler.postDelayed(r, ms)
+                ({ handler.removeCallbacks(r) })
+            },
         )
 
         startAsForeground()
@@ -190,6 +206,7 @@ class AssistantService : Service() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(aynReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
         runCatching { unregisterReceiver(packageReceiver) }
@@ -205,6 +222,23 @@ class AssistantService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** AYN double press: arms the Replay Buffer if it's off, otherwise saves a clip. Either way, a toast says so. */
+    private fun onAynDoublePress() {
+        scope.launch(Dispatchers.IO) {
+            val msg = if (!replay.isArmed) {
+                replay.setEnabled(true)
+                getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed)
+            } else {
+                val result = replay.save()
+                Log.i(TAG, "replay save (double press): $result")
+                sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
+                if (result.startsWith("error:")) getString(R.string.msg_save_failed, result.removePrefix("error:"))
+                else getString(R.string.msg_saved_to, result)
+            }
+            withContext(Dispatchers.Main) { Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show() }
+        }
+    }
 
     /** Re-checks for Better Dual Screen Assistant ([force] skips the detector's short cache) and applies the result. */
     private fun recheckStandby(force: Boolean) {
@@ -280,6 +314,7 @@ class AssistantService : Service() {
             addAction(ACTION_RECHECK_COEXISTENCE)
             addAction(ACTION_REPLAY_SET_ENABLED)
             addAction(ACTION_REPLAY_SAVE)
+            addAction(ACTION_REPLAY_REARM)
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -325,7 +360,12 @@ class AssistantService : Service() {
         const val ACTION_REPLAY_SAVE = "jr.brian.commandpannel.action.REPLAY_SAVE"
         const val ACTION_REPLAY_SAVED = "jr.brian.commandpannel.action.REPLAY_SAVED"
         const val EXTRA_REPLAY_RESULT = "replay_result"
+        /** Restart a running Replay Buffer so a changed capture setting applies now; answered by [ACTION_REPLAY_REARMED]. */
+        const val ACTION_REPLAY_REARM = "jr.brian.commandpannel.action.REPLAY_REARM"
+        const val ACTION_REPLAY_REARMED = "jr.brian.commandpannel.action.REPLAY_REARMED"
+        const val EXTRA_REPLAY_ARMED = "replay_armed"
         const val EXTRA_ENABLE = "enable"
+        const val PREF_DOUBLE_PRESS_REPLAY = "ayn_double_press_replay"
         /** Re-run Better Dual Screen Assistant detection now (sent by the companion after it changes BDSA). */
         const val ACTION_RECHECK_COEXISTENCE = "jr.brian.commandpannel.action.RECHECK_COEXISTENCE"
         /** On [ACTION_SHOW_OVERLAY]: an automatic show (companion launch) that standby may skip. */

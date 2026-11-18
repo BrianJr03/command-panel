@@ -43,6 +43,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
 import androidx.compose.ui.zIndex
+import jr.brian.commandpannel.BuildConfig
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.TileIcon
 import jr.brian.commandpannel.ui.components.painter
@@ -370,7 +371,8 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
             AppIconBadge(if (themed) LocalTccLookSpec.current.tile.buttonShape else RoundedCornerShape(11.dp))
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(stringResource(R.string.app_full_name), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
+                // Debug builds show their launcher name ("TCP Debug"), so the two installs are easy to tell apart.
+                Text(stringResource(if (BuildConfig.DEBUG) R.string.app_name else R.string.app_full_name), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
                 Text(lookLabel(stringResource(R.string.navigation_system_set_text)), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
             }
         }
@@ -481,6 +483,12 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.tile_name_replay_buffer),
         stringResource(R.string.settings_replay_desc),
         state.replayEnabled, vm::setReplayEnabled,
+        Modifier.tourTarget(TourSpot.REPLAY),
+    )
+    SwitchCard(
+        stringResource(R.string.settings_replay_double_press),
+        stringResource(R.string.settings_replay_double_press_desc),
+        state.replayDoublePress, vm::setReplayDoublePress,
         Modifier.tourTarget(TourSpot.REPLAY),
     )
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {

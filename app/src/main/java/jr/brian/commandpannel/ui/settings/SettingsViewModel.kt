@@ -115,6 +115,7 @@ data class SettingsState(
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
     val replayMessage: String? = null,
     val replayTarget: jr.brian.commandpannel.privileged.ReplayTarget = jr.brian.commandpannel.privileged.ReplayTarget.DEFAULT,
+    val replayDoublePress: Boolean = false,
     val appPickerOpen: Boolean = false,
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
@@ -173,7 +174,14 @@ class SettingsViewModel @Inject constructor(
             .normalizeReplayWindowSeconds(prefs.getInt("replay_window_seconds", 30)),
         replayPreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null)),
         replayTarget = jr.brian.commandpannel.privileged.ReplayTarget.fromKey(prefs.getString("replay_target", null)),
+        replayDoublePress = prefs.getBoolean(AssistantService.PREF_DOUBLE_PRESS_REPLAY, false),
     )
+
+    /** The service reads this pref on each AYN press, so saving it is enough. */
+    fun setReplayDoublePress(enable: Boolean) {
+        prefs.edit().putBoolean(AssistantService.PREF_DOUBLE_PRESS_REPLAY, enable).apply()
+        _state.value = _state.value.copy(replayDoublePress = enable)
+    }
 
     fun setReplayEnabled(enable: Boolean) {
         prefs.edit().putBoolean("replay_enabled", enable).apply()
@@ -185,19 +193,37 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(replayEnabled = enable, replayMessage = app.getString(if (enable) R.string.msg_replay_arming else R.string.msg_replay_off))
     }
 
+    /**
+     * After a capture setting changes: asks the service to restart a running buffer with it, and returns the message
+     * to show meanwhile (replaced by the outcome when the service answers). An off buffer just picks it up next arm.
+     */
+    private fun replaySettingMessage(): String {
+        if (!_state.value.replayEnabled) return app.getString(R.string.msg_replay_next_arm)
+        app.registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: Intent) {
+                val armed = i.getBooleanExtra(AssistantService.EXTRA_REPLAY_ARMED, false)
+                val msg = app.getString(if (armed) R.string.msg_replay_rearmed else R.string.msg_replay_rearm_failed)
+                _state.value = _state.value.copy(replayMessage = msg)
+                runCatching { c.unregisterReceiver(this) }
+            }
+        }, android.content.IntentFilter(AssistantService.ACTION_REPLAY_REARMED), android.content.Context.RECEIVER_NOT_EXPORTED)
+        app.sendBroadcast(Intent(AssistantService.ACTION_REPLAY_REARM).setPackage(app.packageName))
+        return app.getString(R.string.msg_replay_rearming)
+    }
+
     fun setReplayWindowSeconds(seconds: Int) {
         prefs.edit().putInt("replay_window_seconds", seconds).apply()
-        _state.value = _state.value.copy(replayWindowSeconds = seconds, replayMessage = app.getString(R.string.msg_replay_next_arm))
+        _state.value = _state.value.copy(replayWindowSeconds = seconds, replayMessage = replaySettingMessage())
     }
 
     fun setReplayPreset(preset: jr.brian.commandpannel.privileged.ReplayBitratePreset) {
         prefs.edit().putString("replay_bitrate", preset.key).apply()
-        _state.value = _state.value.copy(replayPreset = preset, replayMessage = app.getString(R.string.msg_replay_next_arm))
+        _state.value = _state.value.copy(replayPreset = preset, replayMessage = replaySettingMessage())
     }
 
     fun setReplayTarget(target: jr.brian.commandpannel.privileged.ReplayTarget) {
         prefs.edit().putString("replay_target", target.key).apply()
-        _state.value = _state.value.copy(replayTarget = target, replayMessage = app.getString(R.string.msg_replay_next_arm))
+        _state.value = _state.value.copy(replayTarget = target, replayMessage = replaySettingMessage())
     }
 
     fun saveReplayClip() {

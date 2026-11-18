@@ -14,6 +14,12 @@ class AynButtonMachineTest {
         var keyguard = false
         var blanked = false
         var clock = 0L
+        var doublePress = false
+        var doubles = 0
+        /** The fake scheduler's one pending block; [fire] runs it as if the window ran out. */
+        var pending: (() -> Unit)? = null
+
+        fun fire() { pending?.also { pending = null }?.invoke() }
 
         fun machine(debounceMs: Long = 400L) = AynButtonMachine(
             isKeyguardLocked = { keyguard },
@@ -24,6 +30,9 @@ class AynButtonMachineTest {
             onWakeBottom = { wakes++ },
             now = { clock },
             debounceMs = debounceMs,
+            doublePressEnabled = { doublePress },
+            onDoublePress = { doubles++ },
+            schedule = { _, block -> pending = block; { pending = null } },
         )
     }
 
@@ -72,5 +81,86 @@ class AynButtonMachineTest {
         r.clock = 1200; up(m) // within 400ms -> ignored
         r.clock = 1500; up(m) // after 400ms -> toggles
         assertEquals(2, r.toggles)
+    }
+
+    @Test
+    fun doublePressOff_togglesRightAway() {
+        val r = Recorder(); val m = r.machine()
+        up(m)
+        assertEquals(1, r.toggles)
+        assertEquals(null, r.pending)
+    }
+
+    @Test
+    fun doublePressOn_singlePress_togglesOnlyAfterTheWindow() {
+        val r = Recorder().apply { doublePress = true }; val m = r.machine()
+        down(m); up(m)
+        assertEquals("waits for a possible second press", 0, r.toggles)
+        r.fire()
+        assertEquals(1, r.toggles)
+        assertEquals(0, r.doubles)
+    }
+
+    @Test
+    fun doublePressOn_twoQuickPresses_fireDoublePressAndNeverToggle() {
+        val r = Recorder().apply { doublePress = true }; val m = r.machine()
+        down(m); up(m)
+        down(m); up(m)
+        assertEquals(1, r.doubles)
+        assertEquals("pending single press is canceled", null, r.pending)
+        r.fire()
+        assertEquals(0, r.toggles)
+    }
+
+    @Test
+    fun doublePressOn_thirdPressStartsANewSinglePress() {
+        val r = Recorder().apply { doublePress = true }; val m = r.machine()
+        up(m); up(m); up(m)
+        assertEquals(1, r.doubles)
+        r.fire()
+        assertEquals(1, r.toggles)
+    }
+
+    @Test
+    fun doublePressOn_whileBlanked_singlePressStillWakesAfterTheWindow() {
+        val r = Recorder().apply { doublePress = true; blanked = true }; val m = r.machine()
+        up(m)
+        assertEquals(0, r.wakes)
+        r.fire()
+        assertEquals(1, r.wakes)
+        assertEquals(0, r.toggles)
+    }
+
+    @Test
+    fun longPress_cancelsAPendingSinglePress() {
+        val r = Recorder().apply { doublePress = true }; val m = r.machine()
+        up(m)
+        down(m, long = true); up(m)
+        assertEquals(null, r.pending)
+        assertEquals(0, r.toggles)
+        assertEquals(0, r.doubles)
+        assertEquals(1, r.blanks)
+    }
+
+    @Test
+    fun doublePressOn_onKeyguard_doesNothing() {
+        val r = Recorder().apply { doublePress = true; keyguard = true }; val m = r.machine()
+        up(m); up(m)
+        assertEquals(0, r.doubles)
+        assertEquals(null, r.pending)
+    }
+
+    @Test
+    fun synchronousScheduler_leavesNoStalePendingPress() {
+        val r = Recorder().apply { doublePress = true }
+        val m = AynButtonMachine(
+            isKeyguardLocked = { false }, isBottomBlanked = { false },
+            onToggleOverlay = { r.toggles++ }, onHideOverlay = {}, onBlankBottom = {}, onWakeBottom = {},
+            now = { r.clock }, doublePressEnabled = { true }, onDoublePress = { r.doubles++ },
+        )
+        r.clock = 1000; up(m)
+        r.clock = 2000; up(m)
+        assertEquals(2, r.toggles)
+        assertEquals(0, r.doubles)
     }
 }

@@ -53,6 +53,15 @@ class ReplayBufferController(
 
     fun disarm() = engine.stop()
 
+    /**
+     * Restarts a running capture with the current prefs, so a new target, window or bitrate applies now. The buffered
+     * footage is dropped. Returns whether capture is armed afterward.
+     */
+    fun rearm(): Boolean {
+        engine.stop()
+        return arm().also { if (!it) Log.w(tag, "re-arm after a settings change failed") }
+    }
+
     fun bufferedSeconds(): Int = (engine.bufferedDurationUs() / 1_000_000L).toInt()
 
     /** Saves the buffered clip. Returns the saved path, or `error:<code>`. */
