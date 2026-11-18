@@ -284,6 +284,11 @@
     <string name="theme_part_sliders">Sliders</string>
     <string name="theme_part_nav">Nav bar</string>
     <string name="theme_part_backdrop">Backdrop</string>
+    <!-- Backdrops no built-in look uses (Theme Studio names them itself) -->
+    <string name="theme_backdrop_gradient_wash">Gradient wash</string>
+    <string name="theme_backdrop_topographic">Topographic</string>
+    <string name="theme_backdrop_honeycomb">Honeycomb</string>
+    <string name="theme_backdrop_starfield">Starfield</string>
     <string name="theme_part_header">Card headers</string>
     <string name="theme_fonts_desc">Bundled fonts or your own TTF/OTF files. Imported fonts stay on this device.</string>
     <string name="theme_font_labels">Label font</string>

@@ -2,6 +2,7 @@ package jr.brian.commandpannel.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import jr.brian.commandpannel.ui.theme.BackdropStyle
 import jr.brian.commandpannel.ui.theme.BundledFont
 import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.CustomLook
@@ -67,6 +68,15 @@ class CustomLookTest {
         )
         val decoded = CustomLookJson.decodeList(CustomLookJson.encodeList(listOf(look))).single()
         assertEquals(look, decoded)
+    }
+
+    @Test
+    fun `new backdrops round trip and apply`() {
+        listOf(BackdropStyle.GRADIENT_WASH, BackdropStyle.TOPOGRAPHIC, BackdropStyle.HONEYCOMB, BackdropStyle.STARFIELD).forEach { b ->
+            val look = CustomLook(id = b.name, name = b.name, baseLook = TccUiLook.AURORA_GLASS, backdrop = b)
+            val decoded = CustomLookJson.decodeList(CustomLookJson.encodeList(listOf(look))).single()
+            assertEquals(b, decoded.backdrop)
+        }
     }
 
     @Test

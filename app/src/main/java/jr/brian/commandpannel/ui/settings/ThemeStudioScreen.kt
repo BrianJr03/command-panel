@@ -54,6 +54,7 @@ import jr.brian.commandpannel.system.FontImportException
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.overlay.OverlayTab
 import jr.brian.commandpannel.ui.theme.BundledFont
+import jr.brian.commandpannel.ui.theme.BackdropStyle
 import jr.brian.commandpannel.ui.theme.CustomLook
 import jr.brian.commandpannel.ui.theme.NavStyle
 import jr.brian.commandpannel.ui.theme.SliderStyle
@@ -237,6 +238,8 @@ private class Part<T>(
     val set: (CustomLook, T) -> CustomLook,
     /** The part's parametric style, offered last (its settings live in the Custom category); `null` for none. */
     custom: T? = null,
+    /** Styles no built-in look uses, with their own names; listed among the presets. */
+    val extras: List<Pair<T, Int>> = emptyList(),
 ) {
     /** Presets, each named after the first built-in look (in declaration order) that uses it. */
     val presets: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first }
@@ -249,7 +252,15 @@ private val PARTS: List<Part<*>> = listOf(
     Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM),
     Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM),
     Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM),
-    Part(R.string.theme_part_backdrop, { it.backdrop }, { l, v -> l.copy(backdrop = v) }),
+    Part(
+        R.string.theme_part_backdrop, { it.backdrop }, { l, v -> l.copy(backdrop = v) },
+        extras = listOf(
+            BackdropStyle.GRADIENT_WASH to R.string.theme_backdrop_gradient_wash,
+            BackdropStyle.TOPOGRAPHIC to R.string.theme_backdrop_topographic,
+            BackdropStyle.HONEYCOMB to R.string.theme_backdrop_honeycomb,
+            BackdropStyle.STARFIELD to R.string.theme_backdrop_starfield,
+        ),
+    ),
     Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }),
 )
 
@@ -280,8 +291,8 @@ private fun <T> PartRow(part: Part<T>, traits: LookTraits, draft: CustomLook, on
     val current = part.of(traits)
     Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
     ChipRow {
-        // Presets alphabetically, then Custom last.
-        (sortedByLabel(part.presets) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
+        // Presets (and extras) alphabetically, then Custom last.
+        (sortedByLabel(part.presets + part.extras) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
             OptionChip(stringResource(labelRes), current == value) { onChange(part.set(draft, value)) }
         }
     }

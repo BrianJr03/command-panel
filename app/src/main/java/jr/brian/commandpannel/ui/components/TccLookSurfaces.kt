@@ -35,6 +35,10 @@ import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.HeaderStyle
 import jr.brian.commandpannel.ui.components.looks.LookCardRenderer
 import jr.brian.commandpannel.ui.components.looks.LookPaint
+import jr.brian.commandpannel.ui.components.looks.gradientWashBackdrop
+import jr.brian.commandpannel.ui.components.looks.honeycombBackdrop
+import jr.brian.commandpannel.ui.components.looks.starfieldBackdrop
+import jr.brian.commandpannel.ui.components.looks.topographicBackdrop
 import jr.brian.commandpannel.ui.components.looks.LookTileRenderer
 import jr.brian.commandpannel.ui.components.looks.halftoneBackdrop
 import jr.brian.commandpannel.ui.components.looks.lcdPixelGridBackdrop
@@ -557,6 +561,10 @@ fun Modifier.tccLookBackdrop(
         BackdropStyle.LCD_PIXEL_GRID -> base.lcdPixelGridBackdrop(paint)
         BackdropStyle.SYNTH_GRID -> base.synthGridBackdrop(paint)
         BackdropStyle.HALFTONE -> base.halftoneBackdrop(paint)
+        BackdropStyle.GRADIENT_WASH -> base.gradientWashBackdrop(paint)
+        BackdropStyle.TOPOGRAPHIC -> base.topographicBackdrop(paint)
+        BackdropStyle.HONEYCOMB -> base.honeycombBackdrop(paint)
+        BackdropStyle.STARFIELD -> base.starfieldBackdrop(paint)
     }
     if (!spec.traits.scanlines) return withLayer
     return withLayer.drawWithContent {

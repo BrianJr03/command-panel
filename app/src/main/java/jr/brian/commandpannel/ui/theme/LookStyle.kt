@@ -96,7 +96,8 @@ enum class NavStyle {
     CUSTOM
 }
 
-enum class BackdropStyle { SOLID, AURORA, PAPER_DOTS, HUD_GRID, LCD_PIXEL_GRID, SYNTH_GRID, HALFTONE }
+/** The overlay's background layer. Values after [HALFTONE] belong to no built-in look; Theme Studio offers them by name. */
+enum class BackdropStyle { SOLID, AURORA, PAPER_DOTS, HUD_GRID, LCD_PIXEL_GRID, SYNTH_GRID, HALFTONE, GRADIENT_WASH, TOPOGRAPHIC, HONEYCOMB, STARFIELD }
 
 enum class HeaderStyle { NONE, INK_STRIP, INDEXED_MONO, TITLED_FRAME }
 
