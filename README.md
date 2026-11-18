@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/fe6379b3-bcc7-4a41-be42-1eb2219ed595
+
 <div align="center">
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Thor Command Panel (TCP)</h1>
