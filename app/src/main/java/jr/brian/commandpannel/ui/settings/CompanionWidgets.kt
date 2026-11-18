@@ -10,6 +10,7 @@ import jr.brian.commandpannel.ui.components.tccCard
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
+import jr.brian.commandpannel.ui.theme.StockLookSpec
 import jr.brian.commandpannel.ui.theme.lookLabel
 import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 import jr.brian.commandpannel.ui.theme.tccLookColors
@@ -176,9 +177,17 @@ internal val p: CompanionPalette
 internal fun controlShape(default: Dp): Shape =
     if (LocalCompanionThemed.current) LocalTccLookSpec.current.slider.controlShape else RoundedCornerShape(default)
 
+/**
+ * The stock look's panel shape is a percentage radius (`RoundedCornerShape(16)`), sized for the overlay's small cards.
+ * On a tall companion card that becomes a huge corner that clips the first and last rows, so stock (and custom looks
+ * that keep its shape) use a fixed radius here instead, like the overlay's `TccCard`.
+ */
 @Composable
-internal fun cardShape(): Shape =
-    if (LocalCompanionThemed.current) LocalTccLookSpec.current.panelCardShape else RoundedCornerShape(18.dp)
+internal fun cardShape(): Shape {
+    if (!LocalCompanionThemed.current) return RoundedCornerShape(18.dp)
+    val spec = LocalTccLookSpec.current
+    return if (spec.panelCardShape == StockLookSpec.panelCardShape) RoundedCornerShape(18.dp) else spec.panelCardShape
+}
 
 /** Scale-on-focus animation; snaps for looks that opt out of motion (E-Ink). */
 @Composable
@@ -203,7 +212,7 @@ internal fun Modifier.companionCard(focused: Boolean = false, focusable: Boolean
         return clip(shape).background(bg)
             .border(if (focused) 2.dp else 1.dp, if (focused) p.accent else p.border, shape)
     }
-    val card = tccCard(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors(), focused = focused && focusable)
+    val card = tccCard(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors(), focused = focused && focusable, shape = shape)
     return if (focused) card.border(2.dp, p.accent, shape) else card
 }
 
