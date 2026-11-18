@@ -210,7 +210,10 @@ private fun TerminalTileCell(state: TileContentState) {
 }
 
 internal object TerminalTile : LookTileRenderer {
-    override fun tile(base: Modifier, p: LookPaint, selected: Boolean, index: Int): Modifier = base
+    // An active tile is inverse video (ink cell, background-colored icon), like the `[x]` cell. Without the fill the
+    // active icon is drawn in the background color on the background and disappears.
+    override fun tile(base: Modifier, p: LookPaint, selected: Boolean, index: Int): Modifier =
+        if (selected) base.background(p.lookColors.terminalInk) else base
 
     override fun iconTint(p: LookPaint, selected: Boolean, index: Int): Color =
         if (selected) p.colors.primaryBackground else p.lookColors.terminalInk
