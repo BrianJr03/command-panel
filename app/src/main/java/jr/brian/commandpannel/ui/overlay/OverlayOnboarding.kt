@@ -65,7 +65,7 @@ import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.system.OverlayLayout
 import jr.brian.commandpannel.ui.components.GamepadGlyph
-import jr.brian.commandpannel.ui.components.OnboardingKey
+import jr.brian.commandpannel.ui.components.GamepadButton
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeController
 import jr.brian.commandpannel.ui.theme.LocalTccColors
@@ -354,9 +354,9 @@ private fun OnboardingCallout(
                 stringResource(R.string.tour_step_count, step.ordinal + 1, steps.size),
                 color = colors.tertiary, fontSize = 12.sp, style = tccTextStyle(), modifier = Modifier.weight(1f),
             )
-            if (!last) OnboardingButton(stringResource(R.string.overlay_onboarding_skip), OnboardingKey.SKIP, emphasized = false, onClick = onSkip)
-            if (step.ordinal > 0) OnboardingButton(stringResource(R.string.tour_back), OnboardingKey.BACK, emphasized = false, onClick = onBack)
-            OnboardingButton(stringResource(if (last) R.string.tour_done else R.string.tour_next), OnboardingKey.NEXT, emphasized = true, onClick = onNext)
+            if (!last) OnboardingButton(stringResource(R.string.overlay_onboarding_skip), GamepadButton.Y, emphasized = false, onClick = onSkip)
+            if (step.ordinal > 0) OnboardingButton(stringResource(R.string.tour_back), GamepadButton.B, emphasized = false, onClick = onBack)
+            OnboardingButton(stringResource(if (last) R.string.tour_done else R.string.tour_next), GamepadButton.A, emphasized = true, onClick = onNext)
         }
     }
 }
@@ -401,7 +401,7 @@ private fun ThemeSamples(currentLook: TccUiLook?, pulse: () -> Float, onLook: (T
 }
 
 @Composable
-private fun OnboardingButton(label: String, glyph: OnboardingKey, emphasized: Boolean, onClick: () -> Unit) {
+private fun OnboardingButton(label: String, glyph: GamepadButton, emphasized: Boolean, onClick: () -> Unit) {
     val colors = LocalTccColors.current
     val shape = RoundedCornerShape(50)
     Box(

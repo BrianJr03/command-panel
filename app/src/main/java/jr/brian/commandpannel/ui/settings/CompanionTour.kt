@@ -79,7 +79,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.OnboardingBackHandler
-import jr.brian.commandpannel.ui.components.OnboardingKey
+import jr.brian.commandpannel.ui.components.GamepadButton
 import jr.brian.commandpannel.ui.components.onboardingControls
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
 import jr.brian.commandpannel.ui.theme.lookLabel
@@ -480,9 +480,9 @@ private fun TourCallout(
                 stringResource(R.string.tour_step_count, index + 1, count),
                 color = p.textTertiary, fontSize = 12.sp, style = tccTextStyle(), modifier = Modifier.weight(1f),
             )
-            if (!lastStep) Chip(stringResource(R.string.tour_skip), glyph = OnboardingKey.SKIP, onClick = onSkip)
-            if (index > 0) Chip(stringResource(R.string.tour_back), glyph = OnboardingKey.BACK, onClick = onBack)
-            AccentButton(stringResource(if (lastStep) R.string.tour_done else R.string.tour_next), glyph = OnboardingKey.NEXT, onClick = onNext)
+            if (!lastStep) Chip(stringResource(R.string.tour_skip), glyph = GamepadButton.Y, onClick = onSkip)
+            if (index > 0) Chip(stringResource(R.string.tour_back), glyph = GamepadButton.B, onClick = onBack)
+            AccentButton(stringResource(if (lastStep) R.string.tour_done else R.string.tour_next), glyph = GamepadButton.A, onClick = onNext)
         }
     }
 }

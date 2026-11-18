@@ -41,9 +41,15 @@ import jr.brian.commandpannel.ui.components.noRippleClickable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.components.GamepadButton
 import jr.brian.commandpannel.system.FontImportException
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.overlay.OverlayTab
@@ -87,6 +93,9 @@ internal fun ThemeStudioScreen(
     var previewMode by remember { mutableStateOf(if (state.themeMode == 3) 3 else 4) }
     val saved = state.customLooks.any { it.id == draft.id }
     val firstFocus = remember { FocusRequester() }
+    // Select (−) jumps to the save button, Start (+) to Save and apply; A then presses it.
+    val saveFocus = remember { FocusRequester() }
+    val applyFocus = remember { FocusRequester() }
     BackHandler(onBack = onClose)
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
@@ -98,7 +107,25 @@ internal fun ThemeStudioScreen(
     val savedMsg = stringResource(R.string.theme_saved)
     val appliedMsg = stringResource(R.string.theme_applied)
     PaddedBringIntoView {
-    Column(Modifier.fillMaxSize().then(backdrop).systemBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+    Column(
+        Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
+            // Preview shortcuts from anywhere in Studio: Y dark, X light, L1 / R1 step through Settings, Mode and Cards.
+            .onPreviewKeyEvent { e ->
+                val kinds = PreviewKind.entries
+                val action: (() -> Unit)? = when (e.key) {
+                    Key.ButtonY -> { { previewMode = 4 } }
+                    Key.ButtonX -> { { previewMode = 3 } }
+                    Key.ButtonL1 -> { { preview = kinds[Math.floorMod(preview.ordinal - 1, kinds.size)] } }
+                    Key.ButtonR1 -> { { preview = kinds[(preview.ordinal + 1) % kinds.size] } }
+                    Key.ButtonSelect -> { { runCatching { saveFocus.requestFocus() } } }
+                    Key.ButtonStart -> { { runCatching { applyFocus.requestFocus() } } }
+                    else -> null
+                }
+                if (action != null && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) action()
+                action != null
+            }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
         // ---- top bar: back, name, save actions ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Chip(stringResource(R.string.theme_back), onClick = onClose)
@@ -114,16 +141,23 @@ internal fun ThemeStudioScreen(
             val fromRepo = draft.source != null
             fun ownCopy() = draft.copy(id = UUID.randomUUID().toString(), source = null)
             if (saved || fromRepo) {
-                Chip(stringResource(R.string.theme_save_new)) {
-                    val copy = ownCopy()
-                    vm.saveCustomLook(copy); draft = copy; message = savedMsg
+                // Select's target when there's no plain Save (a repo look only saves as a copy).
+                Box(if (fromRepo) Modifier.focusRequester(saveFocus) else Modifier) {
+                    Chip(stringResource(R.string.theme_save_new), glyph = if (fromRepo) GamepadButton.SELECT else null) {
+                        val copy = ownCopy()
+                        vm.saveCustomLook(copy); draft = copy; message = savedMsg
+                    }
                 }
             }
-            if (!fromRepo) Chip(stringResource(R.string.theme_save)) { vm.saveCustomLook(draft); message = savedMsg }
-            AccentButton(stringResource(R.string.theme_save_apply)) {
+            if (!fromRepo) {
+                Box(Modifier.focusRequester(saveFocus)) {
+                    Chip(stringResource(R.string.theme_save), glyph = GamepadButton.SELECT) { vm.saveCustomLook(draft); message = savedMsg }
+                }
+            }
+            Box(Modifier.focusRequester(applyFocus)) { AccentButton(stringResource(R.string.theme_save_apply), glyph = GamepadButton.START) {
                 val target = if (fromRepo) ownCopy() else draft
                 vm.saveCustomLook(target, apply = true); draft = target; message = appliedMsg
-            }
+            } }
         }
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -169,13 +203,14 @@ internal fun ThemeStudioScreen(
                     OptionChip(stringResource(R.string.theme_preview_dark), previewMode == 4) { previewMode = 4 }
                     OptionChip(stringResource(R.string.theme_preview_light), previewMode == 3) { previewMode = 3 }
                 }
+                InfoLine(stringResource(R.string.theme_preview_buttons_hint), p.textTertiary)
             }
         }
     }
     }
 }
 
-private val PREVIEW_WIDTH = 360.dp
+private val PREVIEW_WIDTH = 336.dp
 
 private enum class StudioCategory(@StringRes val titleRes: Int) {
     PARTS(R.string.theme_cat_parts),

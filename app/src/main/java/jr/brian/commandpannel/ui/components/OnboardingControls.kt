@@ -78,16 +78,18 @@ fun OnboardingBackHandler(enabled: Boolean = true, onBack: () -> Unit) {
     BackHandler(enabled) { onBack() }
 }
 
-/** The gamepad button behind each onboarding control, shown as a badge before its label. */
-enum class OnboardingKey(@StringRes val letterRes: Int) {
-    NEXT(R.string.gamepad_button_a),
-    BACK(R.string.gamepad_button_b),
-    SKIP(R.string.gamepad_button_y),
+/** A gamepad button shown as a badge before a control's label, so it's clear which button does what. */
+enum class GamepadButton(@StringRes val letterRes: Int) {
+    A(R.string.gamepad_button_a),
+    B(R.string.gamepad_button_b),
+    Y(R.string.gamepad_button_y),
+    SELECT(R.string.gamepad_button_select),
+    START(R.string.gamepad_button_start),
 }
 
-/** A round gamepad-button badge ("A", "B", "Y") in [color], drawn before a control's label. */
+/** A round gamepad-button badge ("A", "B", "Y", "−", "+") in [color], drawn before a control's label. */
 @Composable
-fun GamepadGlyph(key: OnboardingKey, color: Color, style: TextStyle = TextStyle.Default) {
+fun GamepadGlyph(key: GamepadButton, color: Color, style: TextStyle = TextStyle.Default) {
     Box(Modifier.size(18.dp).border(1.5.dp, color, CircleShape), contentAlignment = Alignment.Center) {
         Text(stringResource(key.letterRes), color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold, style = style)
     }

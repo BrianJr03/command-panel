@@ -52,6 +52,8 @@
     <string name="gamepad_button_a" translatable="false">A</string>
     <string name="gamepad_button_b" translatable="false">B</string>
     <string name="gamepad_button_y" translatable="false">Y</string>
+    <string name="gamepad_button_select" translatable="false">−</string>
+    <string name="gamepad_button_start" translatable="false">+</string>
 
     <!-- Overlay: first-run onboarding (Next / Done / step count reuse the tour_* keys) -->
     <string name="overlay_onboarding_skip">Skip</string>
@@ -295,6 +297,7 @@
     <string name="theme_preview_mode">Mode</string>
     <string name="theme_preview_dark">Dark</string>
     <string name="theme_preview_light">Light</string>
+    <string name="theme_preview_buttons_hint">L1 / R1 switch preview · Y dark · X light</string>
     <string name="theme_preview_cards">Cards</string>
     <string name="theme_cat_parts">Parts</string>
     <string name="theme_cat_fonts">Fonts</string>

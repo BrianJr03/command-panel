@@ -369,7 +369,7 @@ internal fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
 internal fun AccentButton(
     text: String,
     enabled: Boolean = true,
-    glyph: jr.brian.commandpannel.ui.components.OnboardingKey? = null,
+    glyph: jr.brian.commandpannel.ui.components.GamepadButton? = null,
     onClick: () -> Unit,
 ) {
     val f = focusState()
@@ -398,7 +398,7 @@ internal fun Chip(
     text: String,
     selected: Boolean = false,
     enabled: Boolean = true,
-    glyph: jr.brian.commandpannel.ui.components.OnboardingKey? = null,
+    glyph: jr.brian.commandpannel.ui.components.GamepadButton? = null,
     onClick: () -> Unit,
 ) {
     val f = focusState()
