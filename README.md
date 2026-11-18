@@ -140,3 +140,11 @@ Command Panel was **inspired by** stormpanda's Better Dual Screen Assistant (a s
 - **Fonts** are SIL OFL 1.1, shipped with their notices.
 
 The full, auditable record lives in **[`docs/reference/LICENSE_COMPLIANCE.md`](docs/reference/LICENSE_COMPLIANCE.md)**.
+
+## License
+
+Copyright © 2026 Brian Jr
+
+Command Panel is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License, version 3** (or, at your option, any later version), as published by the Free Software Foundation. It is distributed in the hope that it will be useful, but **without any warranty**; see the [`LICENSE`](LICENSE) file for the full text.
+
+The bundled fonts keep their own license, the SIL Open Font License 1.1 (see [`THIRD_PARTY_NOTICES.txt`](app/src/main/assets/THIRD_PARTY_NOTICES.txt)). AYN's stock icons are not part of this project: they're loaded at runtime from the stock app on your device.
