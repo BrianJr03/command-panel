@@ -229,8 +229,8 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
             AppIconBadge(if (themed) LocalTccLookSpec.current.tile.buttonShape else RoundedCornerShape(11.dp))
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(stringResource(R.string.app_name), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
-                Text(lookLabel(stringResource(R.string.app_full_name)), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
+                Text(stringResource(R.string.app_full_name), color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
+                Text(lookLabel(stringResource(R.string.navigation_system_set_text)), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
             }
         }
         NavItem.entries.forEach { item ->
