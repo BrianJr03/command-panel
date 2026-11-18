@@ -257,8 +257,16 @@ class SettingsViewModel @Inject constructor(
             val uri = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:$relative")
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                // No URI grant flag: the app holds no permission on this document, so asking to pass one on throws.
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Prefer the system Files app: other file managers (Super File) can't read a storage document link and
+            // report an invalid path. Without Files, let Android offer whatever can open it.
+            val files = listOf("com.android.documentsui", "com.google.android.documentsui").firstOrNull {
+                app.packageManager.resolveActivity(Intent(intent).setPackage(it), 0) != null
+            }
+            if (files != null) intent.setPackage(files)
             runCatching { app.startActivity(intent) }.onFailure {
+                android.util.Log.w("SettingsViewModel", "couldn't open the clips folder", it)
                 _state.value = _state.value.copy(replayMessage = app.getString(R.string.msg_replay_folder_open_failed))
             }
         }
