@@ -26,4 +26,4 @@ More ways to style the panel, a live Theme Studio, and a theme repo that comes b
 See the [v0.3.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.3.0) for the previous release.
 
 ---
-*Personal project for the AYN Thor, licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
+*Licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
