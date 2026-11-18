@@ -33,6 +33,8 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 > 🎨 **Want to add your own theme?** A single Look re-skins both the overlay and the companion. See the **[Theming Guide wiki](https://github.com/BrianJr03/command-panel/wiki)** — it walks through adding one (even with an AI agent) and the gotchas to watch for.
 >
 > 🧩 **Prefer no code?** Build your own in the **[Theme Studio](#theme-studio)** right on the device.
+>
+> 📦 **Want more looks?** **[tcp-themes](https://github.com/BrianJr03/tcp-themes)** is the default pack from BrianJr03: 13 extra looks with previews. In the app, open **Themes → Theme repos**, paste `https://github.com/BrianJr03/tcp-themes` and press **Follow**.
 
 ---
 
@@ -62,6 +64,7 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
   - Packs dropped into that folder show up with previews, ready to add or use as a starting point.
 - **Follow theme repos.**
   - Paste a GitHub link and its looks are added; they update when the author pushes changes.
+  - **[BrianJr03/tcp-themes](https://github.com/BrianJr03/tcp-themes)** is the default pack from BrianJr03. Follow it to get its looks and future updates.
   - Start your own from the **[tcp-themes template](https://github.com/BrianJr03/tcp-themes)**: press *Use this template*, export your looks into `themes/`, push, and share the link.
   - The pack format is documented in the template's README.
 - **Gamepad-first**, like the rest of the companion.
