@@ -53,7 +53,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import jr.brian.commandpannel.ui.overlay.arrange.LocalPreviewHighlight
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -285,12 +284,12 @@ internal fun ThemeStudioScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Category bar: each category swaps the controls below; the preview always shows the whole look.
-                // A dot marks the categories where this look differs from its base look.
+                // Categories where this look differs from its base look (they get a Reset chip).
                 val changed = draft.changedCategories()
                 ChipRow(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { controlsScroll.animateScrollTo(0) } }) {
                     StudioCategory.entries.forEachIndexed { i, c ->
                         Box(Modifier.focusRequester(categoryFocus.getValue(c))) {
-                            OptionChip(stringResource(c.titleRes), category == c, marked = c in changed) { category = c }
+                            OptionChip(stringResource(c.titleRes), category == c) { category = c }
                         }
                     }
                 }
@@ -575,7 +574,6 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
 internal fun OptionChip(
     text: String,
     selected: Boolean,
-    marked: Boolean = false,
     /** Drawn before the label (Parts options show a sample of the style). */
     leading: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
@@ -606,8 +604,6 @@ internal fun OptionChip(
                 text, color = if (selected) p.onAccent else if (f.value) p.textPrimary else p.textSecondary,
                 fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, style = tccTextStyle(),
             )
-            // [marked]: something in here differs from the base look.
-            if (marked) Box(Modifier.size(6.dp).clip(CircleShape).background(if (selected) p.onAccent else p.accent))
         }
     }
 }
