@@ -11,6 +11,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.Prefs
+import jr.brian.commandpannel.ui.overlay.OverlayOnboarding
 import jr.brian.commandpannel.ui.settings.SettingsScreen
 import jr.brian.commandpannel.ui.settings.SettingsViewModel
 
@@ -40,11 +42,13 @@ class MainActivity : ComponentActivity() {
             return
         }
         AssistantService.start(this)
-        // Opening the companion also brings up the overlay on the bottom screen to preview changes.
+        // Opening the companion also brings up the overlay on the bottom screen to preview changes. On first launch it
+        // isn't marked automatic, so standby doesn't skip it: the overlay's onboarding runs before the companion tour.
+        val onboarding = !Prefs.of(this).getBoolean(OverlayOnboarding.KEY_SEEN, false)
         runCatching {
             startService(
                 Intent(this, AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY)
-                    .putExtra(AssistantService.EXTRA_AUTO, true),
+                    .putExtra(AssistantService.EXTRA_AUTO, !onboarding),
             )
         }
         setContent {

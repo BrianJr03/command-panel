@@ -126,10 +126,19 @@ class AssistantService : Service() {
         tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)
         replay = jr.brian.commandpannel.system.ReplayBufferController(applicationContext, privileged)
         bdsa = BdsaDetector(applicationContext, privileged)
-        overlay = OverlayHost(this) { _ ->
-            val state by repository.uiState.collectAsState()
-            OverlayRoot(state = state, actions = repository)
-        }
+        overlay = OverlayHost(
+            this,
+            content = { _ ->
+                val state by repository.uiState.collectAsState()
+                OverlayRoot(state = state, actions = repository)
+            },
+            // Onboarding that can't be shown counts as done, so the companion tour isn't left waiting for it.
+            onShowFailed = {
+                val seen = jr.brian.commandpannel.system.Prefs.of(this)
+                    .getBoolean(jr.brian.commandpannel.ui.overlay.OverlayOnboarding.KEY_SEEN, false)
+                if (!seen) repository.endOnboarding()
+            },
+        )
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
             isBottomBlanked = { screenMode.isBottomBlanked() },

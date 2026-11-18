@@ -33,7 +33,7 @@ internal fun UpdatesCard(state: SettingsState, vm: SettingsViewModel) {
                 stringResource(if (state.updateChecking) R.string.settings_update_checking else R.string.settings_update_check),
             ) { vm.checkForUpdates(manual = true) }
             Chip(stringResource(R.string.settings_update_whats_new), onClick = vm::showWhatsNew)
-            Box(Modifier.tourTarget(TourSpot.TOUR_REPLAY)) { Chip(stringResource(R.string.tour_replay), onClick = vm::startTour) }
+            Box(Modifier.tourTarget(TourSpot.TOUR_REPLAY)) { Chip(stringResource(R.string.tour_replay), onClick = vm::replayTour) }
             if (BuildConfig.DEBUG) Chip(stringResource(R.string.settings_update_preview), onClick = vm::previewUpdate)
         }
         state.updateMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }

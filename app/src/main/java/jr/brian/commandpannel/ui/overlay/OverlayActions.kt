@@ -39,6 +39,12 @@ interface OverlayActions {
     /** Persists a new overlay card arrangement (from Arrange mode). */
     fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout)
 
+    /** Moves the first-run onboarding to [step]. */
+    fun setOnboardingStep(step: OverlayOnboardingStep)
+
+    /** Finishes or skips the first-run onboarding; either way it doesn't start on its own again. */
+    fun endOnboarding()
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}
@@ -64,5 +70,7 @@ interface OverlayActions {
         override fun launchCompanion() {}
         override fun setNavTab(tab: OverlayTab) {}
         override fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout) {}
+        override fun setOnboardingStep(step: OverlayOnboardingStep) {}
+        override fun endOnboarding() {}
     }
 }

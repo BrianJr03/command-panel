@@ -61,6 +61,8 @@ data class OverlayUiState(
     val accentOverride: Int? = null,
     /** The nav tab to open on (persisted across overlay open/close, like the stock `current_navigation_interface_name`). */
     val navTab: OverlayTab = OverlayTab.SETTINGS,
+    /** The first-run onboarding's current step, or null when it isn't running (always null in previews). */
+    val onboardingStep: OverlayOnboardingStep? = null,
 )
 
 /** A quick-settings tile: its icon (stock drawable or Material vector) and the title for its current value. */

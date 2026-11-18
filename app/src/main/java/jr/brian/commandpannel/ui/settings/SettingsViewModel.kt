@@ -1,5 +1,6 @@
 package jr.brian.commandpannel.ui.settings
 
+import jr.brian.commandpannel.ui.overlay.OverlayOnboarding
 import android.app.Application
 import android.content.Intent
 import androidx.annotation.StringRes
@@ -564,6 +565,7 @@ class SettingsViewModel @Inject constructor(
     override fun onCleared() {
         runCatching { app.unregisterReceiver(bdsaPackageReceiver) }
         app.contentResolver.unregisterContentObserver(ledColorObserver)
+        prefs.unregisterOnSharedPreferenceChangeListener(onboardingListener)
         super.onCleared()
     }
 
@@ -665,14 +667,33 @@ class SettingsViewModel @Inject constructor(
     /** The APK downloaded for the open update, kept for the Android-installer fallback. */
     private var downloadedApk: java.io.File? = null
 
+    /** The tour starts once the overlay's onboarding (on the bottom screen) is finished or skipped. */
+    private var tourAfterOnboarding = false
+
+    private val onboardingListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+        if (key != OverlayOnboarding.KEY_SEEN || !p.getBoolean(key, false) || !tourAfterOnboarding) {
+            return@OnSharedPreferenceChangeListener
+        }
+        tourAfterOnboarding = false
+        if (_state.value.updateDialog == null) startTour() else tourPending = true
+    }
+
     init {
+        prefs.registerOnSharedPreferenceChangeListener(onboardingListener)
         _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.cleanup(app) }
             showWhatsNewIfUpdated()
-            // The tour shows once, after any What's New dialog; the automatic update check waits until it's done.
+            // The tour shows once, after the overlay's onboarding and any What's New dialog; the automatic update check
+            // waits until it's done.
             if (!prefs.getBoolean(KEY_TOUR_SEEN, false)) {
-                if (_state.value.updateDialog == null) startTour() else tourPending = true
+                if (!prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false)) {
+                    tourAfterOnboarding = true
+                } else if (_state.value.updateDialog == null) {
+                    startTour()
+                } else {
+                    tourPending = true
+                }
                 return@launch
             }
             autoCheckForUpdates()
@@ -804,6 +825,18 @@ class SettingsViewModel @Inject constructor(
 
     /** The first-run tour is waiting for the What's New dialog to close. */
     private var tourPending = false
+
+    /**
+     * General → Updates → "Take the tour": replays the overlay's onboarding on the bottom screen, then this tour.
+     * Clearing the onboarding's seen flag restarts it in the overlay; an explicit show brings the overlay up for it.
+     */
+    fun replayTour() {
+        tourAfterOnboarding = true
+        prefs.edit().remove(OverlayOnboarding.KEY_SEEN).apply()
+        runCatching {
+            app.startService(Intent(app, AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY))
+        }
+    }
 
     /** Starts the companion tour from its first step (also General → Updates → "Take the tour"). */
     fun startTour() {

@@ -20,6 +20,8 @@ import android.os.Looper
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.SystemSettings.Keys
 import jr.brian.commandpannel.ui.overlay.OverlayActions
+import jr.brian.commandpannel.ui.overlay.OverlayOnboarding
+import jr.brian.commandpannel.ui.overlay.OverlayOnboardingStep
 import jr.brian.commandpannel.ui.overlay.OverlayUiState
 import jr.brian.commandpannel.ui.overlay.QuickTile
 import kotlinx.coroutines.CoroutineScope
@@ -155,6 +157,9 @@ class SettingsRepository(
                 look = activeLook.first,
                 customLook = activeLook.second,
                 navTab = readNavTab(),
+                // Starts on its own until finished or skipped; keeps its step across refreshes.
+                onboardingStep = if (prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false)) null
+                    else it.onboardingStep ?: OverlayOnboardingStep.WELCOME,
             )
         }
     }
@@ -463,6 +468,15 @@ class SettingsRepository(
     override fun setNavTab(tab: jr.brian.commandpannel.ui.overlay.OverlayTab) {
         prefs.edit().putString("overlay_nav_tab", tab.name).apply()
         _uiState.update { it.copy(navTab = tab) }
+    }
+
+    override fun setOnboardingStep(step: OverlayOnboardingStep) {
+        _uiState.update { if (it.onboardingStep == null) it else it.copy(onboardingStep = step) }
+    }
+
+    override fun endOnboarding() {
+        prefs.edit().putBoolean(OverlayOnboarding.KEY_SEEN, true).apply()
+        _uiState.update { it.copy(onboardingStep = null) }
     }
 
     override fun launchCompanion() {

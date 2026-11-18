@@ -64,6 +64,9 @@ fun OverlayRoot(
         val selectTab: (OverlayTab) -> Unit = { tab = it; actions.setNavTab(it) }
         var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
         var showBottomTip by remember { mutableStateOf(false) }
+        // The dummy bool: onboarding shows the Launch button (and points at it) even before an app is chosen.
+        val onboarding = state.onboardingStep != null
+        var launchBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
         // Modal tiles open a dialog; instant tiles run their action.
         val onTile: (String) -> Unit = { id ->
@@ -82,10 +85,12 @@ fun OverlayRoot(
                     modifier = Modifier.fillMaxSize(),
                     quickLaunchLabel = state.quickLaunchLabel,
                     quickLaunchApp = state.quickLaunchApp,
+                    forceLaunch = onboarding,
+                    onLaunchPositioned = { launchBounds = it },
                     order = state.navOrder,
                     onMode = { selectTab(OverlayTab.MODE) },
                     onTask = { actions.openRecents() },
-                    onLaunch = { actions.quickLaunch() },
+                    onLaunch = { if (!onboarding) actions.quickLaunch() },
                     onSettings = { selectTab(OverlayTab.SETTINGS) },
                     onApp = { actions.launchCompanion() },
                 )
@@ -139,6 +144,17 @@ fun OverlayRoot(
                         actions.selectMode(1)
                     },
                     onDismiss = { showBottomTip = false },
+                )
+            }
+            state.onboardingStep?.let { step ->
+                OverlayOnboardingLayer(
+                    step = step,
+                    arrange = arrange,
+                    layout = state.layout,
+                    navAtTop = navAtTop,
+                    launchBounds = launchBounds,
+                    onStep = actions::setOnboardingStep,
+                    onEnd = actions::endOnboarding,
                 )
             }
         }
