@@ -137,12 +137,6 @@ class AssistantService : Service() {
                     actions = repository,
                 )
             },
-            // Onboarding that can't be shown counts as done, so the companion tour isn't left waiting for it.
-            onShowFailed = {
-                val seen = jr.brian.commandpannel.system.Prefs.of(this)
-                    .getBoolean(jr.brian.commandpannel.ui.overlay.OverlayOnboarding.KEY_SEEN, false)
-                if (!seen) repository.endOnboarding()
-            },
         )
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },

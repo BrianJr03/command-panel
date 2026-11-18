@@ -20,8 +20,23 @@ import jr.brian.commandpannel.ui.settings.SettingsViewModel
  * Companion settings screen on the top display. Ensures the assistant service is running, then shows the two-pane
  * settings UI (general / appearance / diagnostics). The overlay itself lives on the bottom display via the service.
  */
+/** Whether the companion is in front (resumed). The overlay's onboarding brings it up when it isn't (same process). */
+object CompanionPresence {
+    val resumed = kotlinx.coroutines.flow.MutableStateFlow(false)
+}
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    override fun onResume() {
+        super.onResume()
+        CompanionPresence.resumed.value = true
+    }
+
+    override fun onPause() {
+        CompanionPresence.resumed.value = false
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The companion UI is designed for the top screen; if it was launched on the bottom (or any other)

@@ -21,6 +21,7 @@ More ways to style the panel, a live Theme Studio, and a theme repo that comes b
 - **Settings keep your place.** Turning "Companion follows overlay look" on or off no longer jumps back to General.
 - **The Themes library scrolls back up.** Moving up to the tabs shows the page from the top again instead of hiding the first card.
 - **Quick Launch gets out of the way.** The overlay closes once the app you picked opens.
+- **The overlay guide waits for the overlay.** If the overlay doesn't open on first launch, the companion tour runs as normal and the overlay guide starts the first time the overlay shows, bringing the companion up alongside it.
 
 See the [v0.3.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.3.0) for the previous release.
 

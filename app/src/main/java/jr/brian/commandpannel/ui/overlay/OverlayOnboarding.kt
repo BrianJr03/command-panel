@@ -138,7 +138,13 @@ internal fun OverlayOnboardingLayer(
     onStep: (OverlayOnboardingStep) -> Unit,
     onLook: (TccUiLook) -> Unit,
     onEnd: () -> Unit,
+    onNeedCompanion: () -> Unit,
 ) {
+    // The companion has to be up: it carries the gamepad keys here and follows the theme step. Whenever the
+    // onboarding shows or moves on with it gone (the overlay opened on its own, or the user left), bring it back.
+    LaunchedEffect(step) {
+        if (!jr.brian.commandpannel.CompanionPresence.resumed.value) onNeedCompanion()
+    }
     val motion = LocalTccLookSpec.current.traits.animate
     val colors = LocalTccColors.current
     val density = LocalDensity.current

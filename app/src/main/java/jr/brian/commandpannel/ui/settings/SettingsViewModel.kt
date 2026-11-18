@@ -34,6 +34,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -732,17 +735,23 @@ class SettingsViewModel @Inject constructor(
     /** The APK downloaded for the open update, kept for the Android-installer fallback. */
     private var downloadedApk: java.io.File? = null
 
-    /** The tour starts once the overlay's onboarding (on the bottom screen) is finished or skipped. */
-    private var tourAfterOnboarding = false
+    /**
+     * The overlay's onboarding is on the bottom screen right now (its layer listens for the keys the companion
+     * forwards). It only shows once the overlay really is up, so it can run long after first launch.
+     */
+    private val overlayOnboardingOnScreen: Boolean get() = OverlayOnboarding.commands.subscriptionCount.value > 0
 
-    private val onboardingListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+    /** The companion tour step paused while the overlay's onboarding is on screen; it carries on from here after. */
+    private var pausedTourStep: Int? = null
+
+    /** Gives the overlay a moment to come up with its onboarding (it's shown as the companion opens). */
+    private suspend fun awaitOverlayOnboarding() {
+        kotlinx.coroutines.withTimeoutOrNull(3_000) { OverlayOnboarding.commands.subscriptionCount.first { it > 0 } }
+    }
+
+    private val onboardingListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         // The onboarding's theme step changes the look from the overlay; keep the Themes section in step.
         if (key == "overlay_look") refreshLooks()
-        if (key != OverlayOnboarding.KEY_SEEN || !p.getBoolean(key, false) || !tourAfterOnboarding) {
-            return@OnSharedPreferenceChangeListener
-        }
-        tourAfterOnboarding = false
-        if (_state.value.updateDialog == null) startTour() else tourPending = true
     }
 
     init {
@@ -752,19 +761,28 @@ class SettingsViewModel @Inject constructor(
         )
         prefs.registerOnSharedPreferenceChangeListener(onboardingListener)
         _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck)
+        // One guide at a time: the companion tour pauses while the overlay's onboarding is on screen, then resumes.
+        viewModelScope.launch {
+            OverlayOnboarding.commands.subscriptionCount.map { it > 0 }.distinctUntilChanged().collect { onScreen ->
+                if (onScreen) {
+                    _state.value.tourStep?.let { pausedTourStep = it; _state.value = _state.value.copy(tourStep = null) }
+                } else {
+                    pausedTourStep?.let { step ->
+                        pausedTourStep = null
+                        if (_state.value.updateDialog == null) _state.value = _state.value.copy(tourStep = step) else tourPending = true
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.cleanup(app) }
             showWhatsNewIfUpdated()
-            // The tour shows once, after the overlay's onboarding and any What's New dialog; the automatic update check
-            // waits until it's done.
+            // The tour shows once, after any What's New dialog; the automatic update check waits until it's done. If the
+            // overlay comes up with its onboarding, that goes first (the tour waits, paused); if it doesn't come up, the
+            // tour runs as normal and the overlay's onboarding waits for the overlay's first real show.
             if (!prefs.getBoolean(KEY_TOUR_SEEN, false)) {
-                if (!prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false)) {
-                    tourAfterOnboarding = true
-                } else if (_state.value.updateDialog == null) {
-                    startTour()
-                } else {
-                    tourPending = true
-                }
+                if (!prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false)) awaitOverlayOnboarding()
+                if (_state.value.updateDialog == null) startTour() else tourPending = true
                 return@launch
             }
             autoCheckForUpdates()
@@ -902,15 +920,20 @@ class SettingsViewModel @Inject constructor(
      * Clearing the onboarding's seen flag restarts it in the overlay; an explicit show brings the overlay up for it.
      */
     fun replayTour() {
-        tourAfterOnboarding = true
         prefs.edit().remove(OverlayOnboarding.KEY_SEEN).apply()
         runCatching {
             app.startService(Intent(app, AssistantService::class.java).setAction(AssistantService.ACTION_SHOW_OVERLAY))
+        }
+        viewModelScope.launch {
+            awaitOverlayOnboarding()
+            startTour()
         }
     }
 
     /** Starts the companion tour from its first step (also General → Updates → "Take the tour"). */
     fun startTour() {
+        // Waits (paused at its first step) while the overlay's onboarding is on screen.
+        if (overlayOnboardingOnScreen) { pausedTourStep = 0; return }
         // The Nav Bar section's cards are hidden while its app picker is open.
         _state.value = _state.value.copy(tourStep = 0, appPickerOpen = false)
     }

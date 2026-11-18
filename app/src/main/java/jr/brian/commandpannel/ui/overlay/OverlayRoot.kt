@@ -158,6 +158,7 @@ fun OverlayRoot(
                     currentLook = state.look.takeIf { state.customLook == null },
                     onStep = actions::setOnboardingStep,
                     onLook = actions::setLook,
+                    onNeedCompanion = actions::launchCompanion,
                     onEnd = actions::endOnboarding,
                 )
             }

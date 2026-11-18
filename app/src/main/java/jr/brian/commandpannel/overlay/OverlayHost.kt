@@ -30,8 +30,6 @@ import jr.brian.commandpannel.system.DisplayTopology
 class OverlayHost(
     private val context: Context,
     private val content: @Composable (dismiss: () -> Unit) -> Unit,
-    /** Called when [show] can't put the window up (no bottom display, or the window manager refused it). */
-    private val onShowFailed: () -> Unit = {},
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val topology = DisplayTopology(context)
@@ -50,7 +48,6 @@ class OverlayHost(
         if (isShowing) return@onMain
         val display = topology.bottomDisplay ?: run {
             Log.w(TAG, "no bottom display; cannot show overlay")
-            onShowFailed()
             return@onMain
         }
         val displayContext = context.createDisplayContext(display)
@@ -82,7 +79,6 @@ class OverlayHost(
         } catch (t: Throwable) {
             Log.e(TAG, "addView failed", t)
             owner.onDestroy()
-            onShowFailed()
             return@onMain
         }
         composeView = view
