@@ -1,32 +1,15 @@
-## Command Panel v0.2.0
+## Command Panel v0.2.1
 
-The first public release of **Command Panel (TCP)**, a user-installable replacement for the AYN Thor's stock dual-screen assistant.
+A bug-fix release.
 
-### New in this version
-- **Companion tour.** A guided walk through every section of the companion on first launch: it switches sections, scrolls to each setting and spotlights it with an explanation. Take it again any time from General → Updates.
-- **Replay Buffer: pick the screen.** Capture the top screen, the bottom screen, or **both stacked into one video**, laid out like the device. Clips are named `_Top`, `_Bottom` or `_Both`.
+### Fixes
+- **The AYN button no longer falls back to the stock assistant.** With *Replace Stock Assistant* on, the stock panel could open instead of Command Panel's overlay, usually after the screen had been off. Android was restarting the stock assistant after the screen turned on, and the restarted copy wasn't held back. Command Panel now keeps it suppressed through screen on and off, and takes the button back if it ever restarts.
+- **Theme Studio's preview switches tabs right away.** Picking *Settings* or *Mode* above the preview now updates it immediately, instead of only after switching to *Cards* and back.
 
-### Overlay
-- Bottom-screen overlay with Mode and Settings tabs, opened by the AYN button.
-- Screen modes: **Dual-screen**, **Only top screen** and **Only bottom screen**.
-- Brightness and volume cards, a 60/120 Hz toggle with a live FPS readout, and quick-setting tiles.
-- **Arrange mode**: long-press to drag the overlay's cards into any layout.
-- Full gamepad navigation.
+### Good to know
+- Command Panel's overlay can't appear while Android Settings (or another protected system screen) is open on the top screen: Android hides app overlays there. Leave that screen and the overlay shows.
 
-### Looks and Theme Studio
-- 16 overlay looks, each restyling cards, tiles, gauges, sliders and fonts, in light and dark.
-- **Theme Studio**: mix parts from any look or build your own with a live preview, then share looks as packs or follow GitHub theme repos for updates.
-- The companion can follow the overlay's look, and the accent can follow the Ambient LED color.
-
-### Companion app
-- A gamepad-navigable settings console: pick and reorder tiles, arrange the nav bar, and set up a Quick Launch button.
-- Battery time estimate, a hidden network-speed option, and settings backup and restore.
-- **In-app updates**: checks GitHub for new releases, shows the patch notes, and installs in one press.
-- Works alongside **Better Dual Screen Assistant**: Command Panel stands by while BDSA controls the hardware.
-
-### Tools
-- **Replay Buffer**: a rolling root screen capture you can save as an MP4 after the moment.
-- Screenshot tile for the top, bottom or both screens.
+See the [v0.2.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.2.0) for everything else in this version.
 
 ---
-*Personal project for the AYN Thor. Bundles AYN stock assets and OFL fonts (see THIRD_PARTY_NOTICES).*
+*Personal project for the AYN Thor, licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
