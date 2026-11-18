@@ -393,7 +393,6 @@
     <string name="theme_repo_remove_confirm">Press again to remove its looks</string>
     <string name="theme_repo_never_synced">Not synced yet</string>
     <string name="theme_repo_synced">Synced %1$s · %2$s</string>
-    <string name="theme_from_repo">From %1$s (updates replace it; edits save as a copy)</string>
     <string name="theme_fonts_download_title">Download fonts?</string>
     <string name="theme_fonts_download_desc">These looks use fonts that aren\'t on this device. The pack lists where to download them:</string>
     <string name="theme_fonts_download_item">%1$s from %2$s (%3$s)</string>
