@@ -96,8 +96,14 @@ object PackInstaller {
 internal class HttpStatusException(val code: Int) : IllegalStateException("HTTP $code")
 
 internal object Http {
-    fun getBytes(url: String, maxBytes: Int, accept: String? = null): ByteArray {
+    /**
+     * GitHub API calls go through [GitHubRateGuard]: [githubReserve] requests are kept back (theme syncs leave a few for
+     * the update check), and a call past the limit throws [GitHubRateLimitedException] instead of being sent.
+     */
+    fun getBytes(url: String, maxBytes: Int, accept: String? = null, githubReserve: Int = 0): ByteArray {
         require(url.startsWith("https://")) { "https only" }
+        val github = URL(url).host == GitHubRateGuard.HOST
+        if (github) GitHubRateGuard.acquire(githubReserve)
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = 10_000
@@ -107,6 +113,12 @@ internal object Http {
             conn.setRequestProperty("Cache-Control", "no-cache")
             accept?.let { conn.setRequestProperty("Accept", it) }
             val code = conn.responseCode
+            if (github) {
+                GitHubRateGuard.observe(conn)
+                if ((code == 403 || code == 429) && GitHubRateGuard.available() == 0) {
+                    throw GitHubRateLimitedException(GitHubRateGuard.retryAt())
+                }
+            }
             if (code !in 200..299) throw HttpStatusException(code)
             // Redirects (raw.githubusercontent, CDNs) must stay on https.
             require(conn.url.protocol == "https") { "https only" }
@@ -126,7 +138,8 @@ internal object Http {
         }
     }
 
-    fun getText(url: String, maxBytes: Int, accept: String? = null): String = String(getBytes(url, maxBytes, accept), Charsets.UTF_8)
+    fun getText(url: String, maxBytes: Int, accept: String? = null, githubReserve: Int = 0): String =
+        String(getBytes(url, maxBytes, accept, githubReserve), Charsets.UTF_8)
 
     /**
      * Streams [url] into [dest] (https only, redirects included), reporting `(bytesRead, totalOrMinus1)` as it goes.

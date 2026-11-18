@@ -125,6 +125,10 @@ internal fun Themes(
             )
             Chip(stringResource(R.string.theme_repo_add), enabled = link.isNotBlank() && !state.themeBusy, onClick = follow)
         }
+        // Opening Themes re-checks repos hourly; this checks them all now (within GitHub's hourly limit).
+        if (state.themeSources.isNotEmpty()) {
+            Chip(stringResource(R.string.theme_repos_sync_all), enabled = !state.themeBusy) { vm.syncAllSources() }
+        }
         state.repoMessage?.let { InfoLine(it) }
     }
     state.themeSources.forEach { source -> SourceCard(source, state, vm) }

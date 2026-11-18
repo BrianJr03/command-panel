@@ -417,6 +417,7 @@
     <string name="theme_repos_desc">Paste a GitHub link to a theme repo (made from the TCP theme template), or a direct https link to a .tcplooks.json file. Its looks are added and stay up to date when the author pushes changes.</string>
     <string name="theme_repo_hint">https://github.com/owner/repo</string>
     <string name="theme_repo_add">Follow</string>
+    <string name="theme_repos_sync_all">Sync repos</string>
     <string name="theme_repo_update">Update</string>
     <string name="theme_repo_remove">Remove</string>
     <string name="theme_repo_remove_confirm">Press again to remove its looks</string>
@@ -511,6 +512,15 @@
         <item quantity="other">Synced %2$s (%1$d looks).</item>
     </plurals>
     <string name="msg_source_failed">Couldn\'t sync %1$s: %2$s</string>
+    <string name="msg_sources_up_to_date">All repos are up to date.</string>
+    <plurals name="msg_sources_synced">
+        <item quantity="one">Synced your repos (%1$d look changed).</item>
+        <item quantity="other">Synced your repos (%1$d looks changed).</item>
+    </plurals>
+    <plurals name="msg_source_rate_limited">
+        <item quantity="one">GitHub\'s hourly limit is nearly used up, so syncing paused. Try again in %1$d minute.</item>
+        <item quantity="other">GitHub\'s hourly limit is nearly used up, so syncing paused. Try again in %1$d minutes.</item>
+    </plurals>
     <string name="msg_bdsa_disabled">Disabled. It restores the stock assistant on its way out, and Command Panel takes over.</string>
     <string name="msg_bdsa_disable_failed">Couldn\'t disable it (needs the root shell).</string>
     <string name="msg_bdsa_enabled">Re-enabled. Command Panel stands by while it\'s in control.</string>

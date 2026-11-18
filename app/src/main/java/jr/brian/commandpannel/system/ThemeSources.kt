@@ -37,11 +37,14 @@ data class SyncResult(
     val removedLooks: Int,
     val fontNeeds: FontNeeds,
     val packs: List<LookPack>,
+    /** Set when the GitHub rate guard stopped the sync early: when it can carry on. The rest syncs next time. */
+    val limitedUntilMs: Long? = null,
 )
 
 object ThemeSources {
     const val KEY = "theme_sources"
-    private const val DAY_MS = 24L * 60 * 60 * 1000
+    /** Opening Themes syncs a repo again once its last sync is this old (Sync repos and Update don't wait). */
+    private const val AUTO_SYNC_MS = 60L * 60 * 1000
 
     // ---- links ----
 
@@ -87,7 +90,8 @@ object ThemeSources {
         prefs.edit().putString(KEY, JSONArray().apply { next.forEach { put(encode(it)) } }.toString()).apply()
     }
 
-    fun isDue(source: ThemeSource, now: Long = System.currentTimeMillis()): Boolean = now - source.lastSync > DAY_MS
+    /** Whether opening Themes should sync [source] again. */
+    fun isDue(source: ThemeSource, now: Long = System.currentTimeMillis()): Boolean = now - source.lastSync >= AUTO_SYNC_MS
 
     // ---- sync ----
 
@@ -109,7 +113,10 @@ object ThemeSources {
             // from reporting stale versions.
             val query = listOfNotNull(source.branch?.let { "ref=$it" }, "t=${System.currentTimeMillis()}").joinToString("&")
             val listing = JSONArray(
-                Http.getText("https://api.github.com/repos/${source.owner}/${source.repo}/contents/themes?$query", 256 * 1024, "application/vnd.github+json"),
+                Http.getText(
+                    "https://api.github.com/repos/${source.owner}/${source.repo}/contents/themes?$query", 256 * 1024,
+                    "application/vnd.github+json", githubReserve = GitHubRateGuard.SYNC_RESERVE,
+                ),
             )
             val files = (0 until listing.length()).mapNotNull { listing.optJSONObject(it) }
                 .filter { it.optString("type") == "file" && it.optString("name").endsWith(LookPackJson.EXTENSION) }
@@ -133,10 +140,20 @@ object ThemeSources {
         var removedLooks = 0
         val fontLooks = mutableListOf<CustomLook>()
         var fonts = emptyMap<String, jr.brian.commandpannel.ui.theme.FontSource>()
+        var limitedUntil: Long? = null
         for (path in changed) {
-            val text = prefetched[path] ?: Http.getText(downloadUrls.getValue(path), LookPackJson.MAX_BYTES, "application/vnd.github.raw").also {
-                // Only record a version whose content we actually have, so a bad download is retried next sync.
-                check(gitBlobSha(it.toByteArray()) == remote.getValue(path)) { "content didn't match $path" }
+            // Out of GitHub requests: keep what's done so far; the packs not fetched yet sync next time.
+            val text = prefetched[path] ?: try {
+                Http.getText(
+                    downloadUrls.getValue(path), LookPackJson.MAX_BYTES, "application/vnd.github.raw",
+                    githubReserve = GitHubRateGuard.SYNC_RESERVE,
+                ).also {
+                    // Only record a version whose content we actually have, so a bad download is retried next sync.
+                    check(gitBlobSha(it.toByteArray()) == remote.getValue(path)) { "content didn't match $path" }
+                }
+            } catch (e: GitHubRateLimitedException) {
+                limitedUntil = e.retryAtMs
+                break
             }
             val fileName = path.substringAfterLast('/')
             val pack = LookPackJson.decode(text, fileName.substringBefore('.')) ?: continue
@@ -159,8 +176,9 @@ object ThemeSources {
         // Fonts first, so the installed looks link to them.
         val needs = PackInstaller.prepareFonts(context, privileged, LookPack(source.name, fontLooks, fonts = fonts))
         packs.forEach { PackInstaller.install(context, prefs, it.looks, source.id) }
-        save(prefs, source.copy(lastSync = System.currentTimeMillis(), files = newFiles))
-        SyncResult(changed.size, newFiles.values.sumOf { it.lookIds.size }, removedLooks, needs, packs)
+        // A sync the guard cut short isn't finished, so the next time Themes opens it carries on instead of waiting an hour.
+        save(prefs, source.copy(lastSync = if (limitedUntil == null) System.currentTimeMillis() else source.lastSync, files = newFiles))
+        SyncResult(packs.size, newFiles.values.sumOf { it.lookIds.size }, removedLooks, needs, packs, limitedUntil)
     }
 
     // ---- json ----

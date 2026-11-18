@@ -263,7 +263,8 @@ class SettingsViewModel @Inject constructor(
                 else emptyList()
             }
             _state.value = _state.value.copy(themeFolderReady = ok, folderPacks = packs, themeSources = ThemeSources.all(prefs))
-            if (checkUpdates) ThemeSources.all(prefs).filter { ThemeSources.isDue(it) }.forEach { syncSource(it.id, quiet = true) }
+            // Opening Themes re-checks repos last synced over an hour ago; Sync repos and Update don't wait.
+            if (checkUpdates) syncAllSources(quiet = true, onlyDue = true)
         }
     }
 
@@ -363,27 +364,80 @@ class SettingsViewModel @Inject constructor(
         syncSource(source.id)
     }
 
-    /** Pulls [id]'s latest packs; [quiet] skips the "up to date" message (automatic daily checks). */
-    fun syncSource(id: String, quiet: Boolean = false) {
+    /** Repos with a sync in flight, so opening Themes twice in a row doesn't sync the same repo twice. */
+    private val syncing = mutableSetOf<String>()
+
+    /** Pulls [id]'s latest packs (the repo card's Update). */
+    fun syncSource(id: String) {
         val source = ThemeSources.all(prefs).firstOrNull { it.id == id } ?: return
-        _state.value = _state.value.copy(themeBusy = true)
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { ThemeSources.sync(app, privileged, prefs, source) }
-            refreshLooks()
-            _state.value = _state.value.copy(themeBusy = false, themeSources = ThemeSources.all(prefs))
+            val result = runSync(source) ?: return@launch
             result.onSuccess { r ->
-                val msg = if (r.updatedFiles == 0 && r.removedLooks == 0) {
-                    if (quiet) null else app.getString(R.string.msg_source_up_to_date, source.name)
-                } else {
-                    app.resources.getQuantityString(R.plurals.msg_source_synced, r.lookCount, r.lookCount, source.name)
+                val msg = when {
+                    r.limitedUntilMs != null -> rateLimitMessage(r.limitedUntilMs)
+                    r.updatedFiles == 0 && r.removedLooks == 0 -> app.getString(R.string.msg_source_up_to_date, source.name)
+                    else -> app.resources.getQuantityString(R.plurals.msg_source_synced, r.lookCount, r.lookCount, source.name)
                 }
-                if (msg != null) _state.value = _state.value.copy(repoMessage = msg)
+                _state.value = _state.value.copy(repoMessage = msg)
                 reportFonts(null, r.fontNeeds)
-            }.onFailure { e ->
-                // Automatic checks fail silently (offline, rate-limited); Update reports the error.
-                if (!quiet) _state.value = _state.value.copy(repoMessage = app.getString(R.string.msg_source_failed, source.name, e.message ?: ""))
-            }
+            }.onFailure { e -> _state.value = _state.value.copy(repoMessage = syncFailedMessage(source, e)) }
         }
+    }
+
+    /**
+     * Syncs every followed repo, one at a time, and reports once. [onlyDue] skips repos synced within the hour (the
+     * automatic check when Themes opens); [quiet] says nothing unless looks changed. Stops at GitHub's hourly limit.
+     */
+    fun syncAllSources(quiet: Boolean = false, onlyDue: Boolean = false) {
+        val sources = ThemeSources.all(prefs).filter { !onlyDue || ThemeSources.isDue(it) }
+        if (sources.isEmpty()) return
+        viewModelScope.launch {
+            var changedLooks = 0
+            var limitedUntil: Long? = null
+            var failure: String? = null
+            for (source in sources) {
+                val result = runSync(source) ?: continue
+                result.onSuccess { r ->
+                    if (r.updatedFiles > 0 || r.removedLooks > 0) changedLooks += r.packs.sumOf { it.looks.size } + r.removedLooks
+                    reportFonts(null, r.fontNeeds)
+                    limitedUntil = r.limitedUntilMs
+                }.onFailure { e ->
+                    if (e is jr.brian.commandpannel.system.GitHubRateLimitedException) limitedUntil = e.retryAtMs
+                    else if (failure == null) failure = syncFailedMessage(source, e)
+                }
+                if (limitedUntil != null) break
+            }
+            // Automatic checks only speak up when something changed (offline or rate-limited stays silent).
+            val msg = when {
+                limitedUntil != null && !quiet -> rateLimitMessage(limitedUntil!!)
+                failure != null && !quiet -> failure
+                changedLooks > 0 -> app.resources.getQuantityString(R.plurals.msg_sources_synced, changedLooks, changedLooks)
+                !quiet -> app.getString(R.string.msg_sources_up_to_date)
+                else -> null
+            }
+            if (msg != null) _state.value = _state.value.copy(repoMessage = msg)
+        }
+    }
+
+    /** Runs one repo's sync off the main thread, or returns null when that repo is already syncing. */
+    private suspend fun runSync(source: jr.brian.commandpannel.system.ThemeSource): Result<jr.brian.commandpannel.system.SyncResult>? {
+        if (!syncing.add(source.id)) return null
+        _state.value = _state.value.copy(themeBusy = true)
+        val result = withContext(Dispatchers.IO) { ThemeSources.sync(app, privileged, prefs, source) }
+        syncing.remove(source.id)
+        refreshLooks()
+        _state.value = _state.value.copy(themeBusy = syncing.isNotEmpty(), themeSources = ThemeSources.all(prefs))
+        return result
+    }
+
+    private fun syncFailedMessage(source: jr.brian.commandpannel.system.ThemeSource, e: Throwable): String =
+        if (e is jr.brian.commandpannel.system.GitHubRateLimitedException) rateLimitMessage(e.retryAtMs)
+        else app.getString(R.string.msg_source_failed, source.name, e.message ?: "")
+
+    /** "GitHub's hourly limit…, try again in N minutes" for a sync the rate guard held back. */
+    private fun rateLimitMessage(retryAtMs: Long): String {
+        val minutes = ((retryAtMs - System.currentTimeMillis() + 59_999) / 60_000).toInt().coerceAtLeast(1)
+        return app.resources.getQuantityString(R.plurals.msg_source_rate_limited, minutes, minutes)
     }
 
     /** Stops following [id] and removes the looks it installed. */
