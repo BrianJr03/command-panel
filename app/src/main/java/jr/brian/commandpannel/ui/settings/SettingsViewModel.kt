@@ -100,6 +100,8 @@ data class SettingsState(
     val bdsaDisabledByUs: String? = null,
     /** Result of the last BDSA action. */
     val bdsaMessage: String? = null,
+    /** The other build's (debug / release) name while it replaces the stock assistant and this one stands by, or null. */
+    val siblingOwner: String? = null,
     /** The update / What's New dialog, or null when closed. */
     val updateDialog: UpdatePhase? = null,
     /** A check is running (manual button shows busy). */
@@ -616,11 +618,13 @@ class SettingsViewModel @Inject constructor(
     // ---- Better Dual Screen Assistant coexistence ----
 
     private val bdsa = BdsaDetector(app, privileged)
+    private val sibling = jr.brian.commandpannel.system.SiblingBuild(app, privileged)
 
     // BDSA installed / removed / enabled / disabled while the companion is open (also by Command Panel's own buttons).
     private val bdsaPackageReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: android.content.Context, i: Intent) {
-            if (i.data?.schemeSpecificPart in BdsaDetector.PACKAGES) refreshBdsa(keepMessage = true)
+            val pkg = i.data?.schemeSpecificPart
+            if (pkg in BdsaDetector.PACKAGES || pkg == sibling.siblingPackage) refreshBdsa(keepMessage = true)
         }
     }
 
@@ -643,9 +647,12 @@ class SettingsViewModel @Inject constructor(
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         })
+        // The other build took over (or let go of) the stock replacement; the service turns this one's switch off.
+        sibling.observe { refreshSibling() }
     }
 
     override fun onCleared() {
+        sibling.stop()
         runCatching { app.unregisterReceiver(bdsaPackageReceiver) }
         app.contentResolver.unregisterContentObserver(ledColorObserver)
         prefs.unregisterOnSharedPreferenceChangeListener(onboardingListener)
@@ -665,7 +672,24 @@ class SettingsViewModel @Inject constructor(
             // A message about the previous state ("Re-enabled…") is stale once the state changes.
             val message = _state.value.bdsaMessage.takeIf { keepMessage || _state.value.bdsa.presence == status.presence }
             _state.value = _state.value.copy(bdsa = status, bdsaDisabledByUs = ours, bdsaMessage = message)
+            refreshSibling()
             recheckService()
+        }
+    }
+
+    /** Re-reads whether the other build owns the stock replacement, and this build's switch (which it may have turned off). */
+    private fun refreshSibling() {
+        viewModelScope.launch {
+            val owner = withContext(Dispatchers.IO) { if (sibling.siblingOwns()) sibling.siblingLabel() ?: sibling.siblingPackage else null }
+            // The service turns the switch off when the other build claims (it may still be doing so). Only ever forced
+            // off here: this build's own claim lands before its pref does, and must not flip the switch back.
+            _state.value = _state.value.copy(siblingOwner = owner, replaceStock = _state.value.replaceStock && owner == null)
+        }
+    }
+
+    fun openSibling() {
+        app.packageManager.getLaunchIntentForPackage(sibling.siblingPackage)?.let {
+            runCatching { app.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
     }
 
@@ -710,7 +734,8 @@ class SettingsViewModel @Inject constructor(
                 .setAction(AssistantService.ACTION_SET_REPLACE_STOCK)
                 .putExtra(AssistantService.EXTRA_ENABLE, enable)
         )
-        _state.value = _state.value.copy(replaceStock = enable)
+        // Turning it on takes over from the other build, which stands down.
+        _state.value = _state.value.copy(replaceStock = enable, siblingOwner = _state.value.siblingOwner.takeUnless { enable })
     }
 
     fun setThemeMode(mode: Int) {

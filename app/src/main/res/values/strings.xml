@@ -148,6 +148,7 @@
     <string name="settings_replace_stock">Replace Stock Assistant</string>
     <string name="settings_replace_stock_desc">Suppress the built-in dual-screen assistant so Command Panel handles the AYN button. Turning this off restores the stock assistant.</string>
     <string name="settings_replace_stock_paused">Paused: %1$s is in control. Command Panel takes over when it\'s turned off.</string>
+    <string name="settings_replace_stock_sibling">%1$s is replacing the stock assistant. Turn this on to take over here.</string>
     <string name="bdsa_name">Better Dual Screen Assistant</string>
     <!-- Buttons use the common short name; the banner title and text spell out the full name. -->
     <string name="bdsa_active_title">%1$s is in control</string>
@@ -159,6 +160,9 @@
     <string name="bdsa_inactive_desc">%1$s is installed but not active, so Command Panel is in control.</string>
     <string name="bdsa_disabled_by_us_desc">%1$s is disabled (Command Panel turned it off), so Command Panel is in control.</string>
     <string name="bdsa_reenable">Re-enable BDSA</string>
+    <string name="sibling_active_desc">This copy of Command Panel is standing by so the two builds don\'t fight over the AYN button and screens. Take over to use this one; %1$s turns its Replace stock assistant off.</string>
+    <string name="sibling_take_over">Take over</string>
+    <string name="sibling_open">Open %1$s</string>
     <string name="settings_battery_estimate">Battery Estimate</string>
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>

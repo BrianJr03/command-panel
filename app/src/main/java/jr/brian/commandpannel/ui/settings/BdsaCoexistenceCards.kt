@@ -53,3 +53,21 @@ internal fun BdsaInactiveNote(state: SettingsState, vm: SettingsViewModel) {
         state.bdsaMessage?.let { InfoLine(it) }
     }
 }
+
+/**
+ * Shown at the top of every companion section while the other Command Panel build (debug / release) replaces the
+ * stock assistant: this one is standing by. Taking over turns this build's switch on, and the other one stands down.
+ */
+@Composable
+internal fun SiblingStandbyBanner(state: SettingsState, vm: SettingsViewModel) {
+    val name = state.siblingOwner ?: return
+    Card {
+        CardTitle(stringResource(R.string.bdsa_active_title, name))
+        CardDesc(stringResource(R.string.sibling_active_desc, name))
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AccentButton(stringResource(R.string.sibling_take_over)) { vm.setReplaceStock(true) }
+            Chip(stringResource(R.string.sibling_open, name), onClick = vm::openSibling)
+        }
+    }
+}

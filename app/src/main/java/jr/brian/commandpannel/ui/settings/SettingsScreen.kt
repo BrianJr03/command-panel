@@ -156,7 +156,8 @@ internal fun SettingsContent(
     var nav by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavItem.GENERAL) }
     // Hoisted so the content pane can send D-pad Left back to the selected rail item.
     val railRequesters = remember { NavItem.entries.associateWith { FocusRequester() } }
-    // Re-detect Better Dual Screen Assistant whenever the companion comes to the front (e.g. back from BDSA's app).
+    // Re-detect Better Dual Screen Assistant and the other build whenever the companion comes to the front (e.g. back
+    // from BDSA's app).
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         vm.refreshBdsa()
         onPauseOrDispose { }
@@ -251,8 +252,10 @@ internal fun SettingsContent(
             )
             Text(stringResource(nav.subtitleRes), color = p.textSecondary, fontSize = 14.sp)
             Spacer(Modifier.height(6.dp))
-            // Can't be missed: while BDSA controls the hardware, every section opens with the standby banner.
+            // Can't be missed: while BDSA (or the other build) controls the hardware, every section opens with the
+            // standby banner. BDSA wins over the other build, since it keeps Command Panel on standby either way.
             if (state.bdsa.active) BdsaStandbyBanner(state, vm)
+            else if (state.siblingOwner != null) SiblingStandbyBanner(state, vm)
             when (nav.category) {
                 SettingsCategory.GENERAL -> General(state, vm)
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
@@ -426,8 +429,11 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
     BdsaInactiveNote(state, vm)
     SwitchCard(
         stringResource(R.string.settings_replace_stock),
-        if (state.bdsa.active) stringResource(R.string.settings_replace_stock_paused, stringResource(R.string.bdsa_name))
-        else stringResource(R.string.settings_replace_stock_desc),
+        when {
+            state.bdsa.active -> stringResource(R.string.settings_replace_stock_paused, stringResource(R.string.bdsa_name))
+            state.siblingOwner != null -> stringResource(R.string.settings_replace_stock_sibling, state.siblingOwner)
+            else -> stringResource(R.string.settings_replace_stock_desc)
+        },
         state.replaceStock, vm::setReplaceStock,
         Modifier.tourTarget(TourSpot.REPLACE_STOCK),
     )

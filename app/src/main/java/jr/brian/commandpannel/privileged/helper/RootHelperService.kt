@@ -74,6 +74,14 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
             StockSuppressor { RootHelperMain.runShell(it, 5_000).second }.restore()
         }.getOrElse { Log.w(tag, "stock restore failed", it); false }
         Log.i(tag, "stock restored=$restored")
+        releaseStockOwner()
+    }
+
+    /** Clears the debug / release owner record if it still names this app, so the other build doesn't wait on it. */
+    private fun releaseStockOwner() {
+        val key = jr.brian.commandpannel.system.SiblingBuild.KEY
+        val owner = RootHelperMain.runShell("settings get global $key", 5_000).second.trim()
+        if (owner == appPackage) RootHelperMain.runShell("settings delete global $key", 5_000)
     }
 
     override fun protocolVersion(): Int = HelperProtocol.VERSION

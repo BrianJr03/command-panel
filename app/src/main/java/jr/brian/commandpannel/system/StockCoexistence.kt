@@ -39,6 +39,8 @@ class StockCoexistence(
 
     private val prefs = Prefs.of(context)
     private val suppressor = StockSuppressor(privileged::shell)
+    /** The other build (debug / release); only one of the two replaces stock at a time. */
+    val sibling = SiblingBuild(context, privileged)
 
     private val _enabled = MutableStateFlow(prefs.getBoolean(KEY, false))
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
@@ -63,20 +65,48 @@ class StockCoexistence(
             }
         }
 
-    /** Apply the stored preference at startup (and when leaving standby). */
+    /**
+     * Apply the stored preference at startup (and when leaving standby). If the other build claimed the stock
+     * replacement more recently, this one stands down instead (so having both on resolves on the first start);
+     * otherwise an enabled preference claims it.
+     */
     fun applyInitial() {
-        if (_enabled.value && !standby) scope.launch(Dispatchers.IO) { suppressAndArm() }
+        if (!_enabled.value) return
+        scope.launch(Dispatchers.IO) {
+            if (sibling.siblingOwns()) {
+                standDownForSibling()
+                return@launch
+            }
+            sibling.claim()
+            if (!standby) suppressAndArm()
+        }
     }
 
     fun setEnabled(enable: Boolean) {
         prefs.edit().putBoolean(KEY, enable).apply()
         _enabled.value = enable
-        // On standby the choice is kept and applied once the other replacement stands down.
-        if (standby) return
         scope.launch(Dispatchers.IO) {
+            // Claiming makes the other build stand down; it leaves the stock process for this one to take.
+            if (enable) sibling.claim() else sibling.release()
+            // On standby the choice is kept and applied once the other replacement stands down.
+            if (standby) return@launch
             val ok = if (enable) suppressAndArm() else restoreAndDisarm()
             Log.i(TAG, "setEnabled($enable) -> ${if (enable) "suppressed" else "restored"}=$ok")
         }
+    }
+
+    /**
+     * The other build took over the stock replacement: turn this one's preference off without restoring stock (the
+     * other build owns the stock process now, and restoring it would undo its freeze).
+     */
+    fun standDownForSibling() {
+        if (!_enabled.value) return
+        Log.i(TAG, "${sibling.siblingPackage} took over replacing the stock assistant; standing down")
+        prefs.edit().putBoolean(KEY, false).apply()
+        _enabled.value = false
+        refreezeJob?.cancel()
+        recheckJob?.cancel()
+        privileged.setStockRecoveryArmed(false)
     }
 
     /** Restore stock when the app is stopping, so the AYN button is never left dead. */
@@ -85,6 +115,8 @@ class StockCoexistence(
             // Best-effort synchronous restore on teardown.
             runCatching { restoreAndDisarm() }
         }
+        // Nothing is replacing stock from here any more; the pref stays on and claims again on the next start.
+        if (_enabled.value) runCatching { sibling.release() }
     }
 
     /** Arms the helper's stock recovery first, so there is no window where stock is frozen but not covered. */

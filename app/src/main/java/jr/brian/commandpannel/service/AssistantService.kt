@@ -59,9 +59,10 @@ class AssistantService : Service() {
     private lateinit var bdsa: BdsaDetector
 
     /**
-     * True while Better Dual Screen Assistant claims the hardware. Command Panel then stands by: it ignores the AYN
-     * button, leaves the stock process alone, and stops driving screen modes, so the two never fight. Its own UI (the
-     * companion and an explicitly requested overlay preview) keeps working.
+     * True while Better Dual Screen Assistant, or the other Command Panel build (debug / release), claims the hardware.
+     * Command Panel then stands by: it ignores the AYN button, leaves the stock process alone, and stops driving screen
+     * modes, so the two never fight. Its own UI (the companion and an explicitly requested overlay preview) keeps
+     * working.
      */
     @Volatile private var standby = false
     /** Whether the hardware-facing parts (screen modes, tap waker) are running; flips with [standby]. */
@@ -163,8 +164,14 @@ class AssistantService : Service() {
             privileged.initialize(applicationContext)
             repository.start(scope)
             // Decide standby before touching the stock process or screen modes, so Command Panel never acts, even
-            // briefly, while Better Dual Screen Assistant is in control (e.g. at boot).
-            applyStandby(withContext(Dispatchers.IO) { bdsa.detect(force = true) }.active)
+            // briefly, while Better Dual Screen Assistant or the other build is in control (e.g. at boot).
+            val inControl = withContext(Dispatchers.IO) {
+                // The other build claimed stock more recently: this one's "Replace stock assistant" goes off.
+                if (coexistence.sibling.siblingOwns()) coexistence.standDownForSibling()
+                otherInControl(force = true)
+            }
+            applyStandby(inControl)
+            coexistence.sibling.observe(::onStockOwnerChanged)
             withContext(Dispatchers.IO) { replay.applyEnabledState() }
         }
     }
@@ -186,6 +193,7 @@ class AssistantService : Service() {
         runCatching { unregisterReceiver(aynReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
         runCatching { unregisterReceiver(packageReceiver) }
+        coexistence.sibling.stop()
         coexistence.onStop()
         if (hardwareRunning) tapWaker.stop()
         runCatching { replay.disarm() }
@@ -201,8 +209,23 @@ class AssistantService : Service() {
     /** Re-checks for Better Dual Screen Assistant ([force] skips the detector's short cache) and applies the result. */
     private fun recheckStandby(force: Boolean) {
         scope.launch {
-            val active = withContext(Dispatchers.IO) { bdsa.detect(force) }.active
+            val active = withContext(Dispatchers.IO) { otherInControl(force) }
             if (standbyDecided && active != standby) applyStandby(active)
+        }
+    }
+
+    /** Blocking. Whether BDSA or the other Command Panel build currently replaces the stock assistant. */
+    private fun otherInControl(force: Boolean): Boolean = bdsa.detect(force).active || coexistence.sibling.siblingOwns()
+
+    /**
+     * The other build claimed (or released) the stock replacement. A claim turns this build's "Replace stock
+     * assistant" off first, without restoring stock, then standby follows; a release lets this build leave standby.
+     */
+    private fun onStockOwnerChanged() {
+        scope.launch {
+            val siblingOwns = withContext(Dispatchers.IO) { coexistence.sibling.siblingOwns() }
+            if (siblingOwns) coexistence.standDownForSibling()
+            recheckStandby(force = false)
         }
     }
 
@@ -233,7 +256,17 @@ class AssistantService : Service() {
 
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
-            if (intent.data?.schemeSpecificPart in BdsaDetector.PACKAGES) recheckStandby(force = true)
+            val pkg = intent.data?.schemeSpecificPart
+            if (pkg == coexistence.sibling.siblingPackage) {
+                // An owner that was uninstalled can't hand over; clear its record so neither build waits on it.
+                val removed = intent.action == Intent.ACTION_PACKAGE_REMOVED && !intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                scope.launch {
+                    if (removed) withContext(Dispatchers.IO) { coexistence.sibling.clearIfOwner(pkg) }
+                    recheckStandby(force = true)
+                }
+            } else if (pkg in BdsaDetector.PACKAGES) {
+                recheckStandby(force = true)
+            }
         }
     }
 
