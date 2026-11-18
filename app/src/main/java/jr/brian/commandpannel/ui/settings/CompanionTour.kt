@@ -1,6 +1,5 @@
 package jr.brian.commandpannel.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -66,11 +65,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -84,6 +78,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.components.OnboardingBackHandler
+import jr.brian.commandpannel.ui.components.OnboardingKey
+import jr.brian.commandpannel.ui.components.onboardingControls
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
 import jr.brian.commandpannel.ui.theme.lookLabel
 import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
@@ -95,7 +92,8 @@ import kotlin.math.roundToInt
 /**
  * The companion tour: a guided walk through every settings section on the real screen. Each step selects its section,
  * scrolls the pane to the part it describes, dims everything else and moves a spotlight (with a pulsing accent ring)
- * and a callout card onto it. Gamepad: A / Right next, Left back, B skip. Touch uses the callout's buttons.
+ * and a callout card onto it. Gamepad ([onboardingControls]): A next, B back (exits on the first step), Y skip. Touch
+ * uses the callout's buttons.
  */
 
 /** A region the tour can spotlight. [inPane] regions live in the scrolling content pane (the rest are on the rail). */
@@ -107,6 +105,8 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
     OVERLAY_THEME, FOLLOW_LOOK, RGB_ACCENT,
     ACTIVE_LOOK, MIX, MY_LOOKS, PACKS, REPOS, BUILTIN,
+    /** The selected row in the built-in list (followed while the overlay onboarding's theme step runs). */
+    BUILTIN_SELECTED,
     PRIVILEGED,
     TOUR_REPLAY;
 
@@ -266,7 +266,6 @@ private fun TourLayer(
 ) {
     val step = TOUR_STEPS[index]
     val density = LocalDensity.current
-    val accent = p.accent
     var origin by remember { mutableStateOf(Offset.Zero) }
     var layerSize by remember { mutableStateOf(IntSize.Zero) }
     var calloutSize by remember { mutableStateOf(IntSize.Zero) }
@@ -317,20 +316,6 @@ private fun TourLayer(
         }
     }
 
-    // Spotlight: closes to a point when there's nothing to show, glides and resizes between targets.
-    val closed = Rect(Offset(w / 2, h / 2), Offset(w / 2, h / 2))
-    val holeTarget = hole ?: closed
-    val holeAnim = remember { Animatable(Rect.Zero, Rect.VectorConverter) }
-    val holeStarted = remember { BooleanArray(1) }
-    LaunchedEffect(holeTarget, layerSize) {
-        if (layerSize == IntSize.Zero) return@LaunchedEffect
-        if (!holeStarted[0]) {
-            holeStarted[0] = true
-            holeAnim.snapTo(Rect(holeTarget.center, holeTarget.center))
-        }
-        holeAnim.animateTo(holeTarget, if (motion) spring(dampingRatio = 0.82f, stiffness = 260f) else snap())
-    }
-
     // Callout position: placed without animation the first time (it's hidden until then), then springs along.
     val calloutAnim = remember { Animatable(IntOffset.Zero, IntOffset.VectorConverter) }
     var placed by remember { mutableStateOf(false) }
@@ -344,71 +329,23 @@ private fun TourLayer(
         }
     }
 
-    val pulse = if (motion) {
-        rememberInfiniteTransition(label = "tourPulse").animateFloat(
-            0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "tourPulse",
-        )
-    } else {
-        remember { mutableFloatStateOf(0f) }
-    }
-
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    // Newer Android sends Back through the back dispatcher rather than as a key event.
-    BackHandler { onSkip() }
+    OnboardingBackHandler(onBack = onBack)
 
     Box(
         Modifier.fillMaxSize()
             .onGloballyPositioned { origin = it.positionInRoot(); layerSize = it.size }
             .focusRequester(focus)
             // Takes every gamepad key so nothing under the tour moves; volume and other system keys pass through.
-            .onPreviewKeyEvent { e ->
-                val down = e.type == KeyEventType.KeyDown
-                val first = e.nativeKeyEvent.repeatCount == 0
-                when (e.key) {
-                    Key.ButtonA, Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionRight, Key.ButtonR1 -> {
-                        if (down && first) onNext()
-                        true
-                    }
-                    Key.DirectionLeft, Key.ButtonL1 -> {
-                        if (down) onBack()
-                        true
-                    }
-                    // On release, so the key-up doesn't reach (and close) the companion once the tour is gone.
-                    Key.ButtonB, Key.Back, Key.Escape -> {
-                        if (e.type == KeyEventType.KeyUp) onSkip()
-                        true
-                    }
-                    Key.DirectionUp, Key.DirectionDown, Key.Tab -> true
-                    else -> android.view.KeyEvent.isGamepadButton(e.nativeKeyEvent.keyCode)
-                }
-            }
+            .onboardingControls(onNext = onNext, onBack = onBack, onSkip = onSkip)
             .focusable()
             // Taps outside the callout don't reach the settings underneath.
             .pointerInput(Unit) {
                 awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
             },
     ) {
-        val radius = with(density) { 18.dp.toPx() }
-        val ring = with(density) { 2.dp.toPx() }
-        val halo = with(density) { 3.dp.toPx() }
-        val haloReach = with(density) { 8.dp.toPx() }
-        Canvas(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
-            drawRect(Color.Black.copy(alpha = 0.66f))
-            val r = holeAnim.value
-            if (r.width < 1f || r.height < 1f) return@Canvas
-            drawRoundRect(Color.Black, r.topLeft, r.size, CornerRadius(radius), blendMode = BlendMode.Clear)
-            val t = pulse.value
-            val grow = ring + t * haloReach
-            drawRoundRect(
-                accent.copy(alpha = 0.5f * (1f - t)),
-                topLeft = r.topLeft - Offset(grow, grow),
-                size = Size(r.width + 2 * grow, r.height + 2 * grow),
-                cornerRadius = CornerRadius(radius + grow),
-                style = Stroke(halo),
-            )
-            drawRoundRect(accent, r.topLeft, r.size, CornerRadius(radius), style = Stroke(ring))
-        }
+        Spotlight(hole, layerSize, motion)
         TourCallout(
             index = index,
             motion = motion,
@@ -421,6 +358,78 @@ private fun TourLayer(
             onBack = onBack,
             onSkip = onSkip,
         )
+    }
+}
+
+/**
+ * The dimmed layer with a rounded hole over [hole] (in the layer's coordinates) and a pulsing accent ring. The hole
+ * closes to a point when there's nothing to show, and glides and resizes between targets.
+ */
+@Composable
+private fun Spotlight(hole: Rect?, layerSize: IntSize, motion: Boolean) {
+    val density = LocalDensity.current
+    val accent = p.accent
+    val w = layerSize.width.toFloat()
+    val h = layerSize.height.toFloat()
+    val holeTarget = hole ?: Rect(Offset(w / 2, h / 2), Offset(w / 2, h / 2))
+    val holeAnim = remember { Animatable(Rect.Zero, Rect.VectorConverter) }
+    val holeStarted = remember { BooleanArray(1) }
+    LaunchedEffect(holeTarget, layerSize) {
+        if (layerSize == IntSize.Zero) return@LaunchedEffect
+        if (!holeStarted[0]) {
+            holeStarted[0] = true
+            holeAnim.snapTo(Rect(holeTarget.center, holeTarget.center))
+        }
+        holeAnim.animateTo(holeTarget, if (motion) spring(dampingRatio = 0.82f, stiffness = 260f) else snap())
+    }
+    val pulse = if (motion) {
+        rememberInfiniteTransition(label = "tourPulse").animateFloat(
+            0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "tourPulse",
+        )
+    } else {
+        remember { mutableFloatStateOf(0f) }
+    }
+    val radius = with(density) { 18.dp.toPx() }
+    val ring = with(density) { 2.dp.toPx() }
+    val halo = with(density) { 3.dp.toPx() }
+    val haloReach = with(density) { 8.dp.toPx() }
+    Canvas(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+        drawRect(Color.Black.copy(alpha = 0.66f))
+        val r = holeAnim.value
+        if (r.width < 1f || r.height < 1f) return@Canvas
+        drawRoundRect(Color.Black, r.topLeft, r.size, CornerRadius(radius), blendMode = BlendMode.Clear)
+        val t = pulse.value
+        val grow = ring + t * haloReach
+        drawRoundRect(
+            accent.copy(alpha = 0.5f * (1f - t)),
+            topLeft = r.topLeft - Offset(grow, grow),
+            size = Size(r.width + 2 * grow, r.height + 2 * grow),
+            cornerRadius = CornerRadius(radius + grow),
+            style = Stroke(halo),
+        )
+        drawRoundRect(accent, r.topLeft, r.size, CornerRadius(radius), style = Stroke(ring))
+    }
+}
+
+/**
+ * Follows the overlay onboarding's theme step on the companion: while [active], the spotlight sits on the selected
+ * built-in look and glides to each preset the user taps on the bottom screen. Touches and keys pass through.
+ */
+@Composable
+internal fun CompanionLookSpotlight(active: Boolean, targets: TourTargets, paneBounds: () -> Rect) {
+    val motion = LocalTccLookSpec.current.traits.animate
+    AnimatedVisibility(
+        visible = active,
+        enter = if (motion) fadeIn(tween(380)) else EnterTransition.None,
+        exit = if (motion) fadeOut(tween(260)) else ExitTransition.None,
+    ) {
+        val pad = with(LocalDensity.current) { 8.dp.toPx() }
+        var origin by remember { mutableStateOf(Offset.Zero) }
+        var layerSize by remember { mutableStateOf(IntSize.Zero) }
+        val hole = targets.rectOf(TourSpot.BUILTIN_SELECTED)?.intersectOrNull(paneBounds())?.translate(-origin)?.inflate(pad)
+        Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot(); layerSize = it.size }) {
+            Spotlight(hole, layerSize, motion)
+        }
     }
 }
 
@@ -471,9 +480,9 @@ private fun TourCallout(
                 stringResource(R.string.tour_step_count, index + 1, count),
                 color = p.textTertiary, fontSize = 12.sp, style = tccTextStyle(), modifier = Modifier.weight(1f),
             )
-            if (!lastStep) Chip(stringResource(R.string.tour_skip), onClick = onSkip)
-            if (index > 0) Chip(stringResource(R.string.tour_back), onClick = onBack)
-            AccentButton(stringResource(if (lastStep) R.string.tour_done else R.string.tour_next), onClick = onNext)
+            if (!lastStep) Chip(stringResource(R.string.tour_skip), glyph = OnboardingKey.SKIP, onClick = onSkip)
+            if (index > 0) Chip(stringResource(R.string.tour_back), glyph = OnboardingKey.BACK, onClick = onBack)
+            AccentButton(stringResource(if (lastStep) R.string.tour_done else R.string.tour_next), glyph = OnboardingKey.NEXT, onClick = onNext)
         }
     }
 }

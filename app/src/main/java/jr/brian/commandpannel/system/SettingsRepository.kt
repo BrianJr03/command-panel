@@ -91,6 +91,7 @@ class SettingsRepository(
         telemetry.start(scope)
         batteryEstimate.start(scope)
         scope.launch { batteryEstimate.text.collect { est -> _uiState.update { it.copy(batteryEstimate = est) } } }
+        scope.launch { uiState.collect { OverlayOnboarding.activeStep.value = it.onboardingStep } }
         scope.launch {
             telemetry.state.collect { t ->
                 _uiState.update {
@@ -468,6 +469,11 @@ class SettingsRepository(
     override fun setNavTab(tab: jr.brian.commandpannel.ui.overlay.OverlayTab) {
         prefs.edit().putString("overlay_nav_tab", tab.name).apply()
         _uiState.update { it.copy(navTab = tab) }
+    }
+
+    override fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) {
+        // The pref listener restyles the overlay; the companion picks it up through its own listener.
+        CustomLookStore.select(prefs, jr.brian.commandpannel.ui.theme.LookRef.BuiltIn(look))
     }
 
     override fun setOnboardingStep(step: OverlayOnboardingStep) {

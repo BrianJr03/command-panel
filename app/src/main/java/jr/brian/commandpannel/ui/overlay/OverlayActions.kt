@@ -39,6 +39,9 @@ interface OverlayActions {
     /** Persists a new overlay card arrangement (from Arrange mode). */
     fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout)
 
+    /** Applies a built-in look to the overlay (the onboarding's theme step). */
+    fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook)
+
     /** Moves the first-run onboarding to [step]. */
     fun setOnboardingStep(step: OverlayOnboardingStep)
 
@@ -70,6 +73,7 @@ interface OverlayActions {
         override fun launchCompanion() {}
         override fun setNavTab(tab: OverlayTab) {}
         override fun setOverlayLayout(layout: jr.brian.commandpannel.system.OverlayLayout) {}
+        override fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) {}
         override fun setOnboardingStep(step: OverlayOnboardingStep) {}
         override fun endOnboarding() {}
     }

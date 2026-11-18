@@ -35,10 +35,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -55,44 +57,75 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.system.OverlayLayout
+import jr.brian.commandpannel.ui.components.GamepadGlyph
+import jr.brian.commandpannel.ui.components.OnboardingKey
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeController
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
+import jr.brian.commandpannel.ui.theme.TccUiLook
 import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 import jr.brian.commandpannel.ui.theme.tccTextStyle
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The overlay's first-run onboarding: a short, hands-on walk through the two gestures that are easy to miss, long-press
- * to arrange (then drag and drop) and the Quick Launch nav button. The hands-on steps move on by themselves once the
- * user does the gesture and leave the panel fully usable; the others dim it and only take taps on the callout.
+ * The overlay's first-run onboarding: a short, hands-on walk that opens on the flagship feature, trying a few looks,
+ * then covers what's easy to miss: long-press to arrange (then drag and drop) and the Quick Launch nav button. The hands-on steps move on by themselves once the
+ * user does the gesture and leave the panel fully usable; the others only take taps on the callout.
  */
 object OverlayOnboarding {
     /** The onboarding was finished or skipped. Not backed up, so a restored backup still gets it. */
     const val KEY_SEEN = "overlay_onboarding_seen"
+
+    /** The running step, mirrored by the service's repository so the companion can follow along (same process). */
+    internal val activeStep = MutableStateFlow<OverlayOnboardingStep?>(null)
+
+    /**
+     * Gamepad presses forwarded by the companion. The overlay window never takes focus (it would fight the Thor's
+     * screen-focus handling), so the companion, focused on the top screen, catches A / B / Y and sends them here.
+     */
+    internal val commands = MutableSharedFlow<OnboardingCommand>(extraBufferCapacity = 8)
 }
 
-/** One stop on the onboarding. [handsOn] steps wait for a gesture and let touches through to the panel. */
-enum class OverlayOnboardingStep(@StringRes val titleRes: Int, @StringRes val bodyRes: Int, val handsOn: Boolean = false) {
+/** A forwarded gamepad press: A, B or Y (see [jr.brian.commandpannel.ui.components.onboardingControls]). */
+enum class OnboardingCommand { NEXT, BACK, SKIP, OPTION_PREV, OPTION_NEXT }
+
+/**
+ * One stop on the onboarding. [handsOn] steps wait for a gesture and let touches through to the panel; [dim] steps
+ * darken it (the theme step doesn't, so each look it applies is seen in full).
+ */
+enum class OverlayOnboardingStep(
+    @StringRes val titleRes: Int,
+    @StringRes val bodyRes: Int,
+    val handsOn: Boolean = false,
+    val dim: Boolean = !handsOn,
+) {
     WELCOME(R.string.overlay_onboarding_welcome_title, R.string.overlay_onboarding_welcome_body),
+    THEME(R.string.overlay_onboarding_theme_title, R.string.overlay_onboarding_theme_body, dim = false),
     LONG_PRESS(R.string.overlay_onboarding_long_press_title, R.string.overlay_onboarding_long_press_body, handsOn = true),
     DRAG(R.string.overlay_onboarding_drag_title, R.string.overlay_onboarding_drag_body, handsOn = true),
     FINISH_ARRANGE(R.string.overlay_onboarding_finish_arrange_title, R.string.overlay_onboarding_finish_arrange_body, handsOn = true),
     QUICK_LAUNCH(R.string.overlay_onboarding_quick_launch_title, R.string.overlay_onboarding_quick_launch_body),
 }
 
+/** The looks the theme step offers: the default, plus two that show how far apart the presets go. */
+private val SAMPLE_LOOKS = listOf(TccUiLook.AURORA_GLASS, TccUiLook.TACTICAL_HUD, TccUiLook.SOFT_CONSOLE)
+
 /**
  * Drawn over the whole overlay while [step] runs. [launchBounds] is the Launch nav button's root bounds (the Quick
- * Launch step's spotlight); [navAtTop] keeps the callout clear of the nav bar during the arrange steps.
+ * Launch step's spotlight); [navAtTop] keeps the callout clear of the nav bar during the arrange steps. [currentLook]
+ * is the active built-in look (null for a saved custom look), marked among the theme step's samples.
  */
 @Composable
 internal fun OverlayOnboardingLayer(
@@ -101,7 +134,9 @@ internal fun OverlayOnboardingLayer(
     layout: OverlayLayout,
     navAtTop: Boolean,
     launchBounds: Rect?,
+    currentLook: TccUiLook?,
     onStep: (OverlayOnboardingStep) -> Unit,
+    onLook: (TccUiLook) -> Unit,
     onEnd: () -> Unit,
 ) {
     val motion = LocalTccLookSpec.current.traits.animate
@@ -130,16 +165,50 @@ internal fun OverlayOnboardingLayer(
     // Next does the gesture's job when the user would rather not.
     val onNext: () -> Unit = {
         when (step) {
-            OverlayOnboardingStep.WELCOME -> onStep(OverlayOnboardingStep.LONG_PRESS)
+            OverlayOnboardingStep.WELCOME -> onStep(OverlayOnboardingStep.THEME)
+            OverlayOnboardingStep.THEME -> onStep(OverlayOnboardingStep.LONG_PRESS)
             OverlayOnboardingStep.LONG_PRESS -> arrange.enter()
             OverlayOnboardingStep.DRAG -> onStep(OverlayOnboardingStep.FINISH_ARRANGE)
             OverlayOnboardingStep.FINISH_ARRANGE -> arrange.exit()
             OverlayOnboardingStep.QUICK_LAUNCH -> onEnd()
         }
     }
+    // Back from an arrange step starts the gesture over. The step is set before leaving Arrange mode; both land in the
+    // same frame, so the "left Arrange mid-way" effect above sees LONG_PRESS and stays put.
+    val onBack: () -> Unit = {
+        when (step) {
+            OverlayOnboardingStep.WELCOME -> onEnd()
+            OverlayOnboardingStep.THEME -> onStep(OverlayOnboardingStep.WELCOME)
+            OverlayOnboardingStep.LONG_PRESS -> onStep(OverlayOnboardingStep.THEME)
+            OverlayOnboardingStep.DRAG, OverlayOnboardingStep.FINISH_ARRANGE, OverlayOnboardingStep.QUICK_LAUNCH -> {
+                onStep(OverlayOnboardingStep.LONG_PRESS)
+                arrange.exit()
+            }
+        }
+    }
     val onSkip: () -> Unit = {
         arrange.exit()
         onEnd()
+    }
+    val handlers by rememberUpdatedState(Triple(onNext, onBack, onSkip))
+    // The D-pad and stick cycle the theme step's sample looks (wrapping), and only on that step.
+    val cycleLook by rememberUpdatedState { delta: Int ->
+        if (step == OverlayOnboardingStep.THEME) {
+            val at = SAMPLE_LOOKS.indexOf(currentLook)
+            val next = if (at < 0) (if (delta > 0) 0 else SAMPLE_LOOKS.lastIndex) else Math.floorMod(at + delta, SAMPLE_LOOKS.size)
+            onLook(SAMPLE_LOOKS[next])
+        }
+    }
+    LaunchedEffect(Unit) {
+        OverlayOnboarding.commands.collect { c ->
+            when (c) {
+                OnboardingCommand.NEXT -> handlers.first()
+                OnboardingCommand.BACK -> handlers.second()
+                OnboardingCommand.SKIP -> handlers.third()
+                OnboardingCommand.OPTION_PREV -> cycleLook(-1)
+                OnboardingCommand.OPTION_NEXT -> cycleLook(1)
+            }
+        }
     }
 
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -166,18 +235,18 @@ internal fun OverlayOnboardingLayer(
     val x = ((w - cw) / 2).coerceAtLeast(0f)
     val y = when {
         hole != null -> if (navAtTop) hole.bottom + gap else hole.top - gap - ch
-        step.handsOn -> if (navAtTop) h - margin - ch else h - navClearance - ch
+        !step.dim -> if (navAtTop) h - margin - ch else h - navClearance - ch
         else -> (h - ch) / 2
     }.coerceIn(margin, max(margin, h - ch - margin))
 
-    val pulse = if (motion && hole != null) {
+    val pulse = if (motion && (hole != null || step == OverlayOnboardingStep.THEME)) {
         rememberInfiniteTransition(label = "onboardingPulse").animateFloat(
             0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "onboardingPulse",
         )
     } else {
         remember { mutableFloatStateOf(0f) }
     }
-    val dim by animateFloatAsState(if (step.handsOn) 0f else 0.62f, if (motion) tween(260) else snap(), label = "onboardingDim")
+    val dim by animateFloatAsState(if (step.dim) 0.62f else 0f, if (motion) tween(260) else snap(), label = "onboardingDim")
     // Out of the way while a card is being dragged, so the drop target underneath is visible.
     val calloutAlpha by animateFloatAsState(
         if (arrange.draggedCard != null) 0f else 1f, if (motion) tween(160) else snap(), label = "onboardingCallout",
@@ -218,6 +287,9 @@ internal fun OverlayOnboardingLayer(
         OnboardingCallout(
             step = step,
             motion = motion,
+            pulse = pulse::value,
+            currentLook = currentLook,
+            onLook = onLook,
             modifier = Modifier
                 .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
                 .width(with(density) { cw.coerceAtLeast(0f).toDp() })
@@ -225,6 +297,7 @@ internal fun OverlayOnboardingLayer(
                 // Hidden until measured, so it doesn't jump into place.
                 .graphicsLayer { alpha = if (calloutSize == IntSize.Zero) 0f else calloutAlpha },
             onNext = onNext,
+            onBack = onBack,
             onSkip = onSkip,
         )
     }
@@ -234,8 +307,12 @@ internal fun OverlayOnboardingLayer(
 private fun OnboardingCallout(
     step: OverlayOnboardingStep,
     motion: Boolean,
+    pulse: () -> Float,
+    currentLook: TccUiLook?,
+    onLook: (TccUiLook) -> Unit,
     modifier: Modifier,
     onNext: () -> Unit,
+    onBack: () -> Unit,
     onSkip: () -> Unit,
 ) {
     val colors = LocalTccColors.current
@@ -271,19 +348,60 @@ private fun OnboardingCallout(
                 Text(stringResource(s.bodyRes), color = colors.secondary, fontSize = 14.sp, lineHeight = 19.sp)
             }
         }
+        if (step == OverlayOnboardingStep.THEME) ThemeSamples(currentLook, pulse, onLook)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 stringResource(R.string.tour_step_count, step.ordinal + 1, steps.size),
                 color = colors.tertiary, fontSize = 12.sp, style = tccTextStyle(), modifier = Modifier.weight(1f),
             )
-            if (!last) OnboardingButton(stringResource(R.string.overlay_onboarding_skip), emphasized = false, onClick = onSkip)
-            OnboardingButton(stringResource(if (last) R.string.tour_done else R.string.tour_next), emphasized = true, onClick = onNext)
+            if (!last) OnboardingButton(stringResource(R.string.overlay_onboarding_skip), OnboardingKey.SKIP, emphasized = false, onClick = onSkip)
+            if (step.ordinal > 0) OnboardingButton(stringResource(R.string.tour_back), OnboardingKey.BACK, emphasized = false, onClick = onBack)
+            OnboardingButton(stringResource(if (last) R.string.tour_done else R.string.tour_next), OnboardingKey.NEXT, emphasized = true, onClick = onNext)
+        }
+    }
+}
+
+/** The sample looks as pulsing, highlighted buttons; the active one is filled. Tapping one applies it right away. */
+@Composable
+private fun ThemeSamples(currentLook: TccUiLook?, pulse: () -> Float, onLook: (TccUiLook) -> Unit) {
+    val colors = LocalTccColors.current
+    val shape = RoundedCornerShape(12.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SAMPLE_LOOKS.forEach { look ->
+            val active = look == currentLook
+            Box(
+                Modifier
+                    .weight(1f)
+                    .drawBehind {
+                        // Pulsing halo around each sample, as on the tour's spotlight.
+                        val reach = 5.dp.toPx() * pulse()
+                        drawRoundRect(
+                            colors.accent.copy(alpha = 0.5f * (1f - pulse())),
+                            topLeft = Offset(-reach, -reach),
+                            size = Size(size.width + 2 * reach, size.height + 2 * reach),
+                            cornerRadius = CornerRadius(12.dp.toPx() + reach),
+                            style = Stroke(2.dp.toPx()),
+                        )
+                    }
+                    .clip(shape)
+                    .then(if (active) Modifier.background(colors.accent) else Modifier.border(2.dp, colors.accent, shape))
+                    .noRippleClickable { onLook(look) }
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(look.labelRes),
+                    color = if (active) Color.White else colors.primary,
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                    maxLines = 2, style = tccTextStyle(),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun OnboardingButton(label: String, emphasized: Boolean, onClick: () -> Unit) {
+private fun OnboardingButton(label: String, glyph: OnboardingKey, emphasized: Boolean, onClick: () -> Unit) {
     val colors = LocalTccColors.current
     val shape = RoundedCornerShape(50)
     Box(
@@ -293,10 +411,11 @@ private fun OnboardingButton(label: String, emphasized: Boolean, onClick: () -> 
             .noRippleClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(
-            label,
-            color = if (emphasized) Color.White else colors.primary,
-            fontSize = 14.sp, fontWeight = FontWeight.Bold, style = tccTextStyle(),
-        )
+        val fg = if (emphasized) Color.White else colors.primary
+        // The gamepad button first, then the word, so it's clear which button does what.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            GamepadGlyph(glyph, fg, tccTextStyle())
+            Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
+        }
     }
 }

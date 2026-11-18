@@ -5,6 +5,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
@@ -50,10 +55,17 @@ import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 
 /**
  * Companion "Themes" section: the active look with a live preview, the user's saved looks, and the built-in looks.
- * Mixing and editing open [ThemeStudioScreen] through [onOpenStudio].
+ * Mixing and editing open [ThemeStudioScreen] through [onOpenStudio]. Past [DECK_THRESHOLD] saved looks, the list is
+ * one deck card ([deckFocus]) that opens the Themes library through [onOpenLibrary].
  */
 @Composable
-internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
+internal fun Themes(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    onOpenStudio: (CustomLook) -> Unit,
+    deckFocus: FocusRequester,
+    onOpenLibrary: () -> Unit,
+) {
     val activeName = state.overlayCustomLook?.name ?: stringResource(state.overlayLook.labelRes)
     val newName = stringResource(R.string.theme_new_look_name, state.customLooks.size + 1)
     Card(Modifier.tourTarget(TourSpot.ACTIVE_LOOK)) {
@@ -79,37 +91,20 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         CardDesc(stringResource(R.string.theme_mix_desc))
     }
 
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importLook) }
     LaunchedEffect(Unit) { vm.refreshThemeFolder() }
 
     state.pendingFonts?.let { FontDownloadCard(it, state.themeBusy, vm) }
 
     SectionHeader(stringResource(R.string.theme_my_looks), Modifier.tourTarget(TourSpot.MY_LOOKS))
-    Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) {
-        CardDesc(stringResource(R.string.theme_share_desc, ThemeFolder.THEMES))
-        Spacer(Modifier.height(4.dp))
-        val allName = stringResource(R.string.theme_export_all_name)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.customLooks.isNotEmpty()) {
-                Chip(stringResource(R.string.theme_export_all)) { vm.exportLooks(state.customLooks.filter { it.source == null }, allName) }
-            }
-            Chip(stringResource(R.string.theme_import)) { importer.launch(LOOK_MIME_TYPES) }
-        }
-        state.themeMessage?.let { InfoLine(it) }
-    }
-    if (state.customLooks.isEmpty()) {
-        Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
-    }
-    state.customLooks.forEach { look ->
-        SavedLookCard(look, state, vm, onOpenStudio) { vm.exportLooks(listOf(look), look.name) }
+    MyLooksHeaderCard(state, vm, Modifier.tourTarget(TourSpot.MY_LOOKS))
+    if (state.customLooks.size > DECK_THRESHOLD) {
+        SavedLooksDeck(state, onOpenLibrary, Modifier.focusRequester(deckFocus).tourTarget(TourSpot.MY_LOOKS))
+    } else {
+        SavedLooksList(state, vm, onOpenStudio)
     }
 
     SectionHeader(stringResource(R.string.theme_packs), Modifier.tourTarget(TourSpot.PACKS))
-    Card(Modifier.tourTarget(TourSpot.PACKS)) {
-        CardDesc(stringResource(if (state.themeFolderReady) R.string.theme_packs_desc else R.string.theme_packs_unavailable, ThemeFolder.ROOT))
-        if (state.themeFolderReady && state.folderPacks.isEmpty()) InfoLine(stringResource(R.string.theme_packs_empty))
-        Chip(stringResource(R.string.theme_packs_refresh)) { vm.refreshThemeFolder(checkUpdates = false) }
-    }
+    PacksHeaderCard(state, vm, Modifier.tourTarget(TourSpot.PACKS))
     state.folderPacks.forEach { fp -> FolderPackCard(fp, state, vm, onOpenStudio) }
 
     SectionHeader(stringResource(R.string.theme_repos), Modifier.tourTarget(TourSpot.REPOS))
@@ -139,13 +134,112 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         CardDesc(stringResource(R.string.settings_overlay_look_desc))
         Spacer(Modifier.height(6.dp))
         sortedLooks().forEach { look ->
-            RadioRow(stringResource(look.labelRes), state.overlayLookRef == LookRef.BuiltIn(look)) { vm.setLook(look) }
+            val selected = state.overlayLookRef == LookRef.BuiltIn(look)
+            Box(if (selected) Modifier.tourTarget(TourSpot.BUILTIN_SELECTED) else Modifier) {
+                RadioRow(stringResource(look.labelRes), selected) { vm.setLook(look) }
+            }
         }
     }
 }
 
+/** More saved looks than this collapse into [SavedLooksDeck]. */
+private const val DECK_THRESHOLD = 3
+
+/** Export all / import for the saved looks, and the last export or import message. */
 @Composable
-private fun SavedLookCard(
+internal fun MyLooksHeaderCard(state: SettingsState, vm: SettingsViewModel, modifier: Modifier = Modifier) {
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importLook) }
+    Card(modifier) {
+        CardDesc(stringResource(R.string.theme_share_desc, ThemeFolder.THEMES))
+        Spacer(Modifier.height(4.dp))
+        val allName = stringResource(R.string.theme_export_all_name)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (state.customLooks.isNotEmpty()) {
+                Chip(stringResource(R.string.theme_export_all)) { vm.exportLooks(state.customLooks.filter { it.source == null }, allName) }
+            }
+            Chip(stringResource(R.string.theme_import)) { importer.launch(LOOK_MIME_TYPES) }
+        }
+        state.themeMessage?.let { InfoLine(it) }
+    }
+}
+
+/** Every saved look as its own card, or the empty-state card. */
+@Composable
+internal fun SavedLooksList(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
+    if (state.customLooks.isEmpty()) {
+        Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
+    }
+    state.customLooks.forEach { look ->
+        SavedLookCard(look, state, vm, onOpenStudio) { vm.exportLooks(listOf(look), look.name) }
+    }
+}
+
+/** The TCP Themes folder: what it is (or why it's unavailable), and a refresh. */
+@Composable
+internal fun PacksHeaderCard(state: SettingsState, vm: SettingsViewModel, modifier: Modifier = Modifier) {
+    Card(modifier) {
+        CardDesc(stringResource(if (state.themeFolderReady) R.string.theme_packs_desc else R.string.theme_packs_unavailable, ThemeFolder.ROOT))
+        if (state.themeFolderReady && state.folderPacks.isEmpty()) InfoLine(stringResource(R.string.theme_packs_empty))
+        Chip(stringResource(R.string.theme_packs_refresh)) { vm.refreshThemeFolder(checkUpdates = false) }
+    }
+}
+
+/**
+ * The saved looks as one card: the first three previews fanned like a deck, with the count. A or a tap opens the
+ * Themes library on its Local tab.
+ */
+@Composable
+private fun SavedLooksDeck(state: SettingsState, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val looks = state.customLooks
+    val top = looks.take(DECK_THRESHOLD)
+    FocusCard(onActivate = onOpen, modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Back cards first, so the first look sits on top: each one further back is offset, tilted and smaller.
+            Box(Modifier.padding(horizontal = 22.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
+                top.indices.reversed().forEach { i ->
+                    val look = top[i]
+                    val (angle, dx, dy) = DECK_FAN[i]
+                    val depth = 1f - i * 0.06f
+                    Box(
+                        Modifier
+                            .offset(dx, dy)
+                            .graphicsLayer {
+                                rotationZ = angle
+                                scaleX = depth
+                                scaleY = depth
+                                shadowElevation = (10 - i * 3).dp.toPx()
+                                shape = RoundedCornerShape(14.dp)
+                                clip = false
+                            },
+                    ) {
+                        OverlayLookPreview(state, look.baseLook, look, width = DECK_PREVIEW_WIDTH, padding = LOOK_PREVIEW_PADDING)
+                    }
+                }
+            }
+            Spacer(Modifier.width(20.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CardTitle(stringResource(R.string.theme_my_looks))
+                InfoLine(pluralStringResource(R.plurals.theme_pack_look_count, looks.size, looks.size))
+                InfoLine(top.joinToString(" · ") { it.name })
+                Spacer(Modifier.height(4.dp))
+                InfoLine(lookLabel(stringResource(R.string.theme_library_open)), p.accent)
+            }
+        }
+    }
+}
+
+/** Tilt (degrees) and offset of each card in [SavedLooksDeck], front card first. */
+private val DECK_FAN = listOf(
+    Triple(0f, 0.dp, 0.dp),
+    Triple(-7f, (-16).dp, (-6).dp),
+    Triple(6f, 18.dp, (-10).dp),
+)
+
+/** Width of each preview in the deck. */
+private val DECK_PREVIEW_WIDTH = 180.dp
+
+@Composable
+internal fun SavedLookCard(
     look: CustomLook,
     state: SettingsState,
     vm: SettingsViewModel,
@@ -210,7 +304,7 @@ private fun FontDownloadCard(needs: FontNeeds, busy: Boolean, vm: SettingsViewMo
 
 /** A pack in the TCP Themes folder: its info, and its looks (with previews) once expanded. */
 @Composable
-private fun FolderPackCard(fp: FolderPack, state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
+internal fun FolderPackCard(fp: FolderPack, state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
     val pack = fp.pack
     var expanded by remember(fp.path) { mutableStateOf(false) }
     Card {

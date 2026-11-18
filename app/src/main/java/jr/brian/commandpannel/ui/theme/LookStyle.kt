@@ -43,6 +43,9 @@ enum class TccUiLook {
     }
 
     companion object {
+        /** The look a fresh install (no `overlay_look` set) starts on. */
+        val DEFAULT = AURORA_GLASS
+
         fun fromKey(key: String?): TccUiLook = entries.firstOrNull { it.name == key } ?: AUTO
     }
 }

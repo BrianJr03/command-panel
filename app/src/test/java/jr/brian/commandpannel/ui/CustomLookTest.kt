@@ -81,7 +81,9 @@ class CustomLookTest {
     fun `look refs parse both kinds`() {
         assertEquals(LookRef.Custom("abc"), LookRef.parse("custom:abc"))
         assertEquals(LookRef.BuiltIn(TccUiLook.TERMINAL), LookRef.parse("TERMINAL"))
-        assertEquals(LookRef.BuiltIn(TccUiLook.AUTO), LookRef.parse(null))
+        assertEquals(LookRef.BuiltIn(TccUiLook.DEFAULT), LookRef.parse(null))
+        assertEquals(LookRef.BuiltIn(TccUiLook.AURORA_GLASS), LookRef.parse(null))
+        assertEquals(LookRef.BuiltIn(TccUiLook.AUTO), LookRef.parse("NOT_A_LOOK"))
     }
 
     @Test

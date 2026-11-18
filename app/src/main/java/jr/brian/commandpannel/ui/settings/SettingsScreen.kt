@@ -86,7 +86,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import jr.brian.commandpannel.ui.theme.LookRef
+import jr.brian.commandpannel.ui.components.OnboardingBackHandler
+import jr.brian.commandpannel.ui.components.onboardingControls
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -132,14 +136,24 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
 fun SettingsScreen(state: SettingsState, vm: SettingsViewModel) {
     val focusedBounds = remember { FocusedBounds() }
     CompanionTheme(state) {
-        CompositionLocalProvider(LocalFocusedBounds provides focusedBounds) { SettingsContent(state, vm) }
+        CompositionLocalProvider(LocalFocusedBounds provides focusedBounds) {
+            CompanionNavHost(state, vm)
+            // Update / What's New dialog, over whichever screen is showing.
+            state.updateDialog?.let { UpdateDialog(it, vm) }
+        }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
-    var nav by remember { mutableStateOf(NavItem.GENERAL) }
+internal fun SettingsContent(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    openStudio: (jr.brian.commandpannel.ui.theme.CustomLook) -> Unit,
+    openThemes: (ThemeLibraryTab) -> Unit,
+) {
+    // Saveable, so coming back from Theme Studio or the Themes library lands on the same section (and scroll).
+    var nav by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavItem.GENERAL) }
     // Hoisted so the content pane can send D-pad Left back to the selected rail item.
     val railRequesters = remember { NavItem.entries.associateWith { FocusRequester() } }
     // Re-detect Better Dual Screen Assistant whenever the companion comes to the front (e.g. back from BDSA's app).
@@ -147,17 +161,13 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         vm.refreshBdsa()
         onPauseOrDispose { }
     }
-    // Theme Studio replaces the whole two-pane screen while it's open.
-    var studio by remember { mutableStateOf<jr.brian.commandpannel.ui.theme.CustomLook?>(null) }
-    // Update / What's New dialog, over whichever screen is showing.
-    state.updateDialog?.let { UpdateDialog(it, vm) }
-    studio?.let { look ->
-        ThemeStudioScreen(look, state, vm, onClose = { studio = null })
-        return
-    }
     val scroll = rememberScrollState()
     val focusedBounds = LocalFocusedBounds.current
+    // The section the pane was last reset for: returning to this screen keeps its scroll instead of jumping to the top.
+    var scrolledFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<NavItem?>(null) }
     LaunchedEffect(nav) {
+        if (scrolledFor == nav) return@LaunchedEffect
+        scrolledFor = nav
         scroll.scrollTo(0)
         // A new section: the previously focused control is gone, so Right from the rail picks the nearest one.
         focusedBounds?.lastInPane = null
@@ -169,17 +179,56 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     } else {
         Modifier.background(p.bg)
     }
+    // Back from the Themes library, focus goes back to the deck card that opened it.
+    val deckFocus = remember { FocusRequester() }
+    var returnToDeck by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!returnToDeck) return@LaunchedEffect
+        returnToDeck = false
+        // After the rail's own first-focus request.
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        runCatching { deckFocus.requestFocus() }
+    }
     val tourTargets = remember { TourTargets() }
     val touring = state.tourStep != null
     TourDriver(state.tourStep, tourTargets, scroll, viewport, onSection = { cat -> nav = NavItem.entries.first { it.category == cat } })
+    // While the overlay onboarding's theme step runs, the Themes section follows each preset tapped on the bottom screen.
+    val overlayStep by jr.brian.commandpannel.ui.overlay.OverlayOnboarding.activeStep.collectAsState()
+    val followingLook = overlayStep == jr.brian.commandpannel.ui.overlay.OverlayOnboardingStep.THEME && !touring
+    LookFollowDriver(
+        followingLook, state.overlayLookRef, tourTargets, scroll, viewport,
+        onThemes = { nav = NavItem.entries.first { it.category == SettingsCategory.THEMES } },
+    )
     // When the tour ends, gamepad focus goes back to the selected section.
     var wasTouring by remember { mutableStateOf(false) }
     LaunchedEffect(touring) {
         if (touring) wasTouring = true
         else if (wasTouring) runCatching { railRequesters.getValue(nav).requestFocus() }
     }
-    Box(Modifier.fillMaxSize()) {
-    CompositionLocalProvider(LocalTourTargets provides if (touring) tourTargets else null) {
+    // The overlay window can't take focus, so while its onboarding is on screen the companion catches A / B / Y for it.
+    // Only while the overlay is listening: hidden mid-onboarding, the companion keeps its own controls.
+    val overlayListening by jr.brian.commandpannel.ui.overlay.OverlayOnboarding.commands.subscriptionCount.collectAsState()
+    val forwardKeys = overlayStep != null && overlayListening > 0 && !touring
+    val forward: (jr.brian.commandpannel.ui.overlay.OnboardingCommand) -> Unit = {
+        jr.brian.commandpannel.ui.overlay.OverlayOnboarding.commands.tryEmit(it)
+    }
+    OnboardingBackHandler(enabled = forwardKeys) { forward(jr.brian.commandpannel.ui.overlay.OnboardingCommand.BACK) }
+    Box(
+        Modifier.fillMaxSize().onboardingControls(
+            enabled = forwardKeys,
+            onNext = { forward(jr.brian.commandpannel.ui.overlay.OnboardingCommand.NEXT) },
+            onBack = { forward(jr.brian.commandpannel.ui.overlay.OnboardingCommand.BACK) },
+            onSkip = { forward(jr.brian.commandpannel.ui.overlay.OnboardingCommand.SKIP) },
+            // On the theme step the D-pad and stick move between its three looks; elsewhere they step as usual.
+            onDirection = if (overlayStep == jr.brian.commandpannel.ui.overlay.OverlayOnboardingStep.THEME) { d ->
+                forward(
+                    if (d < 0) jr.brian.commandpannel.ui.overlay.OnboardingCommand.OPTION_PREV
+                    else jr.brian.commandpannel.ui.overlay.OnboardingCommand.OPTION_NEXT,
+                )
+            } else null,
+        ),
+    ) {
+    CompositionLocalProvider(LocalTourTargets provides if (touring || followingLook) tourTargets else null) {
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav, railRequesters) { nav = it }
         PaddedBringIntoView {
@@ -209,7 +258,10 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
                 SettingsCategory.NAV_BAR -> NavBarSettings(state, vm, scroll) { viewport.value }
                 SettingsCategory.APPEARANCE -> Appearance(state, vm)
-                SettingsCategory.THEMES -> Themes(state, vm) { studio = it }
+                SettingsCategory.THEMES -> Themes(state, vm, openStudio, deckFocus) {
+                    returnToDeck = true
+                    openThemes(ThemeLibraryTab.LOCAL)
+                }
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
         }
@@ -225,6 +277,37 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         onBack = vm::tourBack,
         onSkip = vm::endTour,
     )
+    CompanionLookSpotlight(followingLook, tourTargets, paneBounds = { viewport.value })
+    }
+}
+
+/**
+ * Opens Themes and scrolls the selected built-in look to the middle of the pane, again each time [look] changes, so
+ * the spotlight can glide onto it.
+ */
+@Composable
+private fun LookFollowDriver(
+    active: Boolean,
+    look: LookRef,
+    targets: TourTargets,
+    scroll: ScrollState,
+    viewport: State<Rect>,
+    onThemes: () -> Unit,
+) {
+    val motion = LocalTccLookSpec.current.traits.animate
+    LaunchedEffect(active) { if (active) onThemes() }
+    LaunchedEffect(active, look) {
+        if (!active) return@LaunchedEffect
+        // Wait for the section (and the newly selected row) to lay out before measuring.
+        kotlinx.coroutines.withTimeoutOrNull(800) {
+            androidx.compose.runtime.snapshotFlow { targets.rectOf(TourSpot.BUILTIN_SELECTED) }.first { it != null }
+        } ?: return@LaunchedEffect
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        val rect = targets.rectOf(TourSpot.BUILTIN_SELECTED) ?: return@LaunchedEffect
+        val to = (scroll.value + rect.center.y - viewport.value.center.y).roundToInt().coerceIn(0, scroll.maxValue)
+        if (to == scroll.value) return@LaunchedEffect
+        if (motion) scroll.animateScrollTo(to, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        else scroll.scrollTo(to)
     }
 }
 

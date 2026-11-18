@@ -139,8 +139,12 @@ sealed interface LookRef {
     companion object {
         const val PREFIX = "custom:"
 
-        fun parse(key: String?): LookRef =
-            if (key != null && key.startsWith(PREFIX)) Custom(key.removePrefix(PREFIX)) else BuiltIn(TccUiLook.fromKey(key))
+        /** Unset means [TccUiLook.DEFAULT]; an unknown name falls back to the stock look. */
+        fun parse(key: String?): LookRef = when {
+            key == null -> BuiltIn(TccUiLook.DEFAULT)
+            key.startsWith(PREFIX) -> Custom(key.removePrefix(PREFIX))
+            else -> BuiltIn(TccUiLook.fromKey(key))
+        }
     }
 }
 

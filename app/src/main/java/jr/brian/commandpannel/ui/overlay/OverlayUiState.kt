@@ -54,7 +54,7 @@ data class OverlayUiState(
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
     val layout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
-    val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT,
     /** The active Theme Studio look (overrides on top of [look]), or null for a built-in look. */
     val customLook: jr.brian.commandpannel.ui.theme.CustomLook? = null,
     /** When set, overrides the overlay palette accent with the Thor's ambient-LED color (fork feature, inverted). */

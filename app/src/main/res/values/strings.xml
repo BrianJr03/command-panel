@@ -48,10 +48,15 @@
     <string name="arrange_reset">Reset</string>
     <string name="arrange_done">Done</string>
 
+    <!-- Gamepad button badges on the onboarding controls -->
+    <string name="gamepad_button_a" translatable="false">A</string>
+    <string name="gamepad_button_b" translatable="false">B</string>
+    <string name="gamepad_button_y" translatable="false">Y</string>
+
     <!-- Overlay: first-run onboarding (Next / Done / step count reuse the tour_* keys) -->
     <string name="overlay_onboarding_skip">Skip</string>
     <string name="overlay_onboarding_welcome_title">This is %1$s</string>
-    <string name="overlay_onboarding_welcome_body">Your controls for both screens live here. Press the AYN button to open or close it. Here are two things that are easy to miss.</string>
+    <string name="overlay_onboarding_welcome_body">Your controls for both screens live here. Press the AYN button to open or close it. First, make it yours, then a few things that are easy to miss. Press A for next, B to go back, and Y to skip.</string>
     <string name="overlay_onboarding_long_press_title">Long-press to rearrange</string>
     <string name="overlay_onboarding_long_press_body">Press and hold anywhere on the panel to start arranging its cards. Try it now.</string>
     <string name="overlay_onboarding_drag_title">Drag and drop</string>
@@ -59,6 +64,8 @@
     <string name="overlay_onboarding_finish_arrange_title">Save your layout</string>
     <string name="overlay_onboarding_finish_arrange_body">Tap Done to keep it, or Reset to go back to the default layout.</string>
     <string name="overlay_onboarding_quick_launch_title">Quick Launch</string>
+    <string name="overlay_onboarding_theme_title">Pick a look</string>
+    <string name="overlay_onboarding_theme_body">Tap a preset to restyle the panel and see the difference. The companion\'s Themes section has the full list, and you can mix your own there.</string>
     <string name="overlay_onboarding_quick_launch_body">This button opens an app of your choice on the screen you pick. Choose the app in the companion under Nav Bar → Quick Launch. Until you do, it stays hidden.</string>
 
     <!-- Overlay: quick-tile dialogs (others reuse stock keys) -->
@@ -244,6 +251,11 @@
     <string name="theme_my_looks">My looks</string>
     <string name="theme_my_looks_empty">No saved looks yet. Use Mix and match or Customize to make one.</string>
     <string name="theme_builtin">Built-in looks</string>
+    <!-- Themes library (all saved looks and theme packs) -->
+    <string name="theme_library_local">Local</string>
+    <string name="theme_library_packs">Packs</string>
+    <string name="theme_library_open">Open all looks</string>
+    <string name="theme_library_tabs_hint">L1 / R1 to switch</string>
     <string name="theme_new_look_name">My look %1$d</string>
     <string name="theme_apply">Apply</string>
     <string name="theme_applied">Applied</string>
@@ -524,7 +536,7 @@
     <string name="tour_replay">Take the tour</string>
     <string name="tour_step_count">%1$d of %2$d</string>
     <string name="tour_welcome_title">Welcome to %1$s</string>
-    <string name="tour_welcome_body">This quick tour goes through each section of the companion and what it controls. Press A or D-pad Right for the next step, Left to go back, and B to skip.</string>
+    <string name="tour_welcome_body">This quick tour goes through each section of the companion and what it controls. Press A for the next step, B to go back, and Y to skip.</string>
     <string name="tour_rail_title">Sections</string>
     <string name="tour_rail_body">Settings are grouped into sections here. Moving through the list switches the pane on the right, and D-pad Right jumps into that section\'s settings.</string>
     <string name="tour_general_body">Core behavior: taking over the AYN button, status bar extras, backups, updates and the replay buffer.</string>

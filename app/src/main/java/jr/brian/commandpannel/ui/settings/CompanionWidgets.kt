@@ -366,7 +366,12 @@ internal fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
 
 /** A focusable action button. */
 @Composable
-internal fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun AccentButton(
+    text: String,
+    enabled: Boolean = true,
+    glyph: jr.brian.commandpannel.ui.components.OnboardingKey? = null,
+    onClick: () -> Unit,
+) {
     val f = focusState()
     val shape = controlShape(12.dp)
     val scale by focusScale(f.value, 1.05f, "btnScale")
@@ -379,16 +384,23 @@ internal fun AccentButton(text: String, enabled: Boolean = true, onClick: () -> 
             .padding(horizontal = 20.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            lookLabel(text), color = if (enabled) p.onAccent else p.textTertiary, fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
-        )
+        val fg = if (enabled) p.onAccent else p.textTertiary
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            glyph?.let { jr.brian.commandpannel.ui.components.GamepadGlyph(it, fg, tccTextStyle()) }
+            Text(lookLabel(text), color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+        }
     }
 }
 
 /** A focusable compact pill (replay window, reorder arrows). */
 @Composable
-internal fun Chip(text: String, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun Chip(
+    text: String,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    glyph: jr.brian.commandpannel.ui.components.OnboardingKey? = null,
+    onClick: () -> Unit,
+) {
     val f = focusState()
     val shape = controlShape(10.dp)
     val scale by focusScale(f.value, 1.08f, "chipScale")
@@ -401,7 +413,12 @@ internal fun Chip(text: String, selected: Boolean = false, enabled: Boolean = tr
             .then(if (enabled) Modifier.focusControl(f, onClick).noRippleClickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = tccTextStyle()) }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            glyph?.let { jr.brian.commandpannel.ui.components.GamepadGlyph(it, fg, tccTextStyle()) }
+            Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, style = tccTextStyle())
+        }
+    }
 }
 
 /** Gap kept between a focused card (border and focus scale included) and the top/bottom edge of the scrolling pane. */

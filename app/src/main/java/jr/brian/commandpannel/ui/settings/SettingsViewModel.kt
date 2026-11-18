@@ -71,9 +71,9 @@ data class SettingsState(
     val navOrder: List<String> = jr.brian.commandpannel.system.NavBarButton.entries.map { it.key },
     val overlayLayout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,
     /** The base look of the active selection (the look itself for built-ins). */
-    val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.AUTO,
+    val overlayLook: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT,
     /** What `overlay_look` points at: a built-in look or a saved Theme Studio look. */
-    val overlayLookRef: LookRef = LookRef.BuiltIn(jr.brian.commandpannel.ui.theme.TccUiLook.AUTO),
+    val overlayLookRef: LookRef = LookRef.BuiltIn(jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT),
     /** The active Theme Studio look, or null when a built-in look is selected. */
     val overlayCustomLook: CustomLook? = null,
     val customLooks: List<CustomLook> = emptyList(),
@@ -116,6 +116,8 @@ data class SettingsState(
     val diagnosticsRunning: Boolean = false,
     /** The companion tour's current step (an index into [TOUR_STEPS]), or null when the tour isn't running. */
     val tourStep: Int? = null,
+    /** The look Theme Studio is editing (possibly not saved yet), or null when it isn't open. */
+    val studioDraft: jr.brian.commandpannel.ui.theme.CustomLook? = null,
 )
 
 @HiltViewModel
@@ -205,6 +207,15 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setLook(look: jr.brian.commandpannel.ui.theme.TccUiLook) = selectLook(LookRef.BuiltIn(look))
+
+    /** Hands Theme Studio the look to edit; a new one (Mix, Customize, Start from) isn't saved until the user saves. */
+    fun openStudio(look: jr.brian.commandpannel.ui.theme.CustomLook) {
+        _state.value = _state.value.copy(studioDraft = look)
+    }
+
+    fun closeStudio() {
+        _state.value = _state.value.copy(studioDraft = null)
+    }
 
     /** Applies a built-in or saved look to the overlay (and the companion when it follows the look). */
     fun selectLook(ref: LookRef) {
@@ -671,6 +682,8 @@ class SettingsViewModel @Inject constructor(
     private var tourAfterOnboarding = false
 
     private val onboardingListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+        // The onboarding's theme step changes the look from the overlay; keep the Themes section in step.
+        if (key == "overlay_look") refreshLooks()
         if (key != OverlayOnboarding.KEY_SEEN || !p.getBoolean(key, false) || !tourAfterOnboarding) {
             return@OnSharedPreferenceChangeListener
         }
@@ -851,7 +864,8 @@ class SettingsViewModel @Inject constructor(
 
     fun tourBack() {
         val step = _state.value.tourStep ?: return
-        if (step > 0) _state.value = _state.value.copy(tourStep = step - 1)
+        // Back on the first step leaves the tour.
+        if (step > 0) _state.value = _state.value.copy(tourStep = step - 1) else endTour()
     }
 
     /** Finishes or skips the tour; either way it doesn't start on its own again. */

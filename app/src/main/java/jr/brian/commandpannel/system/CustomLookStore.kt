@@ -42,10 +42,10 @@ object CustomLookStore {
 
     /**
      * The active look as (base look, custom overrides). A dangling `custom:` id (deleted, or a restored backup without
-     * its looks) resolves to the stock look.
+     * its looks) resolves to the default look.
      */
     fun resolve(prefs: SharedPreferences): Pair<TccUiLook, CustomLook?> = when (val ref = selected(prefs)) {
         is LookRef.BuiltIn -> ref.look to null
-        is LookRef.Custom -> find(prefs, ref.id)?.let { it.baseLook to it } ?: (TccUiLook.AUTO to null)
+        is LookRef.Custom -> find(prefs, ref.id)?.let { it.baseLook to it } ?: (TccUiLook.DEFAULT to null)
     }
 }
