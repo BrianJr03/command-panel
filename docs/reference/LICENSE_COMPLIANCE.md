@@ -86,7 +86,7 @@ Arrange mode, Replay Buffer, launcher icon). Findings:
 - **No upstream code in the app.** `grep` for `stormpanda` / `betterdualscreenassistant` across `app/src/` → **0 hits**
   (every ported file was package-renamed; the only `retroid`/`megingiard` hits are descriptive comments in Brian's
   own files, not code or dependencies).
-- **Provenance.** The ported features' commits are all authored by Brian (`thaballa79@gmail.com`): looks `0335e21`,
+- **Provenance.** The ported features' commits are all authored by BrianJr03: looks `0335e21`,
   arrange `a38cef7`, replay `8a37f8f`/`14f0ce1`.
 - **Flagged upstream-origin lines stay out.** The three files the port analysis flagged for upstream-origin lines
   (`QuickTogglesReorderCard`, `ReplayBufferRepositoryTest`, `SettingsBackupTest`) were **not** ported — the reorder
