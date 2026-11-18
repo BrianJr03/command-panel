@@ -256,8 +256,8 @@ internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit
 }
 
 @Composable
-internal fun SectionHeader(text: String) {
-    Row(Modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+internal fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+    Row(modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(3.dp, 13.dp).clip(CircleShape).background(p.accent))
         Spacer(Modifier.width(8.dp))
         Text(lookLabel(text).uppercase(), color = p.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, style = tccTextStyle())
@@ -276,11 +276,11 @@ internal fun InfoLine(text: String, tone: Color = p.textSecondary) = Text(text, 
 
 /** A focusable surface that brightens + scales when focused and fires [onActivate] on A/center. */
 @Composable
-internal fun FocusCard(onActivate: () -> Unit, content: @Composable () -> Unit) {
+internal fun FocusCard(onActivate: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val f = focusState()
     val scale by focusScale(f.value, 1.015f, "cardScale")
     Column(
-        Modifier.fillMaxWidth()
+        modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .focusControl(f, onActivate)
             .companionCard(focused = f.value, focusable = true)
@@ -290,8 +290,14 @@ internal fun FocusCard(onActivate: () -> Unit, content: @Composable () -> Unit) 
 }
 
 @Composable
-internal fun SwitchCard(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    FocusCard(onActivate = { onChange(!checked) }) {
+internal fun SwitchCard(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FocusCard(onActivate = { onChange(!checked) }, modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 CardTitle(title)

@@ -56,7 +56,7 @@ import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
     val activeName = state.overlayCustomLook?.name ?: stringResource(state.overlayLook.labelRes)
     val newName = stringResource(R.string.theme_new_look_name, state.customLooks.size + 1)
-    Card {
+    Card(Modifier.tourTarget(TourSpot.ACTIVE_LOOK)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OverlayLookPreview(state, state.overlayLook, state.overlayCustomLook, width = 250.dp, padding = LOOK_PREVIEW_PADDING)
             Spacer(Modifier.width(18.dp))
@@ -74,7 +74,7 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
             }
         }
     }
-    FocusCard(onActivate = { onOpenStudio(newCustomLook(newName, TccUiLook.AUTO)) }) {
+    FocusCard(onActivate = { onOpenStudio(newCustomLook(newName, TccUiLook.AUTO)) }, modifier = Modifier.tourTarget(TourSpot.MIX)) {
         CardTitle(stringResource(R.string.theme_mix))
         CardDesc(stringResource(R.string.theme_mix_desc))
     }
@@ -84,8 +84,8 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
 
     state.pendingFonts?.let { FontDownloadCard(it, state.themeBusy, vm) }
 
-    SectionHeader(stringResource(R.string.theme_my_looks))
-    Card {
+    SectionHeader(stringResource(R.string.theme_my_looks), Modifier.tourTarget(TourSpot.MY_LOOKS))
+    Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) {
         CardDesc(stringResource(R.string.theme_share_desc, ThemeFolder.THEMES))
         Spacer(Modifier.height(4.dp))
         val allName = stringResource(R.string.theme_export_all_name)
@@ -98,22 +98,22 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
         state.themeMessage?.let { InfoLine(it) }
     }
     if (state.customLooks.isEmpty()) {
-        Card { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
+        Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
     }
     state.customLooks.forEach { look ->
         SavedLookCard(look, state, vm, onOpenStudio) { vm.exportLooks(listOf(look), look.name) }
     }
 
-    SectionHeader(stringResource(R.string.theme_packs))
-    Card {
+    SectionHeader(stringResource(R.string.theme_packs), Modifier.tourTarget(TourSpot.PACKS))
+    Card(Modifier.tourTarget(TourSpot.PACKS)) {
         CardDesc(stringResource(if (state.themeFolderReady) R.string.theme_packs_desc else R.string.theme_packs_unavailable, ThemeFolder.ROOT))
         if (state.themeFolderReady && state.folderPacks.isEmpty()) InfoLine(stringResource(R.string.theme_packs_empty))
         Chip(stringResource(R.string.theme_packs_refresh)) { vm.refreshThemeFolder(checkUpdates = false) }
     }
     state.folderPacks.forEach { fp -> FolderPackCard(fp, state, vm, onOpenStudio) }
 
-    SectionHeader(stringResource(R.string.theme_repos))
-    Card {
+    SectionHeader(stringResource(R.string.theme_repos), Modifier.tourTarget(TourSpot.REPOS))
+    Card(Modifier.tourTarget(TourSpot.REPOS)) {
         CardDesc(stringResource(R.string.theme_repos_desc))
         var link by remember { mutableStateOf("") }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -134,8 +134,8 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
     }
     state.themeSources.forEach { source -> SourceCard(source, state, vm) }
 
-    SectionHeader(stringResource(R.string.theme_builtin))
-    Card {
+    SectionHeader(stringResource(R.string.theme_builtin), Modifier.tourTarget(TourSpot.BUILTIN))
+    Card(Modifier.tourTarget(TourSpot.BUILTIN)) {
         CardDesc(stringResource(R.string.settings_overlay_look_desc))
         Spacer(Modifier.height(6.dp))
         sortedLooks().forEach { look ->

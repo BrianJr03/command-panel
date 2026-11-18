@@ -46,7 +46,9 @@ import androidx.compose.ui.zIndex
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.ui.components.TileIcon
 import jr.brian.commandpannel.ui.components.painter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -167,6 +169,17 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
     } else {
         Modifier.background(p.bg)
     }
+    val tourTargets = remember { TourTargets() }
+    val touring = state.tourStep != null
+    TourDriver(state.tourStep, tourTargets, scroll, viewport, onSection = { cat -> nav = NavItem.entries.first { it.category == cat } })
+    // When the tour ends, gamepad focus goes back to the selected section.
+    var wasTouring by remember { mutableStateOf(false) }
+    LaunchedEffect(touring) {
+        if (touring) wasTouring = true
+        else if (wasTouring) runCatching { railRequesters.getValue(nav).requestFocus() }
+    }
+    Box(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalTourTargets provides if (touring) tourTargets else null) {
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
         NavRail(nav, railRequesters) { nav = it }
         PaddedBringIntoView {
@@ -203,6 +216,47 @@ private fun SettingsContent(state: SettingsState, vm: SettingsViewModel) {
         }
         }
     }
+    }
+    CompanionTourOverlay(
+        stepIndex = state.tourStep,
+        targets = tourTargets,
+        paneBounds = { viewport.value },
+        onNext = vm::tourNext,
+        onBack = vm::tourBack,
+        onSkip = vm::endTour,
+    )
+    }
+}
+
+/**
+ * Moves the screen to each tour step: selects its section, then scrolls the pane so the spotlit part sits near the
+ * top, leaving room for the callout underneath.
+ */
+@Composable
+private fun TourDriver(
+    stepIndex: Int?,
+    targets: TourTargets,
+    scroll: ScrollState,
+    viewport: State<Rect>,
+    onSection: (SettingsCategory) -> Unit,
+) {
+    val motion = LocalTccLookSpec.current.traits.animate
+    val topInset = with(LocalDensity.current) { FOCUS_SCROLL_MARGIN.toPx() }
+    LaunchedEffect(stepIndex) {
+        val step = stepIndex?.let(TOUR_STEPS::get) ?: return@LaunchedEffect
+        step.section?.let(onSection)
+        val spot = step.spot?.takeIf { it.inPane } ?: return@LaunchedEffect
+        // Wait for the section to compose and lay out (and its scroll reset to land) before measuring.
+        kotlinx.coroutines.withTimeoutOrNull(800) {
+            androidx.compose.runtime.snapshotFlow { targets.rectOf(spot) }.first { it != null }
+        } ?: return@LaunchedEffect
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        val rect = targets.rectOf(spot) ?: return@LaunchedEffect
+        val to = (scroll.value + rect.top - viewport.value.top - topInset).roundToInt().coerceIn(0, scroll.maxValue)
+        if (to == scroll.value) return@LaunchedEffect
+        if (motion) scroll.animateScrollTo(to, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        else scroll.scrollTo(to)
+    }
 }
 
 @Composable
@@ -214,6 +268,7 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
     Column(
         // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
         modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
+            .tourTarget(TourSpot.RAIL)
             // Coming back from the content pane (D-pad Left) lands on the selected section, not the geometrically
             // nearest rail item.
             .focusProperties { onEnter = { requesters.getValue(selected).requestFocus() } }
@@ -243,6 +298,7 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
             )
             Row(
                 modifier = Modifier.fillMaxWidth()
+                    .tourTarget(TourSpot.railItem(item.category))
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(navShape).background(bg)
                     .then(if (f.value) Modifier.border(1.5.dp, p.accent, navShape) else Modifier)
@@ -272,7 +328,7 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
  * adaptive 108/72 ratio so it fills the badge; the foreground is drawn smaller so its tiles get breathing room.
  */
 @Composable
-private fun AppIconBadge(shape: Shape) {
+internal fun AppIconBadge(shape: Shape) {
     Box(Modifier.size(38.dp).clip(shape), contentAlignment = Alignment.Center) {
         val full = 38.dp * 108f / 72f
         Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.requiredSize(full))
@@ -290,23 +346,27 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         if (state.bdsa.active) stringResource(R.string.settings_replace_stock_paused, stringResource(R.string.bdsa_name))
         else stringResource(R.string.settings_replace_stock_desc),
         state.replaceStock, vm::setReplaceStock,
+        Modifier.tourTarget(TourSpot.REPLACE_STOCK),
     )
     SwitchCard(
         stringResource(R.string.settings_battery_estimate),
         stringResource(R.string.settings_battery_estimate_desc),
         state.batteryEstimate, vm::setBatteryEstimate,
+        Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
     )
     SwitchCard(
         stringResource(R.string.settings_hide_net_speed),
         stringResource(R.string.settings_hide_net_speed_desc),
         state.hideNetSpeed, vm::setHideNetSpeed,
+        Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
     )
     SwitchCard(
         stringResource(R.string.settings_keep_on_screen),
         stringResource(R.string.settings_keep_on_screen_desc),
         state.keepOnScreen, vm::setKeepOnScreen,
+        Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
     )
-    Card {
+    Card(Modifier.tourTarget(TourSpot.BACKUP)) {
         CardTitle(stringResource(R.string.settings_backup_title))
         CardDesc(stringResource(R.string.settings_backup_desc))
         Spacer(Modifier.height(10.dp))
@@ -318,7 +378,7 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
     }
     UpdatesCard(state, vm)
     ReplayBufferCard(state, vm)
-    Card {
+    Card(Modifier.tourTarget(TourSpot.PREVIEW)) {
         CardTitle(stringResource(R.string.settings_preview_title))
         CardDesc(stringResource(R.string.settings_preview_desc))
         Spacer(Modifier.height(10.dp))
@@ -332,8 +392,9 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.tile_name_replay_buffer),
         stringResource(R.string.settings_replay_desc),
         state.replayEnabled, vm::setReplayEnabled,
+        Modifier.tourTarget(TourSpot.REPLAY),
     )
-    Card {
+    Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_save_last))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -354,7 +415,7 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
-    Card {
+    Card(Modifier.tourTarget(TourSpot.QUICK_LAUNCH)) {
         CardTitle(stringResource(R.string.settings_quick_launch))
         CardDesc(stringResource(R.string.settings_quick_launch_desc))
         Spacer(Modifier.height(10.dp))
@@ -406,9 +467,11 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
         stringResource(R.string.settings_hide_tile_labels),
         stringResource(R.string.settings_hide_tile_labels_desc),
         state.hideTileLabels, vm::setHideTileLabels,
+        Modifier.tourTarget(TourSpot.TILE_LABELS),
     )
-    SectionHeader(stringResource(R.string.settings_order))
+    SectionHeader(stringResource(R.string.settings_order), Modifier.tourTarget(TourSpot.TILE_ORDER))
     OrderCard(
+        modifier = Modifier.tourTarget(TourSpot.TILE_ORDER),
         items = state.orderedEnabledTiles,
         description = stringResource(R.string.settings_tile_order_desc),
         label = { jr.brian.commandpannel.system.QuickSettingTileId.fromKey(it)?.let { id -> stringResource(id.labelRes) } ?: it },
@@ -418,8 +481,8 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
         viewport = viewport,
     )
     jr.brian.commandpannel.system.TileCategory.entries.forEach { cat ->
-        SectionHeader(stringResource(cat.titleRes))
-        Card {
+        SectionHeader(stringResource(cat.titleRes), Modifier.tourTarget(TourSpot.TILE_PICKER))
+        Card(Modifier.tourTarget(TourSpot.TILE_PICKER)) {
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
                 val checked = tile.key in state.enabledTiles
                 FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
@@ -464,12 +527,13 @@ private fun OrderCard(
     onCommit: (List<String>) -> Unit,
     scroll: ScrollState,
     viewport: () -> Rect,
+    modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val reorder = remember(scroll) { ReorderListState(items, scope, scroll, viewport) }
     reorder.onCommit = onCommit
     LaunchedEffect(items) { reorder.sync(items) }
-    Card {
+    Card(modifier) {
         CardDesc(description)
         Spacer(Modifier.height(6.dp))
         Column(verticalArrangement = Arrangement.spacedBy(ORDER_ROW_SPACING)) {
@@ -586,8 +650,9 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
         AppPicker(state, vm)
         return
     }
-    SectionHeader(stringResource(R.string.settings_button_order))
+    SectionHeader(stringResource(R.string.settings_button_order), Modifier.tourTarget(TourSpot.BUTTON_ORDER))
     OrderCard(
+        modifier = Modifier.tourTarget(TourSpot.BUTTON_ORDER),
         items = state.navOrder,
         description = stringResource(R.string.settings_button_order_desc),
         label = { key ->
@@ -613,12 +678,13 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
         scroll = scroll,
         viewport = viewport,
     )
-    SectionHeader(stringResource(R.string.settings_quick_launch))
+    SectionHeader(stringResource(R.string.settings_quick_launch), Modifier.tourTarget(TourSpot.QUICK_LAUNCH))
     QuickLaunchCard(state, vm)
     SwitchCard(
         stringResource(R.string.settings_show_app_on_launch),
         stringResource(R.string.settings_show_app_on_launch_desc),
         state.quickLaunchShowApp, vm::setQuickLaunchShowApp,
+        Modifier.tourTarget(TourSpot.QUICK_LAUNCH),
     )
 }
 
@@ -626,7 +692,7 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
 
 @Composable
 private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
-    Card {
+    Card(Modifier.tourTarget(TourSpot.OVERLAY_THEME)) {
         CardTitle(stringResource(R.string.settings_overlay_theme))
         Spacer(Modifier.height(6.dp))
         listOf(
@@ -641,11 +707,13 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.settings_companion_follow_look),
         stringResource(R.string.settings_companion_follow_look_desc),
         state.companionFollowLook, vm::setCompanionFollowLook,
+        Modifier.tourTarget(TourSpot.FOLLOW_LOOK),
     )
     SwitchCard(
         stringResource(R.string.settings_rgb_accent),
         stringResource(R.string.settings_rgb_accent_desc),
         state.rgbAccentSync, vm::setRgbAccentSync,
+        Modifier.tourTarget(TourSpot.RGB_ACCENT),
     )
 }
 
@@ -653,7 +721,7 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
 
 @Composable
 private fun Diagnostics(state: SettingsState, vm: SettingsViewModel) {
-    Card {
+    Card(Modifier.tourTarget(TourSpot.PRIVILEGED)) {
         CardTitle(stringResource(R.string.settings_privileged_layer))
         CardDesc(stringResource(R.string.settings_privileged_layer_desc))
         Spacer(Modifier.height(10.dp))

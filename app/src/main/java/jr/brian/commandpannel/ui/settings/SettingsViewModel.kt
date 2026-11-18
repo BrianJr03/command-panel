@@ -112,6 +112,8 @@ data class SettingsState(
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
     val diagnosticsRunning: Boolean = false,
+    /** The companion tour's current step (an index into [TOUR_STEPS]), or null when the tour isn't running. */
+    val tourStep: Int? = null,
 )
 
 @HiltViewModel
@@ -661,10 +663,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) { jr.brian.commandpannel.system.update.UpdateInstaller.cleanup(app) }
             showWhatsNewIfUpdated()
-            // Automatic checks are for release builds; a debug build is a separate package a release can't update.
-            if (!jr.brian.commandpannel.BuildConfig.DEBUG && updatePrefs.isAutoCheckDue() && _state.value.updateDialog == null) {
-                checkForUpdates(manual = false)
+            // The tour shows once, after any What's New dialog; the automatic update check waits until it's done.
+            if (!prefs.getBoolean(KEY_TOUR_SEEN, false)) {
+                if (_state.value.updateDialog == null) startTour() else tourPending = true
+                return@launch
             }
+            autoCheckForUpdates()
+        }
+    }
+
+    /** Automatic checks are for release builds; a debug build is a separate package a release can't update. */
+    private fun autoCheckForUpdates() {
+        if (!jr.brian.commandpannel.BuildConfig.DEBUG && updatePrefs.isAutoCheckDue() && _state.value.updateDialog == null) {
+            checkForUpdates(manual = false)
         }
     }
 
@@ -765,13 +776,51 @@ class SettingsViewModel @Inject constructor(
 
     fun skipUpdate() {
         (_state.value.updateDialog as? UpdatePhase.Offer)?.let { updatePrefs.skippedVersion = it.release.version }
-        _state.value = _state.value.copy(updateDialog = null)
+        closeUpdateDialog()
     }
 
     /** Closes the dialog ("Later" / "Close" / "Done"); a What's New dialog counts as seen. */
     fun dismissUpdate() {
         if (_state.value.updateDialog is UpdatePhase.WhatsNew) updatePrefs.whatsNewSeen = currentVersion
+        closeUpdateDialog()
+    }
+
+    private fun closeUpdateDialog() {
         _state.value = _state.value.copy(updateDialog = null)
+        if (tourPending) {
+            tourPending = false
+            startTour()
+        }
+    }
+
+    // ---- companion tour ----
+
+    /** The first-run tour is waiting for the What's New dialog to close. */
+    private var tourPending = false
+
+    /** Starts the companion tour from its first step (also General → Updates → "Take the tour"). */
+    fun startTour() {
+        // The Nav Bar section's cards are hidden while its app picker is open.
+        _state.value = _state.value.copy(tourStep = 0, appPickerOpen = false)
+    }
+
+    fun tourNext() {
+        val step = _state.value.tourStep ?: return
+        if (step >= TOUR_STEPS.lastIndex) endTour() else _state.value = _state.value.copy(tourStep = step + 1)
+    }
+
+    fun tourBack() {
+        val step = _state.value.tourStep ?: return
+        if (step > 0) _state.value = _state.value.copy(tourStep = step - 1)
+    }
+
+    /** Finishes or skips the tour; either way it doesn't start on its own again. */
+    fun endTour() {
+        if (_state.value.tourStep == null) return
+        val firstRun = !prefs.getBoolean(KEY_TOUR_SEEN, false)
+        prefs.edit().putBoolean(KEY_TOUR_SEEN, true).apply()
+        _state.value = _state.value.copy(tourStep = null)
+        if (firstRun) autoCheckForUpdates()
     }
 
     fun openReleasePage() {
@@ -834,5 +883,7 @@ class SettingsViewModel @Inject constructor(
     private companion object {
         /** The BDSA package Command Panel disabled, so the companion can offer to re-enable it. Not backed up. */
         const val KEY_BDSA_DISABLED = "bdsa_disabled_by_command_panel"
+        /** The companion tour was finished or skipped. Not backed up, so a restored backup still gets the tour. */
+        const val KEY_TOUR_SEEN = "companion_tour_seen"
     }
 }

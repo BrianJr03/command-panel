@@ -2,7 +2,8 @@ package jr.brian.commandpannel.ui.settings
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -15,7 +16,7 @@ import jr.brian.commandpannel.R
 /** General → Updates: version, last check, "Check for updates" and "What's new" (plus a dialog preview on debug builds). */
 @Composable
 internal fun UpdatesCard(state: SettingsState, vm: SettingsViewModel) {
-    Card {
+    Card(Modifier.tourTarget(TourSpot.UPDATES)) {
         CardTitle(stringResource(R.string.settings_update_title))
         val version = BuildConfig.VERSION_NAME.substringBefore('-')
         val checked = when {
@@ -26,12 +27,13 @@ internal fun UpdatesCard(state: SettingsState, vm: SettingsViewModel) {
         CardDesc(stringResource(R.string.settings_update_desc, version, checked))
         if (BuildConfig.DEBUG) InfoLine(stringResource(R.string.settings_update_debug_note))
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Stays enabled while checking (a disabled button drops gamepad focus); checkForUpdates ignores repeats.
             AccentButton(
                 stringResource(if (state.updateChecking) R.string.settings_update_checking else R.string.settings_update_check),
             ) { vm.checkForUpdates(manual = true) }
             Chip(stringResource(R.string.settings_update_whats_new), onClick = vm::showWhatsNew)
+            Box(Modifier.tourTarget(TourSpot.TOUR_REPLAY)) { Chip(stringResource(R.string.tour_replay), onClick = vm::startTour) }
             if (BuildConfig.DEBUG) Chip(stringResource(R.string.settings_update_preview), onClick = vm::previewUpdate)
         }
         state.updateMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
