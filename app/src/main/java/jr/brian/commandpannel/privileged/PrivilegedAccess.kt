@@ -70,6 +70,12 @@ class PrivilegedAccess @Inject constructor() {
             runCatching { it.startDisplayMirror(surface, layerStack, srcW, srcH, dstW, dstH) }.getOrDefault(false)
         } ?: false
 
+    /** Adds a mirror of another display without stopping the current one (Replay Buffer's both-screens capture). */
+    fun addDisplayMirror(surface: android.view.Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =
+        RootHelper.binder?.let {
+            runCatching { it.addDisplayMirror(surface, layerStack, srcW, srcH, dstW, dstH) }.getOrDefault(false)
+        } ?: false
+
     fun stopDisplayMirror() {
         RootHelper.binder?.let { runCatching { it.stopDisplayMirror() } }
     }

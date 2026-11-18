@@ -5,6 +5,7 @@ import android.util.Log
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.privileged.ReplayBitratePreset
 import jr.brian.commandpannel.privileged.ReplayCaptureEngine
+import jr.brian.commandpannel.privileged.ReplayTarget
 import jr.brian.commandpannel.privileged.ReplayClipWriter
 import jr.brian.commandpannel.privileged.ReplayRingBuffer
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
@@ -31,6 +32,8 @@ class ReplayBufferController(
 
     private fun preset(): ReplayBitratePreset = ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null))
 
+    private fun target(): ReplayTarget = ReplayTarget.fromKey(prefs.getString("replay_target", null))
+
     private fun clipsRelativeDir(): String =
         ScreenRecorderEngine.normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null))
             ?: ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR
@@ -46,7 +49,7 @@ class ReplayBufferController(
         applyEnabledState()
     }
 
-    fun arm(): Boolean = engine.start(windowSeconds(), preset())
+    fun arm(): Boolean = engine.start(windowSeconds(), preset(), target())
 
     fun disarm() = engine.stop()
 
@@ -69,7 +72,7 @@ class ReplayBufferController(
                 if (!ReplayClipWriter.write(slice, format, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 val dir = clipsRelativeDir()
                 val path = ScreenRecorderEngine.buildReplayClipPath(
-                    targetMode = ScreenRecorderEngine.TARGET_TOP,
+                    targetMode = engine.target.mode,
                     baseDir = "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$dir",
                 )
                 if (!ScreenRecorderEngine.isValidReplayClipOutputPath(path)) {

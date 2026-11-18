@@ -1,7 +1,6 @@
 package jr.brian.commandpannel.privileged
 
 import android.content.Context
-import android.hardware.display.DisplayManager
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -13,7 +12,9 @@ import kotlin.concurrent.thread
 /**
  * Replay-buffer screen capture (Command Panel's own, since the fork's capture engine was upstream code): a
  * `MediaCodec` H.264 encoder with a Surface input, fed by the root helper's [PrivilegedAccess.startDisplayMirror]
- * display mirror. Encoded packets drain into a [ReplayRingBuffer]; [slice] cuts a clip of the last window for saving.
+ * display mirror. One screen is mirrored straight into the encoder; both screens are mirrored into a
+ * [StackedMirrorCompositor], which draws them stacked into the encoder. Encoded packets drain into a
+ * [ReplayRingBuffer]; [slice] cuts a clip of the last window for saving.
  */
 class ReplayCaptureEngine(
     private val context: Context,
@@ -22,11 +23,14 @@ class ReplayCaptureEngine(
     private companion object {
         const val TAG = "ReplayCapture"
         const val MIME = MediaFormat.MIMETYPE_VIDEO_AVC
-        const val ENC_WIDTH = 1280
-        const val ENC_HEIGHT = 720
     }
 
+    /** A physical screen to mirror: its SurfaceFlinger layer stack and real size. */
+    private class Screen(val layerStack: Int, val width: Int, val height: Int)
+
+    private val topology = jr.brian.commandpannel.system.DisplayTopology(context)
     private var codec: MediaCodec? = null
+    private var compositor: StackedMirrorCompositor? = null
     private var ring: ReplayRingBuffer? = null
     private var drainThread: Thread? = null
     @Volatile private var running = false
@@ -38,17 +42,29 @@ class ReplayCaptureEngine(
 
     val isRunning: Boolean get() = running
 
+    /** What the running capture records (names the saved clip). */
+    @Volatile
+    var target: ReplayTarget = ReplayTarget.DEFAULT
+        private set
+
     @Synchronized
-    fun start(windowSeconds: Int, preset: ReplayBitratePreset, fps: Int = 30): Boolean {
+    fun start(windowSeconds: Int, preset: ReplayBitratePreset, target: ReplayTarget, fps: Int = 30): Boolean {
         if (running) return true
-        val target = ScreenRecorderEngine.TARGET_TOP
-        val bitRate = ScreenRecorderEngine.replayVideoBitRate(target, fps, preset)
+        val top = topology.topDisplay?.let(::screenOf)
+        val bottom = topology.bottomDisplay?.let(::screenOf)
+        if (target != ReplayTarget.BOTTOM && top == null || target != ReplayTarget.TOP && bottom == null) {
+            Log.w(TAG, "a display to capture is missing (target=$target)")
+            return false
+        }
+        val layout = ScreenRecorderEngine.replayLayout(
+            target, top?.width ?: 0, top?.height ?: 0, bottom?.width ?: 0, bottom?.height ?: 0,
+        )
+        val bitRate = ScreenRecorderEngine.replayVideoBitRate(target.mode, fps, preset)
         val capacity = ScreenRecorderEngine
-            .estimateReplayBufferBytes(target, fps, preset, windowSeconds, withAudio = false)
+            .estimateReplayBufferBytes(target.mode, fps, preset, windowSeconds, withAudio = false)
             .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-        val (srcW, srcH) = topDisplaySize()
         return try {
-            val format = MediaFormat.createVideoFormat(MIME, ENC_WIDTH, ENC_HEIGHT).apply {
+            val format = MediaFormat.createVideoFormat(MIME, layout.width, layout.height).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
                 setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
                 setInteger(MediaFormat.KEY_FRAME_RATE, fps)
@@ -61,21 +77,47 @@ class ReplayCaptureEngine(
             codec = encoder
             ring = ReplayRingBuffer(capacity, windowSeconds * 1_000_000L)
 
-            val mirrored = privileged.startDisplayMirror(inputSurface, 0, srcW, srcH, ENC_WIDTH, ENC_HEIGHT)
+            val mirrored = if (target == ReplayTarget.BOTH) {
+                mirrorBoth(inputSurface, layout, top!!, bottom!!, fps)
+            } else {
+                val screen = if (target == ReplayTarget.TOP) top!! else bottom!!
+                privileged.startDisplayMirror(inputSurface, screen.layerStack, screen.width, screen.height, layout.width, layout.height)
+            }
             if (!mirrored) {
                 Log.w(TAG, "display mirror failed; aborting capture")
                 stop()
                 return false
             }
+            this.target = target
             running = true
             drainThread = thread(name = "replay-drain") { drainLoop() }
-            Log.i(TAG, "replay capture armed: ${ENC_WIDTH}x$ENC_HEIGHT @ ${bitRate / 1_000_000}Mbps, cap=${capacity / 1024 / 1024}MB")
+            Log.i(TAG, "replay capture armed: $target ${layout.width}x${layout.height} @ ${bitRate / 1_000_000}Mbps, cap=${capacity / 1024 / 1024}MB")
             true
         } catch (t: Throwable) {
             Log.w(TAG, "start failed", t)
             stop()
             false
         }
+    }
+
+    /** Mirrors each screen into its own compositor input, which draws them stacked into [encoderInput]. */
+    private fun mirrorBoth(
+        encoderInput: android.view.Surface,
+        layout: ScreenRecorderEngine.ReplayLayout,
+        top: Screen,
+        bottom: Screen,
+        fps: Int,
+    ): Boolean {
+        val topRegion = layout.top ?: return false
+        val bottomRegion = layout.bottom ?: return false
+        val rects = listOf(topRegion, bottomRegion).map {
+            android.graphics.Rect(it.left, it.top, it.left + it.width, it.top + it.height)
+        }
+        val comp = StackedMirrorCompositor(encoderInput, layout.width, layout.height, rects, fps)
+        if (!comp.start()) return false
+        compositor = comp
+        return privileged.startDisplayMirror(comp.inputs[0], top.layerStack, top.width, top.height, topRegion.width, topRegion.height) &&
+            privileged.addDisplayMirror(comp.inputs[1], bottom.layerStack, bottom.width, bottom.height, bottomRegion.width, bottomRegion.height)
     }
 
     private fun drainLoop() {
@@ -115,6 +157,8 @@ class ReplayCaptureEngine(
         runCatching { drainThread?.join(500) }
         drainThread = null
         privileged.stopDisplayMirror()
+        compositor?.release()
+        compositor = null
         codec?.let { enc ->
             runCatching { enc.stop() }
             runCatching { enc.release() }
@@ -124,14 +168,22 @@ class ReplayCaptureEngine(
         videoFormat = null
     }
 
-    private fun topDisplaySize(): Pair<Int, Int> {
-        return runCatching {
-            val dm = context.getSystemService(DisplayManager::class.java)
-            val display = dm.getDisplay(Display.DEFAULT_DISPLAY)
-            val point = android.graphics.Point()
-            @Suppress("DEPRECATION")
-            display.getRealSize(point)
-            (if (point.x > 0) point.x else 1920) to (if (point.y > 0) point.y else 1080)
-        }.getOrDefault(1920 to 1080)
+    private fun screenOf(display: Display): Screen {
+        val size = topology.realSize(display)
+        return Screen(layerStackOf(display), size.x.takeIf { it > 0 } ?: 1920, size.y.takeIf { it > 0 } ?: 1080)
+    }
+
+    /**
+     * The display's SurfaceFlinger layer stack, from the hidden `DisplayInfo.layerStack` (the app is exempt from the
+     * hidden-API checks). Falls back to the display id, which is what AOSP assigns as the layer stack.
+     */
+    private fun layerStackOf(display: Display): Int = runCatching {
+        val infoClass = Class.forName("android.view.DisplayInfo")
+        val info = infoClass.getConstructor().newInstance()
+        Display::class.java.getMethod("getDisplayInfo", infoClass).invoke(display, info)
+        infoClass.getField("layerStack").getInt(info)
+    }.getOrElse {
+        Log.w(TAG, "layer stack lookup failed for display ${display.displayId}", it)
+        display.displayId
     }
 }

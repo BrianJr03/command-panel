@@ -108,6 +108,7 @@ data class SettingsState(
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
     val replayMessage: String? = null,
+    val replayTarget: jr.brian.commandpannel.privileged.ReplayTarget = jr.brian.commandpannel.privileged.ReplayTarget.DEFAULT,
     val appPickerOpen: Boolean = false,
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
@@ -159,6 +160,7 @@ class SettingsViewModel @Inject constructor(
         replayWindowSeconds = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayWindowSeconds(prefs.getInt("replay_window_seconds", 30)),
         replayPreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null)),
+        replayTarget = jr.brian.commandpannel.privileged.ReplayTarget.fromKey(prefs.getString("replay_target", null)),
     )
 
     fun setReplayEnabled(enable: Boolean) {
@@ -179,6 +181,11 @@ class SettingsViewModel @Inject constructor(
     fun setReplayPreset(preset: jr.brian.commandpannel.privileged.ReplayBitratePreset) {
         prefs.edit().putString("replay_bitrate", preset.key).apply()
         _state.value = _state.value.copy(replayPreset = preset, replayMessage = app.getString(R.string.msg_replay_next_arm))
+    }
+
+    fun setReplayTarget(target: jr.brian.commandpannel.privileged.ReplayTarget) {
+        prefs.edit().putString("replay_target", target.key).apply()
+        _state.value = _state.value.copy(replayTarget = target, replayMessage = app.getString(R.string.msg_replay_next_arm))
     }
 
     fun saveReplayClip() {

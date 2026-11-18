@@ -6,7 +6,7 @@ package jr.brian.commandpannel.privileged.helper
  */
 object HelperProtocol {
     /** Bumped whenever [IRootHelper] gains methods. The app rejects a helper that reports a different version. */
-    const val VERSION = 5
+    const val VERSION = 6
 
     /** Fully-qualified name of the helper's `main`, launched via `app_process`. */
     const val MAIN_CLASS = "jr.brian.commandpannel.privileged.helper.RootHelperMain"

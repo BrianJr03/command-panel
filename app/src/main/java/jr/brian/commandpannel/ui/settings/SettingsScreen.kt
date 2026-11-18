@@ -395,6 +395,14 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         Modifier.tourTarget(TourSpot.REPLAY),
     )
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
+        CardTitle(stringResource(R.string.settings_replay_capture))
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            jr.brian.commandpannel.privileged.ReplayTarget.entries.forEach { target ->
+                Chip(stringResource(target.labelRes), selected = state.replayTarget == target) { vm.setReplayTarget(target) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
         CardTitle(stringResource(R.string.settings_replay_save_last))
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

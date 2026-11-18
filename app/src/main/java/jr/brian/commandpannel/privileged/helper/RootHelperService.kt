@@ -128,6 +128,9 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
     override fun startDisplayMirror(surface: Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =
         DisplayMirror.start(surface, layerStack, srcW, srcH, dstW, dstH)
 
+    override fun addDisplayMirror(surface: Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =
+        DisplayMirror.add(surface, layerStack, srcW, srcH, dstW, dstH)
+
     override fun stopDisplayMirror() = DisplayMirror.stop()
 
     override fun taskFps(displayId: Int): Bundle = TaskFps.sample(displayId)

@@ -56,4 +56,10 @@ interface IRootHelper {
 
     /** SurfaceFlinger's global composite counter (txn 1013) over binder, no shell (v5). -1 on failure. */
     long surfaceFlingerFrameCount();
+
+    /**
+     * Like startDisplayMirror, but runs alongside the mirrors already started instead of replacing them, so two
+     * displays can be captured at once (v6). stopDisplayMirror tears all of them down.
+     */
+    boolean addDisplayMirror(in Surface surface, int layerStack, int srcW, int srcH, int dstW, int dstH);
 }

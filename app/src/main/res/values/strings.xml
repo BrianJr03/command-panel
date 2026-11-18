@@ -150,7 +150,8 @@
     <string name="settings_preview_open">Open overlay on bottom screen</string>
 
     <!-- Companion: Replay buffer -->
-    <string name="settings_replay_desc">Continuously keep the last few seconds of the top screen in memory so you can save a clip after something happens. Uses root screen capture (no cast prompt).</string>
+    <string name="settings_replay_desc">Continuously keep the last few seconds of the screen in memory so you can save a clip after something happens. Uses root screen capture (no cast prompt).</string>
+    <string name="settings_replay_capture">Capture</string>
     <string name="settings_replay_save_last">Save last</string>
     <string name="settings_replay_seconds">%1$ds</string>
     <string name="settings_replay_quality">Quality</string>
@@ -158,6 +159,9 @@
     <string name="replay_quality_high">High</string>
     <string name="replay_quality_balanced">Balanced</string>
     <string name="replay_quality_low">Low</string>
+    <string name="replay_target_top">Top screen</string>
+    <string name="replay_target_bottom">Bottom screen</string>
+    <string name="replay_target_both">Both screens</string>
 
     <!-- Companion: Quick Launch / Nav Bar -->
     <string name="settings_quick_launch">Quick Launch</string>
@@ -516,7 +520,7 @@
     <string name="tour_overlay_extras_body">Fine-tune the overlay: show a battery time estimate, hide the network speed readout, and choose which apps Clear All Tasks leaves running.</string>
     <string name="tour_backup_body">Save every companion setting to a JSON file, or restore your most recent backup after a reinstall.</string>
     <string name="tour_updates_body">See which version you\'re on, check for a new release and reopen the patch notes. Command Panel downloads and installs updates itself.</string>
-    <string name="tour_replay_body">Keep the last few seconds of the top screen in memory, then save a clip after something happens. Pick how far back it reaches and the clip quality.</string>
+    <string name="tour_replay_body">Keep the last few seconds in memory, then save a clip after something happens. Capture the top screen, the bottom one, or both stacked into one video, and pick how far back it reaches and the clip quality.</string>
     <string name="tour_preview_body">Open the overlay on the bottom screen to try your changes for real.</string>
     <string name="tour_nav_bar_body">Arrange the buttons along the bottom of the overlay and set up a Quick Launch shortcut.</string>
     <string name="tour_button_order_body">Put the nav bar buttons in the order you want. With a controller, press A to pick one up, move it with the D-pad, and press A again to drop it.</string>

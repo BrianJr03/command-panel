@@ -1,8 +1,24 @@
 package jr.brian.commandpannel.privileged
 
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+
+/** Which screen(s) the Replay Buffer captures (`replay_target` pref); [mode] is the [ScreenRecorderEngine] target. */
+enum class ReplayTarget(val key: String, val mode: Int, @StringRes val labelRes: Int) {
+    TOP("top", ScreenRecorderEngine.TARGET_TOP, R.string.replay_target_top),
+    BOTTOM("bottom", ScreenRecorderEngine.TARGET_BOTTOM, R.string.replay_target_bottom),
+    BOTH("both", ScreenRecorderEngine.TARGET_BOTH, R.string.replay_target_both);
+
+    companion object {
+        val DEFAULT = TOP
+
+        fun fromKey(key: String?): ReplayTarget = entries.firstOrNull { it.key == key } ?: DEFAULT
+    }
+}
 
 /**
  * Replay-buffer sizing, bitrate and clip-path math (ported from the fork, feature 11). The actual screen capture is
@@ -42,6 +58,49 @@ object ScreenRecorderEngine {
     const val REPLAY_ERR_START_FAILED = "start_failed"
     const val REPLAY_ERR_OUT_OF_MEMORY = "out_of_memory"
     const val REPLAY_ERR_WRITE_FAILED = "write_failed"
+
+    /** Longest side of a single captured screen in the encoded clip; both screens share this width. */
+    const val REPLAY_MAX_EDGE = 1280
+
+    /** A screen's place in the encoded frame, in pixels from the top-left corner. */
+    data class Region(val left: Int, val top: Int, val width: Int, val height: Int)
+
+    /** The encoded frame size and where each captured screen goes in it (null for a screen that isn't captured). */
+    data class ReplayLayout(val width: Int, val height: Int, val top: Region?, val bottom: Region?)
+
+    /**
+     * Encoder frame for [target], given each screen's real size. One screen is scaled to fit [REPLAY_MAX_EDGE] (never
+     * up). Both screens are stacked like the device: the top screen above, the bottom one centered under it, at the
+     * same scale (the Thor's panels have the same pixel density), with black around the smaller one. Frame sides are
+     * multiples of 16, which every H.264 encoder accepts.
+     */
+    fun replayLayout(target: ReplayTarget, topW: Int, topH: Int, bottomW: Int, bottomH: Int): ReplayLayout {
+        fun align16(v: Float) = ((v / 16f).roundToInt() * 16).coerceAtLeast(16)
+        fun scaleFor(longest: Int) = minOf(1f, REPLAY_MAX_EDGE.toFloat() / longest)
+        return when (target) {
+            ReplayTarget.TOP, ReplayTarget.BOTTOM -> {
+                val (w, h) = if (target == ReplayTarget.TOP) topW to topH else bottomW to bottomH
+                val s = scaleFor(maxOf(w, h))
+                val region = Region(0, 0, align16(w * s), align16(h * s))
+                ReplayLayout(
+                    region.width, region.height,
+                    region.takeIf { target == ReplayTarget.TOP }, region.takeIf { target == ReplayTarget.BOTTOM },
+                )
+            }
+            ReplayTarget.BOTH -> {
+                val s = scaleFor(maxOf(topW, bottomW))
+                val tw = (topW * s).roundToInt(); val th = (topH * s).roundToInt()
+                val bw = (bottomW * s).roundToInt(); val bh = (bottomH * s).roundToInt()
+                val width = (maxOf(tw, bw) + 15) / 16 * 16
+                val height = (th + bh + 15) / 16 * 16
+                ReplayLayout(
+                    width, height,
+                    Region((width - tw) / 2, 0, tw, th),
+                    Region((width - bw) / 2, th, bw, bh),
+                )
+            }
+        }
+    }
 
     fun normalizeReplayWindowSeconds(seconds: Int): Int =
         REPLAY_WINDOW_OPTIONS_SECONDS.minByOrNull { kotlin.math.abs(it - seconds) } ?: DEFAULT_REPLAY_WINDOW_SECONDS
