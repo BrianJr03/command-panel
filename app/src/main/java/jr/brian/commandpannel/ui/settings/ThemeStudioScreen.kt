@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.overlay.arrange.LocalPreviewHighlight
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.focusGroup
@@ -107,6 +108,13 @@ internal fun ThemeStudioScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var category by remember { mutableStateOf(StudioCategory.PARTS) }
     var preview by remember { mutableStateOf(PreviewKind.SETTINGS) }
+    // The preview follows the part being edited, until the user picks a preview by hand (for this category).
+    var previewPinned by remember(category) { mutableStateOf(false) }
+    var focusedPart by remember { mutableStateOf<StudioPart?>(null) }
+    val onFocusPart: (StudioPart?) -> Unit = { part ->
+        focusedPart = part
+        if (part != null && !previewPinned) preview = part.preview
+    }
     var previewMode by remember { mutableStateOf(if (state.themeMode == 3) 3 else 4) }
     val saved = state.customLooks.any { it.id == draft.id }
     val firstFocus = remember { FocusRequester() }
@@ -140,14 +148,18 @@ internal fun ThemeStudioScreen(
     PaddedBringIntoView {
     Column(
         Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
-            // Preview shortcuts from anywhere in Studio: Y dark, X light, L1 / R1 step through Settings, Mode and Cards.
+            // Shortcuts from anywhere in Studio: Y dark, X light, L1 / R1 step through Settings, Mode and Cards, L2 / R2
+            // through the categories.
             .onPreviewKeyEvent { e ->
                 val kinds = PreviewKind.entries
+                val cats = StudioCategory.entries
                 val action: (() -> Unit)? = when (e.key) {
                     Key.ButtonY -> { { previewMode = 4 } }
                     Key.ButtonX -> { { previewMode = 3 } }
-                    Key.ButtonL1 -> { { preview = kinds[Math.floorMod(preview.ordinal - 1, kinds.size)] } }
-                    Key.ButtonR1 -> { { preview = kinds[(preview.ordinal + 1) % kinds.size] } }
+                    Key.ButtonL1 -> { { preview = kinds[Math.floorMod(preview.ordinal - 1, kinds.size)]; previewPinned = true } }
+                    Key.ButtonR1 -> { { preview = kinds[(preview.ordinal + 1) % kinds.size]; previewPinned = true } }
+                    Key.ButtonL2 -> { { category = cats[Math.floorMod(category.ordinal - 1, cats.size)] } }
+                    Key.ButtonR2 -> { { category = cats[(category.ordinal + 1) % cats.size] } }
                     Key.ButtonSelect -> { { runCatching { saveFocus.requestFocus() } } }
                     Key.ButtonStart -> { { runCatching { applyFocus.requestFocus() } } }
                     else -> null
@@ -231,6 +243,7 @@ internal fun ThemeStudioScreen(
                 }
                 val base = draft.baseSpec()
                 val update: (CustomLook) -> Unit = { draft = it }
+                CompositionLocalProvider(LocalStudioPartFocus provides onFocusPart) {
                 when (category) {
                     StudioCategory.PARTS -> PartsControls(draft, update)
                     StudioCategory.CUSTOM -> CustomPartControls(draft, update)
@@ -241,19 +254,23 @@ internal fun ThemeStudioScreen(
                     StudioCategory.EFFECTS -> EffectControls(draft, base, update)
                     StudioCategory.FIT -> FitControls(draft, base, update)
                 }
+                }
             }
             // ---- pinned live preview ----
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (preview) {
-                    PreviewKind.CARDS -> CardsLookPreview(state, draft, width = PREVIEW_WIDTH, themeMode = previewMode)
-                    else -> OverlayLookPreview(
-                        state, draft.baseLook, draft, width = PREVIEW_WIDTH, themeMode = previewMode,
-                        tab = if (preview == PreviewKind.MODE) OverlayTab.MODE else OverlayTab.SETTINGS,
-                    )
+                // The cards the focused control edits are outlined in the preview.
+                CompositionLocalProvider(LocalPreviewHighlight provides (focusedPart?.cards ?: emptySet())) {
+                    when (preview) {
+                        PreviewKind.CARDS -> CardsLookPreview(state, draft, width = PREVIEW_WIDTH, themeMode = previewMode)
+                        else -> OverlayLookPreview(
+                            state, draft.baseLook, draft, width = PREVIEW_WIDTH, themeMode = previewMode,
+                            tab = if (preview == PreviewKind.MODE) OverlayTab.MODE else OverlayTab.SETTINGS,
+                        )
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     PreviewKind.entries.forEach { k ->
-                        OptionChip(stringResource(k.titleRes), preview == k) { preview = k }
+                        OptionChip(stringResource(k.titleRes), preview == k) { preview = k; previewPinned = true }
                     }
                     OptionChip(stringResource(R.string.theme_preview_dark), previewMode == 4) { previewMode = 4 }
                     OptionChip(stringResource(R.string.theme_preview_light), previewMode == 3) { previewMode = 3 }
@@ -300,7 +317,7 @@ private fun DiscardChangesDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
 
 private val PREVIEW_WIDTH = 336.dp
 
-private enum class StudioCategory(@StringRes val titleRes: Int) {
+internal enum class StudioCategory(@StringRes val titleRes: Int) {
     PARTS(R.string.theme_cat_parts),
     CUSTOM(R.string.theme_cat_custom),
     FONTS(R.string.theme_cat_fonts),
@@ -312,7 +329,7 @@ private enum class StudioCategory(@StringRes val titleRes: Int) {
 }
 
 /** What the pinned preview shows: an overlay tab, or every card at each of its sizes. */
-private enum class PreviewKind(@StringRes val titleRes: Int) {
+internal enum class PreviewKind(@StringRes val titleRes: Int) {
     SETTINGS(R.string.theme_preview_settings),
     MODE(R.string.theme_preview_mode),
     CARDS(R.string.theme_preview_cards),
@@ -327,6 +344,8 @@ private class Part<T>(
     custom: T? = null,
     /** Styles no built-in look uses, with their own names; listed among the presets. */
     val extras: List<Pair<T, Int>> = emptyList(),
+    /** What it edits in the preview (which tab to show, which cards to outline). */
+    val studio: StudioPart? = null,
 ) {
     /** Presets, each named after the first built-in look (in declaration order) that uses it. */
     val presets: List<Pair<T, Int>> = TccUiLook.entries.map { of(specForLook(it).traits) to it.labelRes }.distinctBy { it.first }
@@ -334,11 +353,11 @@ private class Part<T>(
 }
 
 private val PARTS: List<Part<*>> = listOf(
-    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }, CardStyle.CUSTOM),
-    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }, TileStyle.CUSTOM),
-    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM),
-    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM),
-    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM),
+    Part(R.string.theme_part_cards, { it.card }, { l, v -> l.copy(card = v) }, CardStyle.CUSTOM, studio = StudioPart.CARDS),
+    Part(R.string.theme_part_tiles, { it.tile }, { l, v -> l.copy(tile = v) }, TileStyle.CUSTOM, studio = StudioPart.TILES),
+    Part(R.string.theme_part_gauges, { it.gauge }, { l, v -> l.copy(gauge = v) }, GaugeStyle.CUSTOM, studio = StudioPart.GAUGES),
+    Part(R.string.theme_part_sliders, { it.slider }, { l, v -> l.copy(slider = v) }, SliderStyle.CUSTOM, studio = StudioPart.SLIDERS),
+    Part(R.string.theme_part_nav, { it.nav }, { l, v -> l.copy(nav = v) }, NavStyle.CUSTOM, studio = StudioPart.NAV),
     Part(
         R.string.theme_part_backdrop, { it.backdrop }, { l, v -> l.copy(backdrop = v) },
         extras = listOf(
@@ -347,8 +366,9 @@ private val PARTS: List<Part<*>> = listOf(
             BackdropStyle.HONEYCOMB to R.string.theme_backdrop_honeycomb,
             BackdropStyle.STARFIELD to R.string.theme_backdrop_starfield,
         ),
+        studio = StudioPart.BACKDROP,
     ),
-    Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }),
+    Part(R.string.theme_part_header, { it.header }, { l, v -> l.copy(header = v) }, studio = StudioPart.HEADERS),
 )
 
 @Composable
@@ -376,11 +396,13 @@ private fun PartsControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
 @Composable
 private fun <T> PartRow(part: Part<T>, traits: LookTraits, draft: CustomLook, onChange: (CustomLook) -> Unit) {
     val current = part.of(traits)
-    Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
-    ChipRow {
-        // Presets (and extras) alphabetically, then Custom last.
-        (sortedByLabel(part.presets + part.extras) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
-            OptionChip(stringResource(labelRes), current == value) { onChange(part.set(draft, value)) }
+    Column(Modifier.studioPart(part.studio), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+        ChipRow {
+            // Presets (and extras) alphabetically, then Custom last.
+            (sortedByLabel(part.presets + part.extras) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
+                OptionChip(stringResource(labelRes), current == value) { onChange(part.set(draft, value)) }
+            }
         }
     }
 }

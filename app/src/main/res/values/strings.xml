@@ -309,7 +309,7 @@
     <string name="theme_discard_body">You\'ll lose what you changed since you last saved, and the overlay goes back to the look that\'s applied.</string>
     <string name="theme_discard_keep">Keep editing</string>
     <string name="theme_discard_confirm">Discard</string>
-    <string name="theme_preview_buttons_hint">L1 / R1 switch preview · Y dark · X light</string>
+    <string name="theme_preview_buttons_hint">L1 / R1 preview · L2 / R2 category · Y dark · X light</string>
     <string name="theme_preview_cards">Cards</string>
     <string name="theme_cat_parts">Parts</string>
     <string name="theme_cat_fonts">Fonts</string>

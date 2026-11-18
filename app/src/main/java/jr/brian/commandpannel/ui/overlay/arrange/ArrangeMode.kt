@@ -3,6 +3,7 @@ package jr.brian.commandpannel.ui.overlay.arrange
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -60,6 +61,12 @@ import jr.brian.commandpannel.ui.theme.tccTextStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
+
+/**
+ * Cards to outline in a preview: Theme Studio provides the ones the focused control edits, so it's clear what a
+ * setting changes. Empty everywhere else (the real overlay never outlines).
+ */
+val LocalPreviewHighlight = androidx.compose.runtime.staticCompositionLocalOf<Set<OverlayCardId>> { emptySet() }
 
 /** Spring used for cards sliding into their new slot and for canceled drags returning home. */
 private val ArrangeSpring = spring<Offset>(dampingRatio = 0.85f, stiffness = 350f)
@@ -351,7 +358,8 @@ fun ArrangeableCard(
                 scaleY = scale
                 alpha = if (isLifted) 0.92f else 1f
             }
-            .then(if (isArranging) Modifier.border(2.dp, outlineColor, cardShape) else Modifier),
+            .then(if (isArranging) Modifier.border(2.dp, outlineColor, cardShape) else Modifier)
+            .then(if (card in LocalPreviewHighlight.current) Modifier.previewHighlight(colors.accent, cardShape) else Modifier),
         propagateMinConstraints = true
     ) {
         content(Modifier)
@@ -479,4 +487,22 @@ private fun ToolbarChip(label: String, emphasized: Boolean, enabled: Boolean, on
             style = tccTextStyle()
         )
     }
+}
+
+/** A pulsing accent outline (steady when the look has motion off) marking a card Theme Studio is editing. */
+@Composable
+private fun Modifier.previewHighlight(accent: Color, shape: androidx.compose.ui.graphics.Shape): Modifier {
+    val motion = LocalTccLookSpec.current.traits.animate
+    val alpha = if (motion) {
+        androidx.compose.animation.core.rememberInfiniteTransition(label = "studioHighlight").animateFloat(
+            0.35f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(700), androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "studioHighlight",
+        ).value
+    } else {
+        1f
+    }
+    return border(3.dp, accent.copy(alpha = alpha), shape)
 }

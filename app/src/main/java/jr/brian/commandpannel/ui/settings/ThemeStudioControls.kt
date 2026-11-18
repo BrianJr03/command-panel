@@ -27,6 +27,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.foundation.layout.Column
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
 import jr.brian.commandpannel.ui.components.noRippleClickable
@@ -63,15 +71,16 @@ private class ShapeTarget(
     val get: (CustomLook) -> ShapeDef?,
     val set: (CustomLook, ShapeDef?) -> CustomLook,
     val allowCircle: Boolean = false,
+    val part: StudioPart? = null,
 )
 
 private val SHAPE_TARGETS = listOf(
-    ShapeTarget(R.string.theme_shape_cards, { it.panelCardShape }, { l, v -> l.copy(panelCardShape = v) }),
-    ShapeTarget(R.string.theme_shape_tiles, { it.tileShape }, { l, v -> l.copy(tileShape = v) }, allowCircle = true),
-    ShapeTarget(R.string.theme_shape_slider_controls, { it.sliderControlShape }, { l, v -> l.copy(sliderControlShape = v) }),
-    ShapeTarget(R.string.theme_shape_slider_tracks, { it.sliderTrackShape }, { l, v -> l.copy(sliderTrackShape = v) }),
+    ShapeTarget(R.string.theme_shape_cards, { it.panelCardShape }, { l, v -> l.copy(panelCardShape = v) }, part = StudioPart.CARDS),
+    ShapeTarget(R.string.theme_shape_tiles, { it.tileShape }, { l, v -> l.copy(tileShape = v) }, allowCircle = true, part = StudioPart.TILES),
+    ShapeTarget(R.string.theme_shape_slider_controls, { it.sliderControlShape }, { l, v -> l.copy(sliderControlShape = v) }, part = StudioPart.SLIDERS),
+    ShapeTarget(R.string.theme_shape_slider_tracks, { it.sliderTrackShape }, { l, v -> l.copy(sliderTrackShape = v) }, part = StudioPart.SLIDERS),
     ShapeTarget(R.string.theme_shape_dialogs, { it.dialogShape }, { l, v -> l.copy(dialogShape = v) }),
-    ShapeTarget(R.string.theme_shape_fps_badge, { it.fpsBadgeShape }, { l, v -> l.copy(fpsBadgeShape = v) }, allowCircle = true),
+    ShapeTarget(R.string.theme_shape_fps_badge, { it.fpsBadgeShape }, { l, v -> l.copy(fpsBadgeShape = v) }, allowCircle = true, part = StudioPart.FPS),
 )
 
 private val ShapeKind.labelRes: Int get() = when (this) {
@@ -97,6 +106,7 @@ internal fun ShapeControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
         CardDesc(stringResource(R.string.theme_shapes_desc))
         SHAPE_TARGETS.forEach { target ->
             val current = target.get(draft)
+            Column(Modifier.studioPart(target.part), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ControlLabel(target.titleRes)
             ChipRow {
                 OptionChip(stringResource(R.string.theme_look_default), current == null) { onChange(target.set(draft, null)) }
@@ -117,6 +127,7 @@ internal fun ShapeControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
                     onChange(target.set(draft, current.copy(size = it)))
                 }
                 else -> Unit
+            }
             }
         }
     }
@@ -210,7 +221,7 @@ internal fun TextControls(draft: CustomLook, base: TccLookSpec, onChange: (Custo
         OverridableStepper(R.string.theme_text_spacing, draft.letterSpacingEm, baseSpacing, -0.05f, 0.3f, 0.01f, ValueUnit.EM) {
             onChange(draft.copy(letterSpacingEm = it))
         }
-        OverridableStepper(R.string.theme_text_tile_size, draft.qsLabelFontSize, base.tile.qsLabelFontSize.value, 8f, 13f, 0.5f, ValueUnit.SP) {
+        OverridableStepper(R.string.theme_text_tile_size, draft.qsLabelFontSize, base.tile.qsLabelFontSize.value, 8f, 13f, 0.5f, ValueUnit.SP, part = StudioPart.TILES) {
             onChange(draft.copy(qsLabelFontSize = it))
         }
     }
@@ -243,13 +254,13 @@ internal fun EffectControls(draft: CustomLook, base: TccLookSpec, onChange: (Cus
                 OptionChip(stringResource(R.string.theme_off), v == false) { onChange(t.set(draft, false)) }
             }
         }
-        OverridableStepper(R.string.theme_effect_outline, draft.outlineWidth, base.traits.outlineWidth.value, 0f, 6f, 0.5f, ValueUnit.DP) {
+        OverridableStepper(R.string.theme_effect_outline, draft.outlineWidth, base.traits.outlineWidth.value, 0f, 6f, 0.5f, ValueUnit.DP, part = StudioPart.CARDS) {
             onChange(draft.copy(outlineWidth = it))
         }
-        OverridableStepper(R.string.theme_effect_shadow, draft.shadowOffset, base.traits.shadowOffset.value, 0f, 10f, 1f, ValueUnit.DP) {
+        OverridableStepper(R.string.theme_effect_shadow, draft.shadowOffset, base.traits.shadowOffset.value, 0f, 10f, 1f, ValueUnit.DP, part = StudioPart.CARDS) {
             onChange(draft.copy(shadowOffset = it))
         }
-        OverridableStepper(R.string.theme_effect_pattern, draft.backdropPatternAlpha, base.traits.backdropPatternAlpha, 0f, 1f, 0.1f, ValueUnit.PERCENT) {
+        OverridableStepper(R.string.theme_effect_pattern, draft.backdropPatternAlpha, base.traits.backdropPatternAlpha, 0f, 1f, 0.1f, ValueUnit.PERCENT, part = StudioPart.BACKDROP) {
             onChange(draft.copy(backdropPatternAlpha = it))
         }
     }
@@ -260,7 +271,7 @@ internal fun EffectControls(draft: CustomLook, base: TccLookSpec, onChange: (Cus
 @Composable
 internal fun FitControls(draft: CustomLook, base: TccLookSpec, onChange: (CustomLook) -> Unit) {
     val b = base.settingsTab
-    Card {
+    Card(Modifier.studioPart(StudioPart.FIT)) {
         CardDesc(stringResource(R.string.theme_fit_desc))
         OverridableStepper(R.string.theme_fit_ring_size, draft.ringDiameterRatio, b.ringDiameterRatio, 0.6f, 1f, 0.02f, ValueUnit.PERCENT) {
             onChange(draft.copy(ringDiameterRatio = it))
@@ -301,22 +312,58 @@ private fun Stepper(
     max: Float,
     step: Float,
     unit: ValueUnit,
+    part: StudioPart? = null,
     trailing: @Composable () -> Unit = {},
     onChange: (Float) -> Unit,
 ) {
     fun snap(v: Float) = ((v / step).roundToInt() * step).coerceIn(min, max)
+    // Latest value and callback for the held-down repeat, which outlives a single composition.
+    val current by rememberUpdatedState(value)
+    val change by rememberUpdatedState(onChange)
+    val down = { if (current > min + step / 2) change(snap(current - step)) }
+    val up = { if (current < max - step / 2) change(snap(current + step)) }
+    Column(Modifier.studioPart(part), verticalArrangement = Arrangement.spacedBy(6.dp)) {
     ControlLabel(titleRes)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        // At a limit the button greys out but keeps focus, so the next press doesn't jump away (to Back).
-        Chip(stringResource(R.string.theme_decrease), enabled = value > min + step / 2, focusableWhenDisabled = true) { onChange(snap(value - step)) }
+        // At a limit the button greys out but keeps focus, so the next press doesn't jump away (to Back). Holding A
+        // repeats through the key's own auto-repeat; holding a finger repeats through repeatWhileHeld.
+        Box(Modifier.repeatWhileHeld(down)) {
+            Chip(stringResource(R.string.theme_decrease), enabled = value > min + step / 2, focusableWhenDisabled = true, onClick = down)
+        }
         // Centered between − and +; a longer value widens the slot rather than wrapping.
         Text(
             unit.format(value), color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.widthIn(min = 64.dp),
         )
-        Chip(stringResource(R.string.theme_increase), enabled = value < max - step / 2, focusableWhenDisabled = true) { onChange(snap(value + step)) }
+        Box(Modifier.repeatWhileHeld(up)) {
+            Chip(stringResource(R.string.theme_increase), enabled = value < max - step / 2, focusableWhenDisabled = true, onClick = up)
+        }
         Spacer(Modifier.width(4.dp))
         trailing()
+    }
+    }
+}
+
+/**
+ * Repeats [onStep] while a finger stays down: after 400 ms, then faster down to every 60 ms. The first step is the
+ * child's own click; once repeating starts, the release is consumed so it doesn't add one more step.
+ */
+private fun Modifier.repeatWhileHeld(onStep: () -> Unit): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var wait = 400L
+        var repeated = false
+        while (true) {
+            // Released (or canceled) before the wait ran out: stop.
+            val ended = withTimeoutOrNull(wait) {
+                waitForUpOrCancellation(PointerEventPass.Initial).also { if (repeated) it?.consume() }
+                true
+            }
+            if (ended != null) break
+            onStep()
+            repeated = true
+            wait = (wait * 0.7f).toLong().coerceAtLeast(60L)
+        }
     }
 }
 
@@ -330,10 +377,11 @@ private fun OverridableStepper(
     max: Float,
     step: Float,
     unit: ValueUnit,
+    part: StudioPart? = null,
     onChange: (Float?) -> Unit,
 ) {
     Stepper(
-        titleRes, override ?: baseValue, min, max, step, unit,
+        titleRes, override ?: baseValue, min, max, step, unit, part,
         trailing = {
             if (override != null) Chip(stringResource(R.string.theme_look_default)) { onChange(null) }
             else InfoLine(stringResource(R.string.theme_look_default))
@@ -404,7 +452,7 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
     val c = draft.custom
     fun update(next: CustomRenderParams) = onChange(draft.copy(custom = next))
 
-    CustomBlock(R.string.theme_part_cards, draft.card == CardStyle.CUSTOM, { onChange(draft.copy(card = CardStyle.CUSTOM)) }) {
+    CustomBlock(R.string.theme_part_cards, draft.card == CardStyle.CUSTOM, { onChange(draft.copy(card = CardStyle.CUSTOM)) }, StudioPart.CARDS) {
         val k = c.card
         EnumRow(R.string.theme_custom_fill, FillKind.entries, k.fill, { it.labelRes }) { update(c.copy(card = k.copy(fill = it))) }
         Stepper(R.string.theme_custom_opacity, k.fillOpacity, 0f, 1f, 0.1f, ValueUnit.PERCENT) { update(c.copy(card = k.copy(fillOpacity = it))) }
@@ -413,7 +461,7 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
         Stepper(R.string.theme_custom_shadow, k.shadow, 0f, 12f, 1f, ValueUnit.DP) { update(c.copy(card = k.copy(shadow = it))) }
         BoolRow(R.string.theme_effect_glow, k.glow) { update(c.copy(card = k.copy(glow = it))) }
     }
-    CustomBlock(R.string.theme_part_tiles, draft.tile == TileStyle.CUSTOM, { onChange(draft.copy(tile = TileStyle.CUSTOM)) }) {
+    CustomBlock(R.string.theme_part_tiles, draft.tile == TileStyle.CUSTOM, { onChange(draft.copy(tile = TileStyle.CUSTOM)) }, StudioPart.TILES) {
         val k = c.tile
         EnumRow(R.string.theme_custom_fill, FillKind.entries, k.fill, { it.labelRes }) { update(c.copy(tile = k.copy(fill = it))) }
         EnumRow(R.string.theme_custom_selected_fill, FillKind.entries, k.selectedFill, { it.labelRes }) { update(c.copy(tile = k.copy(selectedFill = it))) }
@@ -421,7 +469,7 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
         if (k.borderWidth > 0f) EnumRow(R.string.theme_custom_border_color, LineRole.entries, k.border, { it.labelRes }) { update(c.copy(tile = k.copy(border = it))) }
         BoolRow(R.string.theme_custom_selected_glow, k.glow) { update(c.copy(tile = k.copy(glow = it))) }
     }
-    CustomBlock(R.string.theme_part_gauges, draft.gauge == GaugeStyle.CUSTOM, { onChange(draft.copy(gauge = GaugeStyle.CUSTOM)) }) {
+    CustomBlock(R.string.theme_part_gauges, draft.gauge == GaugeStyle.CUSTOM, { onChange(draft.copy(gauge = GaugeStyle.CUSTOM)) }, StudioPart.GAUGES) {
         val k = c.gauge
         EnumRow(R.string.theme_custom_gauge_shape, GaugeKind.entries, k.kind, { it.labelRes }) { update(c.copy(gauge = k.copy(kind = it))) }
         Stepper(R.string.theme_custom_thickness, k.thickness, 0.02f, 0.2f, 0.01f, ValueUnit.PERCENT) { update(c.copy(gauge = k.copy(thickness = it))) }
@@ -429,7 +477,7 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
         EnumRow(R.string.theme_custom_gauge_colors, GaugeColorMode.entries, k.colors, { it.labelRes }) { update(c.copy(gauge = k.copy(colors = it))) }
         BoolRow(R.string.theme_effect_glow, k.glow) { update(c.copy(gauge = k.copy(glow = it))) }
     }
-    CustomBlock(R.string.theme_part_sliders, draft.slider == SliderStyle.CUSTOM, { onChange(draft.copy(slider = SliderStyle.CUSTOM)) }) {
+    CustomBlock(R.string.theme_part_sliders, draft.slider == SliderStyle.CUSTOM, { onChange(draft.copy(slider = SliderStyle.CUSTOM)) }, StudioPart.SLIDERS) {
         val k = c.slider
         EnumRow(R.string.theme_custom_track, FillKind.entries, k.track, { it.labelRes }) { update(c.copy(slider = k.copy(track = it))) }
         EnumRow(R.string.theme_custom_fill, FillKind.entries.filter { it != FillKind.NONE }, k.fill, { it.labelRes }) { update(c.copy(slider = k.copy(fill = it))) }
@@ -437,7 +485,7 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
         if (k.borderWidth > 0f) EnumRow(R.string.theme_custom_border_color, LineRole.entries, k.border, { it.labelRes }) { update(c.copy(slider = k.copy(border = it))) }
         BoolRow(R.string.theme_custom_thumb, k.thumb) { update(c.copy(slider = k.copy(thumb = it))) }
     }
-    CustomBlock(R.string.theme_part_nav, draft.nav == NavStyle.CUSTOM, { onChange(draft.copy(nav = NavStyle.CUSTOM)) }) {
+    CustomBlock(R.string.theme_part_nav, draft.nav == NavStyle.CUSTOM, { onChange(draft.copy(nav = NavStyle.CUSTOM)) }, StudioPart.NAV) {
         EnumRow(R.string.theme_custom_nav_indicator, NavIndicator.entries, c.nav.indicator, { it.labelRes }) {
             update(c.copy(nav = c.nav.copy(indicator = it)))
         }
@@ -446,8 +494,8 @@ internal fun CustomPartControls(draft: CustomLook, onChange: (CustomLook) -> Uni
 
 /** One part's custom settings, or a one-press switch to Custom when the part uses a preset. */
 @Composable
-private fun CustomBlock(@StringRes titleRes: Int, active: Boolean, onUseCustom: () -> Unit, content: @Composable () -> Unit) {
-    Card {
+private fun CustomBlock(@StringRes titleRes: Int, active: Boolean, onUseCustom: () -> Unit, part: StudioPart, content: @Composable () -> Unit) {
+    Card(Modifier.studioPart(part)) {
         CardTitle(stringResource(titleRes))
         if (active) content() else {
             CardDesc(stringResource(R.string.theme_custom_inactive))
