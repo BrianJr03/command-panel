@@ -150,6 +150,8 @@ Command Panel was **inspired by** stormpanda's Better Dual Screen Assistant (a s
 
 The full, auditable record lives in **[`docs/reference/LICENSE_COMPLIANCE.md`](docs/reference/LICENSE_COMPLIANCE.md)**.
 
+**AI disclosure:** I'm an Android dev of 5+ years and built this with Claude as a pair programmer. I directed the design, reviewed the code and tested everything on my own Thor.
+
 ## License
 
 Copyright © 2026 Brian Jr
