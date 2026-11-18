@@ -1,29 +1,30 @@
-## Command Panel v0.4.0
+## Command Panel v0.5.0
 
-More ways to style the panel, a live Theme Studio, and a theme repo that comes built in.
+A big Theme Studio upgrade: faster to drive with a gamepad, clearer about what each setting does, and harder to lose work in.
 
 ### New
-- **Four new backdrops.** Gradient wash, Topographic, Honeycomb and Starfield, in Theme Studio under Parts → Backdrop.
-- **See your edits live.** Whatever you pick in Theme Studio shows right away on the real overlay, and on the companion when it follows the look.
-- **Save without losing your place.** Save keeps the look and keeps you editing; Save and apply applies it and closes Studio. Leaving any other way goes back to the look you had.
-- **No lost edits by accident.** Backing out of Theme Studio with unsaved changes asks before throwing them away.
-- **Theme Studio gamepad shortcuts.** Y and X switch the preview to dark or light, L1 and R1 flip between Settings, Mode and Cards, and Select (−) and Start (+) jump to Save and Save and apply.
-- **TCP Themes built in.** New installs follow the TCP Themes repo from the start, so fresh looks arrive on their own. The companion tour shows where it lives.
-- **Sync repos.** One button checks every theme repo you follow. Repos also re-check on their own when Themes opens, at most once an hour.
-- **Friendly to GitHub's limits.** Syncing pauses before GitHub's hourly request limit and tells you when to try again, so app update checks still get through.
+- **Undo and redo.** Step back through your edits with L3 and forward with R3, or tap Undo and Redo. A quick run of changes, like holding + or typing a name, counts as one step.
+- **Fine-tune any color.** Pick a swatch, then adjust its hue, saturation and brightness, or type an exact hex value. Accents can also use your Thor's LED color.
+- **See what a setting changes.** The part you're editing is outlined in the preview, and the preview switches to the tab that shows it best (Mode for sliders, for example).
+- **Option samples.** Card, tile, gauge, nav bar and backdrop choices show a tiny sample of each style.
+- **Switch categories with L2 and R2.** Each category opens at its top.
+- **Hold to repeat.** Holding + or − keeps stepping, faster the longer you hold.
+- **Reset by category.** Every changed category gets its own Reset, and Parts has Reset everything.
+- **Your work is kept.** If Theme Studio closes before you save, Themes offers to resume your unsaved changes or discard them.
 
 ### Changes
-- **Local is just your looks.** In the Themes library, Local shows looks you made or imported. Looks from a repo are under Packs with their repo.
-- **Cleaner previews.** Look previews show the whole look edge to edge, without the clock and battery row or a frame around them, and their corners no longer cut into the cards.
-- **Easier to find exports.** The Export card highlights the file type and the folder, shown as the full path on your device.
+- **Option rows open on your current pick**, and moving into a row lands on it.
+- **Changed parts are labeled** in Parts, so you can see what differs from the base look.
+- **Color contrast check.** Theme Studio warns when a color you pinned would make text or the accent hard to see.
+- **Safer saving.** Saved copies get their own name ("Glacier copy"), a blank name never saves, "Saved" fades after a moment, and removing a font takes two presses.
+- **One copy answers the AYN button.** With two copies of Command Panel installed, only one replaces the stock assistant and the other stands by until you take over.
 
 ### Fixes
-- **Settings keep your place.** Turning "Companion follows overlay look" on or off no longer jumps back to General.
-- **The Themes library scrolls back up.** Moving up to the tabs shows the page from the top again instead of hiding the first card.
-- **Quick Launch gets out of the way.** The overlay closes once the app you picked opens.
-- **The overlay guide waits for the overlay.** If the overlay doesn't open on first launch, the companion tour runs as normal and the overlay guide starts the first time the overlay shows, bringing the companion up alongside it.
+- **Values are centered** between the − and + buttons.
+- **Maxing out a value keeps your place.** Reaching the limit no longer jumps focus to Back.
+- **Focus stays put** when switching categories or resetting one.
 
-See the [v0.3.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.3.0) for the previous release.
+See the [v0.4.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.4.0) for the previous release.
 
 ---
 *Licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
