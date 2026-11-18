@@ -15,12 +15,12 @@ First packaged build of **Command Panel (TCP)** — a user-installable replaceme
 
 ### Companion app
 - Modern dark console UI, gamepad-navigable.
-- Quick-toggle roster with drag-and-drop ordering.
+- Tile roster with drag-and-drop ordering.
 - Ambient-LED → overlay accent sync.
 - Settings backup & restore.
 
 ### Tools
-- Replay Buffer quick toggle (root screen-capture ring buffer → MP4 clip).
+- Replay Buffer tile (root screen-capture ring buffer → MP4 clip).
 
 ---
 *Personal project for the AYN Thor. Bundles AYN stock assets and OFL fonts (see THIRD_PARTY_NOTICES).*

@@ -2,7 +2,7 @@
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Command Panel</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
-  <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick toggles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
+  <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick-setting tiles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
 </div>
 
 ---
@@ -81,7 +81,7 @@ Command Panel ships **16 overlay themes** (plus the stock look) — the whole pa
 - 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
 - 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything.
-- 🧩 **Customizable quick toggles** — enable/disable tiles and **drag-and-drop to reorder** them.
+- 🧩 **Customizable tiles** — turn each one on or off and **drag-and-drop to reorder** them.
 - ✋ **Arrange mode** — long-press the overlay to drag-and-drop its cards into any layout.
 - ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment.
 - 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.

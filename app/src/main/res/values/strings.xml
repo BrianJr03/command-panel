@@ -109,7 +109,7 @@
     <!-- Companion: categories -->
     <string name="settings_cat_general">General</string>
     <string name="settings_cat_nav_bar">Nav Bar</string>
-    <string name="settings_cat_quick_toggles">Toggles</string>
+    <string name="settings_cat_quick_toggles">Tiles</string>
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_diagnostics">Diagnostics</string>
     <string name="settings_cat_themes">Themes</string>
@@ -179,10 +179,10 @@
     <string name="settings_show_app_on_launch">Show app on the Launch button</string>
     <string name="settings_show_app_on_launch_desc">Use the chosen app\'s icon and name on the nav bar instead of the Launch glyph and label.</string>
 
-    <!-- Companion: Quick Toggles -->
+    <!-- Companion: Tiles -->
     <string name="settings_order">Order</string>
-    <string name="settings_hide_tile_labels">Hide Toggle Names</string>
-    <string name="settings_hide_tile_labels_desc">Show only the icons on the overlay\'s quick toggles. The icons grow to fill the space.</string>
+    <string name="settings_hide_tile_labels">Hide Tile Names</string>
+    <string name="settings_hide_tile_labels_desc">Show only the icons on the overlay\'s tiles. The icons grow to fill the space.</string>
     <string name="settings_tile_order_desc">Drag a tile by its handle, or long-press it, to reorder. With a controller: A to pick up, D-pad to move, A to drop.</string>
     <string name="settings_drag_to_reorder">Drag to reorder</string>
 
