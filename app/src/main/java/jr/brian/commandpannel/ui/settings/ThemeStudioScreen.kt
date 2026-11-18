@@ -49,6 +49,16 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Stable
 import jr.brian.commandpannel.ui.theme.StudioDraft
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Dialog
@@ -114,6 +124,12 @@ internal fun ThemeStudioScreen(
     // (for the back gesture) is only enabled while there's something to lose: enabled after the NavHost's, it wins.
     BackHandler(enabled = dirty) { confirmDiscard = true }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    // "Saved" is a moment's confirmation, not a status.
+    LaunchedEffect(message) { if (message != null) { kotlinx.coroutines.delay(3_000); message = null } }
+    // Each category opens at its top, and Up from its first control brings the category bar back into view.
+    val controlsScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(category) { controlsScroll.scrollTo(0) }
 
     val backdrop = if (LocalCompanionThemed.current) {
         Modifier.tccLookBackdrop(LocalTccLookSpec.current, LocalTccColors.current, tccLookColors())
@@ -159,7 +175,22 @@ internal fun ThemeStudioScreen(
             message?.let { InfoLine(it, p.success) }
             // Looks synced from a theme repo are replaced on update, so edits always save as the user's own copy.
             val fromRepo = draft.source != null
-            fun ownCopy() = draft.copy(id = UUID.randomUUID().toString(), source = null)
+            // The raw patterns (no args given), formatted per candidate below.
+            val copyOf = stringResource(R.string.theme_copy_name)
+            val copyOfN = stringResource(R.string.theme_copy_name_n)
+            val untitled = stringResource(R.string.theme_new_look_name, state.customLooks.size + 1)
+            // A blank name falls back to the last saved one (or a numbered "My look").
+            fun named(l: CustomLook) = l.copy(name = nonBlankName(l.name) { lastSaved.name.ifBlank { untitled } })
+            // A copy gets a name no saved look has yet ("Glacier copy", "Glacier copy 2", …).
+            fun ownCopy(): CustomLook {
+                val base = named(draft)
+                val name = copyName(
+                    base.name, state.customLooks.map { it.name },
+                    copy = { String.format(copyOf, it) },
+                    copyN = { n, i -> String.format(copyOfN, n, i) },
+                )
+                return base.copy(id = UUID.randomUUID().toString(), source = null, name = name)
+            }
             if (saved || fromRepo) {
                 // Select's target when there's no plain Save (a repo look only saves as a copy).
                 Box(if (fromRepo) Modifier.focusRequester(saveFocus) else Modifier) {
@@ -171,11 +202,14 @@ internal fun ThemeStudioScreen(
             }
             if (!fromRepo) {
                 Box(Modifier.focusRequester(saveFocus)) {
-                    Chip(stringResource(R.string.theme_save), glyph = GamepadButton.SELECT) { vm.saveCustomLook(draft); lastSaved = draft; message = savedMsg }
+                    Chip(stringResource(R.string.theme_save), glyph = GamepadButton.SELECT) {
+                        val target = named(draft)
+                        vm.saveCustomLook(target); draft = target; lastSaved = target; message = savedMsg
+                    }
                 }
             }
             Box(Modifier.focusRequester(applyFocus)) { AccentButton(stringResource(R.string.theme_save_apply), glyph = GamepadButton.START) {
-                val target = if (fromRepo) ownCopy() else draft
+                val target = if (fromRepo) ownCopy() else named(draft)
                 // Done editing: apply it and leave Studio (the overlay now shows the applied look for real).
                 vm.saveCustomLook(target, apply = true); lastSaved = target; onClose()
             } }
@@ -184,11 +218,11 @@ internal fun ThemeStudioScreen(
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---- controls ----
             Column(
-                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(controlsScroll).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Category bar: each category swaps the controls below; the preview always shows the whole look.
-                ChipRow {
+                ChipRow(Modifier.onFocusChanged { if (it.hasFocus) scope.launch { controlsScroll.animateScrollTo(0) } }) {
                     StudioCategory.entries.forEachIndexed { i, c ->
                         Box(if (i == 0) Modifier.focusRequester(firstFocus) else Modifier) {
                             OptionChip(stringResource(c.titleRes), category == c) { category = c }
@@ -379,7 +413,12 @@ private fun FontControls(
             Text(lookLabelText(R.string.theme_font_manage), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
             ChipRow {
                 state.userFonts.forEach { font ->
-                    Chip(stringResource(R.string.theme_font_remove, font.displayName)) { vm.deleteFont(font.id) }
+                    // Two presses, so a stray A can't remove a font.
+                    var confirm by remember(font.id) { mutableStateOf(false) }
+                    Chip(
+                        stringResource(if (confirm) R.string.theme_font_remove_confirm else R.string.theme_font_remove, font.displayName),
+                        selected = confirm,
+                    ) { if (confirm) vm.deleteFont(font.id) else confirm = true }
                 }
             }
         }
@@ -413,11 +452,19 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
 @Composable
 internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val f = focusState()
+    // Inside a ChipRow, the picked option is where D-pad entry lands and what the row first scrolls to.
+    val row = LocalChipRowSelection.current
+    val rowSelection = if (selected && row != null) {
+        Modifier.focusRequester(row.requester).onPlaced { row.selectedX = it.positionInParent().x.roundToInt() }
+    } else {
+        Modifier
+    }
+    if (selected && row != null) DisposableEffect(row) { row.hasSelected = true; onDispose { row.hasSelected = false } }
     val shape = controlShape(10.dp)
     val scale by focusScale(f.value, 1.08f, "optionScale")
     val bg = when { selected && f.value -> p.accentFocused; selected -> p.accent; f.value -> p.surfaceHigh; else -> p.surfaceHigh.copy(alpha = 0.5f) }
     Box(
-        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+        rowSelection.graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape).background(bg)
             .then(if (f.value) Modifier.border(2.dp, if (selected) p.onAccent else p.accent, shape) else Modifier)
             .focusControl(f, onClick).noRippleClickable(onClick = onClick)
@@ -431,15 +478,44 @@ internal fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** A single-line, horizontally scrolling row of chips (D-pad left/right walks it and scrolls the focused chip in). */
+/** Where a [ChipRow]'s picked [OptionChip] is, so the row can open on it and send D-pad entry to it. */
+@Stable
+internal class ChipRowSelection {
+    val requester = FocusRequester()
+    var hasSelected by mutableStateOf(false)
+    var selectedX by mutableStateOf<Int?>(null)
+}
+
+internal val LocalChipRowSelection = androidx.compose.runtime.compositionLocalOf<ChipRowSelection?> { null }
+
+/**
+ * A single-line, horizontally scrolling row of chips (D-pad left/right walks it and scrolls the focused chip in). It
+ * opens scrolled to the picked option, and D-pad entry from above or below lands on it rather than the nearest chip.
+ */
 @Composable
-internal fun ChipRow(content: @Composable () -> Unit) {
+internal fun ChipRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val scroll = rememberScrollState()
+    val selection = remember { ChipRowSelection() }
+    val inset = with(LocalDensity.current) { (CHIP_ROW_INSET * 3).roundToPx() }
+    // Only the first time: after that the row stays where the user scrolled it.
+    var opened by remember { mutableStateOf(false) }
+    LaunchedEffect(selection.selectedX, scroll.maxValue) {
+        val x = selection.selectedX ?: return@LaunchedEffect
+        if (opened || scroll.maxValue == 0) return@LaunchedEffect
+        opened = true
+        scroll.scrollTo((x - inset).coerceIn(0, scroll.maxValue))
+    }
     // Content padding leaves room for the focused chip's scale and ring at both ends; the padded bring-into-view spec
     // (inherited from the studio / settings pane) keeps D-pad scrolling from parking an end chip flush at the edge.
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp, horizontal = CHIP_ROW_INSET),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) { content() }
+    CompositionLocalProvider(LocalChipRowSelection provides selection) {
+        Row(
+            modifier.fillMaxWidth()
+                .focusProperties { onEnter = { if (selection.hasSelected) runCatching { selection.requester.requestFocus() } } }
+                .focusGroup()
+                .horizontalScroll(scroll).padding(vertical = 6.dp, horizontal = CHIP_ROW_INSET),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) { content() }
+    }
 }
 
 private val CHIP_ROW_INSET = 10.dp
