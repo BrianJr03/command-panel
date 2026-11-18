@@ -90,7 +90,13 @@ class AssistantService : Service() {
                     Log.d(TAG, "AYN button down=$down long=$long standby=$standby")
                     // On standby the other replacement answers the button; a cheap (cached) re-check picks up its
                     // being turned off.
-                    if (standby) recheckStandby(force = false) else machine.onEvent(down, long)
+                    if (standby) {
+                        recheckStandby(force = false)
+                    } else {
+                        // The stock app also got this press if it's no longer frozen; take the button back.
+                        if (down) coexistence.ensureSuppressed()
+                        machine.onEvent(down, long)
+                    }
                 }
                 ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
                 ACTION_HIDE_OVERLAY -> overlay.hide()

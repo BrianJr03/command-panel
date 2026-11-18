@@ -18,9 +18,11 @@ import kotlinx.coroutines.withContext
  * Owns the opt-in "Replace stock assistant" state and applies it. When enabled, the stock assistant is ephemerally
  * suppressed so Command Panel owns the AYN button; when disabled (or the app stops), it is restored.
  *
- * Screen-off handling is the fork's fix (NOTES.md §8 / fork feature 14): a frozen stock process can't drain a queued
- * `SCREEN_OFF` broadcast and ANRs, so on screen-off the process is unfrozen for up to [UNFREEZE_MS] and then
- * re-frozen — long enough for a busy broadcast queue to reach it.
+ * Screen on/off handling extends the fork's fix (NOTES.md §8 / fork feature 14): a frozen stock process can't drain a
+ * queued `SCREEN_OFF` or `SCREEN_ON` broadcast and ANRs. The system then kills it, and since it's persistent it
+ * restarts unfrozen and answers the AYN button again. So on every screen off and on the process is unfrozen for up to
+ * [UNFREEZE_MS] and then re-frozen, long enough for a busy broadcast queue to reach it. A check [RECHECK_MS] after each
+ * freeze ([scheduleRecheck]) and on each AYN press ([ensureSuppressed]) catches a restart for any other reason.
  */
 class StockCoexistence(
     context: Context,
@@ -31,6 +33,8 @@ class StockCoexistence(
         const val TAG = "StockCoexistence"
         const val KEY = "replace_stock_assistant"
         const val UNFREEZE_MS = 5000L
+        /** How long after a freeze to check that the system didn't kill and restart the stock process. */
+        const val RECHECK_MS = 30_000L
     }
 
     private val prefs = Prefs.of(context)
@@ -40,6 +44,7 @@ class StockCoexistence(
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
     private var refreezeJob: Job? = null
+    private var recheckJob: Job? = null
 
     /**
      * True while another stock replacement (Better Dual Screen Assistant) controls the stock process. On standby this
@@ -52,6 +57,7 @@ class StockCoexistence(
             field = value
             if (value) {
                 refreezeJob?.cancel()
+                recheckJob?.cancel()
                 // The other app owns the stock process now; the helper must not "recover" it behind its back.
                 privileged.setStockRecoveryArmed(false)
             }
@@ -84,26 +90,62 @@ class StockCoexistence(
     /** Arms the helper's stock recovery first, so there is no window where stock is frozen but not covered. */
     private fun suppressAndArm(): Boolean {
         privileged.setStockRecoveryArmed(true)
-        return suppressor.suppress()
+        val ok = suppressor.suppress()
+        scheduleRecheck()
+        return ok
     }
 
     private fun restoreAndDisarm(): Boolean {
+        recheckJob?.cancel()
         privileged.setStockRecoveryArmed(false)
         return suppressor.restore()
     }
 
-    fun onScreenOff() {
+    fun onScreenOff() = unfreezeBriefly()
+
+    fun onScreenOn() = unfreezeBriefly()
+
+    /** Lets the stock process handle a screen broadcast, then freezes it again (see the class comment). */
+    private fun unfreezeBriefly() {
         if (!_enabled.value || standby) return
         refreezeJob?.cancel()
+        recheckJob?.cancel()
         refreezeJob = scope.launch(Dispatchers.IO) {
             suppressor.continueProcess()
             delay(UNFREEZE_MS)
             suppressor.stopProcess()
+            scheduleRecheck()
         }
     }
 
-    fun onScreenOn() {
-        // Nothing special; any pending re-freeze still completes.
+    /**
+     * A broadcast already on its way to the stock process when it's frozen (say, a `SCREEN_ON` sent just before the
+     * service started) still ANRs it, and the system's restart comes back unfrozen. So [RECHECK_MS] after each freeze,
+     * suppress it again if it isn't frozen. Skipped while an unfreeze window is open, since that's on purpose.
+     */
+    private fun scheduleRecheck() {
+        recheckJob?.cancel()
+        recheckJob = scope.launch(Dispatchers.IO) {
+            delay(RECHECK_MS)
+            if (!_enabled.value || standby || refreezeJob?.isActive == true || suppressor.isSuppressed()) return@launch
+            Log.w(TAG, "stock assistant restarted after being frozen; suppressing it again")
+            suppressAndArm()
+        }
+    }
+
+    /**
+     * Safety net, run on each AYN press: if the stock process isn't frozen (it restarted after a crash or a kill
+     * Command Panel isn't told about), suppress it again. Suppressing kills the running process, so a stock panel it
+     * just opened closes too. An unfreeze window in progress is cut short, since the press means the user is back.
+     */
+    fun ensureSuppressed() {
+        if (!_enabled.value || standby) return
+        scope.launch(Dispatchers.IO) {
+            if (suppressor.isSuppressed()) return@launch
+            refreezeJob?.cancel()
+            Log.w(TAG, "stock assistant was running unfrozen; suppressing it again")
+            suppressAndArm()
+        }
     }
 
     suspend fun isSuppressed(): Boolean = withContext(Dispatchers.IO) { suppressor.isSuppressed() }
