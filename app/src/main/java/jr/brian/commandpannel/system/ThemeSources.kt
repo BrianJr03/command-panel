@@ -71,6 +71,29 @@ object ThemeSources {
         return null
     }
 
+    // ---- the built-in repo ----
+
+    /** The TCP Themes repo every fresh install follows from the start. */
+    const val DEFAULT_URL = "https://github.com/BrianJr03/tcp-themes"
+    /** Set once the default repo was considered, so removing it sticks (and later installs aren't re-seeded). */
+    const val KEY_DEFAULT_SEEDED = "theme_default_source_seeded"
+
+    /** The default repo as a source, named for display. */
+    val default: ThemeSource = parse(DEFAULT_URL)!!.copy(name = "TCP Themes")
+
+    /**
+     * On a [fresh] install, follows [default] as the first repo; either way it's only decided once. Its packs sync the
+     * first time Themes opens (a never-synced repo is due).
+     */
+    fun seedDefault(prefs: SharedPreferences, fresh: Boolean) {
+        if (prefs.getBoolean(KEY_DEFAULT_SEEDED, false)) return
+        if (fresh && all(prefs).none { it.id == default.id }) {
+            val rest = all(prefs)
+            prefs.edit().putString(KEY, JSONArray().apply { (listOf(default) + rest).forEach { put(encode(it)) } }.toString()).apply()
+        }
+        prefs.edit().putBoolean(KEY_DEFAULT_SEEDED, true).apply()
+    }
+
     // ---- storage ----
 
     fun all(prefs: SharedPreferences): List<ThemeSource> {

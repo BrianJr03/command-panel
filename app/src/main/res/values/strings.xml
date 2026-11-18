@@ -588,6 +588,8 @@
     <string name="tour_my_looks_body">Looks you\'ve saved. Export them as a pack to share, or import a pack someone sent you.</string>
     <string name="tour_packs_body">Packs you put in the TCP Themes folder show up here, along with the fonts they use.</string>
     <string name="tour_repos_body">Follow a GitHub theme repo or a link to a pack. Its looks are added and stay up to date as the author changes them.</string>
+    <string name="tour_default_repo_title">TCP Themes</string>
+    <string name="tour_default_repo_body">Command Panel follows the TCP Themes repo from the start, so new looks show up on their own as they\'re added. Find them under Themes → Packs, or remove the repo here if you\'d rather not.</string>
     <string name="tour_builtin_body">All the looks that ship with Command Panel. Pick one to apply it to the overlay right away.</string>
     <string name="tour_diagnostics_body">Check that the privileged access Command Panel relies on is working.</string>
     <string name="tour_privileged_body">Checks hidden-API access, the root shell and the root helper. If a feature isn\'t working, start here.</string>

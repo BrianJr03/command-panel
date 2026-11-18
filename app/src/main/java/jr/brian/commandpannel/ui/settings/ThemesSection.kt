@@ -29,6 +29,7 @@ import jr.brian.commandpannel.system.FolderPack
 import jr.brian.commandpannel.system.FontNeeds
 import jr.brian.commandpannel.system.ThemeFolder
 import jr.brian.commandpannel.system.ThemeSource
+import jr.brian.commandpannel.system.ThemeSources
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
@@ -133,7 +134,12 @@ internal fun Themes(
         }
         state.repoMessage?.let { InfoLine(it) }
     }
-    state.themeSources.forEach { source -> SourceCard(source, state, vm) }
+    state.themeSources.forEach { source ->
+        // The built-in TCP Themes repo is the tour's stop after Theme repos.
+        Box(if (source.id == ThemeSources.default.id) Modifier.tourTarget(TourSpot.DEFAULT_REPO) else Modifier) {
+            SourceCard(source, state, vm)
+        }
+    }
 
     SectionHeader(stringResource(R.string.theme_builtin), Modifier.tourTarget(TourSpot.BUILTIN))
     Card(Modifier.tourTarget(TourSpot.BUILTIN)) {

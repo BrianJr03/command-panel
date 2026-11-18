@@ -104,7 +104,7 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     BUTTON_ORDER, QUICK_LAUNCH,
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
     OVERLAY_THEME, FOLLOW_LOOK, RGB_ACCENT,
-    ACTIVE_LOOK, MIX, MY_LOOKS, PACKS, REPOS, BUILTIN,
+    ACTIVE_LOOK, MIX, MY_LOOKS, PACKS, REPOS, DEFAULT_REPO, BUILTIN,
     /** The selected row in the built-in list (followed while the overlay onboarding's theme step runs). */
     BUILTIN_SELECTED,
     PRIVILEGED,
@@ -172,6 +172,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(themes, TourSpot.MY_LOOKS, R.string.theme_my_looks, R.string.tour_my_looks_body),
         TourStep(themes, TourSpot.PACKS, R.string.theme_packs, R.string.tour_packs_body),
         TourStep(themes, TourSpot.REPOS, R.string.theme_repos, R.string.tour_repos_body),
+        TourStep(themes, TourSpot.DEFAULT_REPO, R.string.tour_default_repo_title, R.string.tour_default_repo_body),
         TourStep(themes, TourSpot.BUILTIN, R.string.theme_builtin, R.string.tour_builtin_body),
 
         sectionIntro(diagnostics, R.string.tour_diagnostics_body),

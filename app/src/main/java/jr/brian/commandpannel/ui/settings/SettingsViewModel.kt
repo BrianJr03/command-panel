@@ -746,6 +746,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     init {
+        // A fresh install (no first-run guide seen yet) starts out following the TCP Themes repo.
+        ThemeSources.seedDefault(
+            prefs, fresh = !prefs.getBoolean(KEY_TOUR_SEEN, false) && !prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false),
+        )
         prefs.registerOnSharedPreferenceChangeListener(onboardingListener)
         _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck)
         viewModelScope.launch {
