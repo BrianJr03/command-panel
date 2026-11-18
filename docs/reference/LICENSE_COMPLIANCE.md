@@ -55,7 +55,7 @@ helper for privileged calls, an overlay on the bottom display — is an architec
 | §1 personal, non-commercial use on owned hardware | Command Panel is a personal project for Brian's own AYN Thor. |
 | §2.1 no commercial use | None. |
 | §2.2 no pre-installation / bundling on devices | None. |
-| §2.3 binaries | No BDSA or modified-BDSA binary has ever been shared. The fork's history has never contained an APK, keystore, `local.properties` or mapping file (`git log --all --diff-filter=A` is empty for them), `.gitignore` excludes them, and the fork has no GitHub releases. Command Panel is unpublished. |
+| §2.3 binaries | No BDSA or modified-BDSA binary has ever been shared. The fork's history has never contained an APK, keystore, `local.properties` or mapping file (`git log --all --diff-filter=A` is empty for them), `.gitignore` excludes them, and the fork has no GitHub releases. Command Panel releases contain only its own APK (see §8). |
 | §2.3 modified source | **Open item — see §5.** |
 | §3 contributions | No PRs have been opened upstream, so nothing has been licensed to the author under §3. |
 
@@ -73,7 +73,8 @@ helper for privileged calls, an overlay on the bottom display — is an architec
    OFL fonts (with notices) and, as of the same day, **no AYN icon art** (loaded at runtime instead — see §7). No
    keystore or signing secret is tracked (`.gitignore` excludes `*.jks`/`*.keystore`/`*.apk`); release signing runs
    in CI from repo secrets.
-3. **AYN assets.** Command Panel's labels are its own functional English. As of 2026-11-17 it **no longer bundles
+3. **AYN assets.** Command Panel's own labels are its own functional English; it also bundles 67 of the stock app's
+   strings (`stock_strings.xml`, 8 locales) so stock labels keep their ja/ko/zh translations. As of 2026-11-17 it **no longer bundles
    AYN's icon art** — the stock drawables are loaded at runtime from the installed stock app (see §7). This concerns
    AYN, not BDSA.
 
@@ -97,7 +98,7 @@ Arrange mode, Replay Buffer, launcher icon). Findings:
   own code; only Brian's pure helpers (replay bitrate/path math, ring buffer, renderers) were ported.
 - **Fonts.** The 8 bundled font families are SIL OFL 1.1; `assets/THIRD_PARTY_NOTICES.txt` ships the attribution +
   full license alongside them.
-- **Still unpublished / private.** Command Panel has **no git remote** and tracks no binaries/keystore; the fork is
+- **Still unpublished / private** (as of this re-audit; superseded by §5.2 and §8). Command Panel had **no git remote** and tracks no binaries/keystore; the fork is
   **private** (`gh repo view` → `PRIVATE`); no upstream `LICENSE`/`README`/binary is copied into `app/src/`.
 
 **Open item — RESOLVED 2026-11-17.** `fork-port/` (whose `patches/*.patch` carried upstream base lines as diff
@@ -114,8 +115,29 @@ pairs). Those were **deleted** and are now loaded at runtime from the installed 
 `jr.brian.commandpannel.privileged.StockResources` (single chokepoint `rememberStockPainter`). The repo and the APK
 now ship **zero AYN icon art** — only three CP-authored drawables remain (`ic_launcher_background`,
 `ic_launcher_foreground`, `ic_qs_replay_buffer`). If a stock icon can't be read, a neutral CP-owned placeholder is
-shown (never AYN art). This removes AYN-asset redistribution as a concern for the public repo. CP's labels are its
-own functional English (no AYN `strings.xml` is bundled).
+shown (never AYN art). This removes AYN-asset redistribution as a concern for the public repo. CP's own labels are its
+own functional English; the stock labels it reuses come from `stock_strings.xml` (see §5.3).
+
+## 8. Permission from the upstream author — 2026-11-18
+
+Brian reports that on 2026-11-18 stormpanda (Maik Thomalla), the BDSA copyright holder, gave him **full
+permission** for Command Panel's use of BDSA-derived work. This is the "prior written permission" BDSA's license
+asks for (§2, §2.3); Brian keeps the written message with his records. It covers the items a full-history comparison
+turned up the same day:
+
+- The stock ring in `TccLookWidgets.kt` (`drawStockRing`) uses BDSA's `0.055f` stroke calibration (upstream
+  `8e3ccf8`; AYN's stock app uses `0.05f`), in the same code shape as upstream's ring gauge.
+- The look-spec API keeps upstream's names (`TccLookSpec`, `LocalTccLookSpec`, `TccTileVariant`,
+  `tccTextStyle`/`tccDisplayTextStyle`, and spec fields such as `ringDiameterRatio` and `panelCardShape`) so the
+  renderers ported from Brian's fork compile unchanged.
+- The ported fork features were written inside the BDSA fork, so §2.3 ("modified source code") could otherwise be
+  read to reach them.
+
+The rest of that comparison, run against every blob on every Command Panel ref and all 83 upstream commits, found
+no upstream code. The only identical files were Android Studio's template launcher icons, replaced in `097ca68`.
+The longest shared token run, ignoring imports, is 65 tokens of standard EGL/GLES setup. `fork-port/` is in no commit.
+Command Panel is public (`BrianJr03/command-panel`, GPL-3.0 since `e9dea1f`) and its GitHub releases contain only its
+own APK.
 
 ## Files in this folder
 
