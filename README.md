@@ -1,3 +1,9 @@
+<p align="left">
+  <a href="https://github.com/BrianJr03/command-panel/releases"><img src="https://img.shields.io/github/downloads/BrianJr03/command-panel/total?label=downloads&color=7c5cff" alt="Total downloads" /></a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/BrianJr03/command-panel/releases/latest"><img src="https://img.shields.io/github/downloads/BrianJr03/command-panel/latest/total?label=downloads%40latest&color=7c5cff" alt="Downloads of the latest release" /></a>
+</p>
+
 <div align="center">
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Thor Command Panel (TCP)</h1>
