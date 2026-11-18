@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -75,6 +76,8 @@ internal fun ThemeLibraryScreen(
     val scope = rememberCoroutineScope()
     val motion = LocalTccLookSpec.current.traits.animate
     val tabFocus = remember { tabs.associateWith { FocusRequester() } }
+    // Hoisted per page, so moving focus up out of a page to the tabs can scroll that page back to its top.
+    val pageScroll = tabs.map { rememberScrollState() }
     BackHandler(onBack = onClose)
     LaunchedEffect(Unit) {
         vm.refreshThemeFolder()
@@ -112,6 +115,16 @@ internal fun ThemeLibraryScreen(
                 .padding(horizontal = 28.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // Up past a page's first control lands here: show that page from the top again, as the settings pane does.
+            Column(
+                Modifier.onFocusChanged { f ->
+                    if (f.hasFocus) scope.launch {
+                        val s = pageScroll[pager.currentPage]
+                        if (motion) s.animateScrollTo(0) else s.scrollTo(0)
+                    }
+                },
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Chip(stringResource(R.string.theme_back), onClick = onClose)
                 Text(
@@ -133,9 +146,10 @@ internal fun ThemeLibraryScreen(
                 Spacer(Modifier.width(6.dp))
                 InfoLine(stringResource(R.string.theme_library_tabs_hint), p.textTertiary)
             }
+            }
             HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f), beyondViewportPageCount = 0) { page ->
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp),
+                    Modifier.fillMaxSize().verticalScroll(pageScroll[page]).padding(horizontal = 6.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     when (tabs[page]) {
