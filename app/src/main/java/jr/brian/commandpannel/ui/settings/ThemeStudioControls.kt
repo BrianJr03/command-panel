@@ -49,6 +49,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
 import jr.brian.commandpannel.ui.components.noRippleClickable
 import jr.brian.commandpannel.ui.theme.CardStyle
+import jr.brian.commandpannel.ui.theme.BLUR_RADIUS_MAX
+import jr.brian.commandpannel.ui.theme.BLUR_RADIUS_MIN
+import jr.brian.commandpannel.ui.theme.BLUR_TINT_MAX
 import jr.brian.commandpannel.ui.theme.CustomLook
 import jr.brian.commandpannel.ui.theme.CustomRenderParams
 import jr.brian.commandpannel.ui.theme.FillKind
@@ -275,6 +278,9 @@ internal fun TextControls(draft: CustomLook, base: TccLookSpec, onChange: (Custo
 
 private class Toggle(@StringRes val titleRes: Int, val get: (CustomLook) -> Boolean?, val base: (TccLookSpec) -> Boolean, val set: (CustomLook, Boolean?) -> CustomLook)
 
+/** Shown after the backdrop pattern stepper, with its strength and tint steppers under it. */
+private val BLUR_TOGGLE = Toggle(R.string.theme_effect_blur, { it.blurBehind }, { it.traits.blurBehind }, { l, v -> l.copy(blurBehind = v) })
+
 private val TOGGLES = listOf(
     Toggle(R.string.theme_effect_glow, { it.glow }, { it.traits.glow }, { l, v -> l.copy(glow = v) }),
     Toggle(R.string.theme_effect_scanlines, { it.scanlines }, { it.traits.scanlines }, { l, v -> l.copy(scanlines = v) }),
@@ -288,16 +294,7 @@ private val TOGGLES = listOf(
 internal fun EffectControls(draft: CustomLook, base: TccLookSpec, onChange: (CustomLook) -> Unit) {
     Card {
         CardDesc(stringResource(R.string.theme_effects_desc))
-        TOGGLES.forEach { t ->
-            val v = t.get(draft)
-            ControlLabel(t.titleRes)
-            ChipRow {
-                val def = stringResource(if (t.base(base)) R.string.theme_on else R.string.theme_off)
-                OptionChip(stringResource(R.string.theme_look_default_value, def), v == null) { onChange(t.set(draft, null)) }
-                OptionChip(stringResource(R.string.theme_on), v == true) { onChange(t.set(draft, true)) }
-                OptionChip(stringResource(R.string.theme_off), v == false) { onChange(t.set(draft, false)) }
-            }
-        }
+        TOGGLES.forEach { ToggleRow(it, draft, base, onChange) }
         OverridableStepper(R.string.theme_effect_outline, draft.outlineWidth, base.traits.outlineWidth.value, 0f, 6f, 0.5f, ValueUnit.DP, part = StudioPart.CARDS) {
             onChange(draft.copy(outlineWidth = it))
         }
@@ -307,6 +304,29 @@ internal fun EffectControls(draft: CustomLook, base: TccLookSpec, onChange: (Cus
         OverridableStepper(R.string.theme_effect_pattern, draft.backdropPatternAlpha, base.traits.backdropPatternAlpha, 0f, 1f, 0.1f, ValueUnit.PERCENT, part = StudioPart.BACKDROP) {
             onChange(draft.copy(backdropPatternAlpha = it))
         }
+        ToggleRow(BLUR_TOGGLE, draft, base, onChange)
+        if (draft.blurBehind ?: base.traits.blurBehind) {
+            InfoLine(stringResource(R.string.theme_effect_blur_hint))
+            OverridableStepper(R.string.theme_effect_blur_radius, draft.blurRadius, base.traits.blurRadiusDp, BLUR_RADIUS_MIN, BLUR_RADIUS_MAX, 4f, ValueUnit.DP, part = StudioPart.BACKDROP) {
+                onChange(draft.copy(blurRadius = it))
+            }
+            OverridableStepper(R.string.theme_effect_blur_tint, draft.blurTint, base.traits.blurTint, 0f, BLUR_TINT_MAX, 0.05f, ValueUnit.PERCENT, part = StudioPart.BACKDROP) {
+                onChange(draft.copy(blurTint = it))
+            }
+        }
+    }
+}
+
+/** Look default / On / Off chips for one [Toggle]. */
+@Composable
+private fun ToggleRow(t: Toggle, draft: CustomLook, base: TccLookSpec, onChange: (CustomLook) -> Unit) {
+    val v = t.get(draft)
+    ControlLabel(t.titleRes)
+    ChipRow {
+        val def = stringResource(if (t.base(base)) R.string.theme_on else R.string.theme_off)
+        OptionChip(stringResource(R.string.theme_look_default_value, def), v == null) { onChange(t.set(draft, null)) }
+        OptionChip(stringResource(R.string.theme_on), v == true) { onChange(t.set(draft, true)) }
+        OptionChip(stringResource(R.string.theme_off), v == false) { onChange(t.set(draft, false)) }
     }
 }
 

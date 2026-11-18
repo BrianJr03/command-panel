@@ -35,7 +35,7 @@ object ScreenRecorderEngine {
     const val AUDIO_BIT_RATE = 192_000
 
     const val REPLAY_STORAGE_ROOT = "/storage/emulated/0"
-    const val DEFAULT_REPLAY_CLIPS_RELATIVE_DIR = "game_clips"
+    const val DEFAULT_REPLAY_CLIPS_RELATIVE_DIR = "TCP Clips"
     const val REPLAY_CLIPS_DIR = "$REPLAY_STORAGE_ROOT/$DEFAULT_REPLAY_CLIPS_RELATIVE_DIR"
     private const val MAX_REPLAY_DIR_DEPTH = 8
     private const val MAX_REPLAY_DIR_SEGMENT_LENGTH = 64
@@ -171,12 +171,26 @@ object ScreenRecorderEngine {
         targetMode: Int,
         baseDir: String = REPLAY_CLIPS_DIR,
     ): String {
-        val suffix = when (targetMode) {
-            TARGET_TOP -> "Top"
-            TARGET_BOTTOM -> "Bottom"
-            else -> "Both"
-        }
-        return "${baseDir.trimEnd('/')}/Replay_${timestampStr}_${suffix}.mp4"
+        return "${baseDir.trimEnd('/')}/Replay_${timestampStr}_${replayTargetFolder(targetMode)}.mp4"
+    }
+
+    /** What a clip captured ("Top" / "Bottom" / "Both"): its subfolder under the clips folder and its file-name suffix. */
+    fun replayTargetFolder(targetMode: Int): String = when (targetMode) {
+        TARGET_TOP -> "Top"
+        TARGET_BOTTOM -> "Bottom"
+        else -> "Both"
+    }
+
+    /**
+     * The clips folder for a folder picked in the system picker, from its tree document id (`"primary:Movies/Clips"`),
+     * or `null` if clips can't go there: another volume (SD card), the storage root, anything
+     * [normalizeReplayClipsRelativeDir] rejects, or too deep to fit the per-screen subfolder.
+     */
+    fun replayClipsDirFromTreeDocId(docId: String): String? {
+        val volume = docId.substringBefore(':', missingDelimiterValue = "")
+        if (volume != "primary") return null
+        val dir = normalizeReplayClipsRelativeDir(docId.substringAfter(':')) ?: return null
+        return dir.takeIf { it.split('/').size < MAX_REPLAY_DIR_DEPTH }
     }
 
     /** Confined to a [normalizeReplayClipsRelativeDir]-valid folder on internal shared storage with a strict leaf name. */

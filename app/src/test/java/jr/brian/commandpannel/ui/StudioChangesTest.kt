@@ -12,6 +12,7 @@ import jr.brian.commandpannel.ui.theme.ShapeDef
 import jr.brian.commandpannel.ui.theme.ShapeKind
 import jr.brian.commandpannel.ui.theme.TccUiLook
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,5 +39,16 @@ class StudioChangesTest {
         assertTrue(reset.changedCategories().isEmpty())
         assertEquals("Mine", reset.name)
         assertEquals(TccUiLook.TERMINAL, reset.baseLook)
+    }
+
+    @Test
+    fun `blur settings belong to effects`() {
+        val look = base.copy(blurBehind = true, blurRadius = 24f, blurTint = 0.2f)
+        assertEquals(setOf(StudioCategory.EFFECTS), look.changedCategories())
+        val reset = look.resetCategory(StudioCategory.EFFECTS)
+        assertTrue(reset.changedCategories().isEmpty())
+        assertNull(reset.blurBehind)
+        assertNull(reset.blurRadius)
+        assertNull(reset.blurTint)
     }
 }

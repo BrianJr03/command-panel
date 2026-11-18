@@ -481,22 +481,26 @@ internal class BuiltInTileRenderer private constructor(private val style: TileSt
 /**
  * Overlay root backdrop for the active look: solid background plus an optional static aurora,
  * paper-dot or HUD-grid layer, and (Tactical HUD) a draw-only scanline overlay above content.
+ * [windowBlur] is true when the overlay window is blurring what's behind it (a [jr.brian.commandpannel.ui.theme.LookTraits.blurBehind] look); the
+ * background and aurora then turn translucent so the blurred screen shows through.
  */
 fun Modifier.tccLookBackdrop(
     spec: TccLookSpec,
     colors: TccColorPalette,
     lookColors: TccLookColors,
     // Aurora blob colors (top-left, right, bottom); `null` derives them from the palette accent.
-    auroraColors: List<Color>? = null
+    auroraColors: List<Color>? = null,
+    windowBlur: Boolean = false,
 ): Modifier {
     val paint = LookPaint(spec, colors, lookColors)
-    val base = background(
-        when {
-            spec.traits.oledBackdrop && colors.isDark -> Color.Black
-            spec.traits.liftedBackdrop -> lookColors.softSurface
-            else -> colors.primaryBackground
-        }
-    )
+    val seeThrough = windowBlur && spec.traits.blurBehind
+    val fill = when {
+        spec.traits.oledBackdrop && colors.isDark -> Color.Black
+        spec.traits.liftedBackdrop -> lookColors.softSurface
+        else -> colors.primaryBackground
+    }
+    // A tint over the blurred screen keeps text readable on any wallpaper.
+    val base = background(if (seeThrough) fill.copy(alpha = spec.traits.blurTint) else fill)
     val withLayer = when (spec.traits.backdrop) {
         BackdropStyle.SOLID -> base
         BackdropStyle.AURORA -> base.drawBehind {
@@ -504,7 +508,7 @@ fun Modifier.tccLookBackdrop(
                 lookColors.isPureBlack -> 0.30f
                 colors.isDark -> 0.62f
                 else -> 0.40f
-            }
+            } * if (seeThrough) 0.6f else 1f
             val blobColors = auroraColors?.takeIf { it.size >= 3 }
                 ?: AuroraGradientPreset.MATCH_ACCENT.resolveColors(colors.accent)
             val blobs = listOf(

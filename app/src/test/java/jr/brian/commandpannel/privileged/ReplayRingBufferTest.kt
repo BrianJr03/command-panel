@@ -154,7 +154,7 @@ class ReplayRingBufferTest {
     @Test
     fun `replay clip path validation only accepts Replay_ names in allowed folders`() {
         val good = ScreenRecorderEngine.buildReplayClipPath("20261114_101500", ScreenRecorderEngine.TARGET_BOTH)
-        assertEquals("/storage/emulated/0/game_clips/Replay_20261114_101500_Both.mp4", good)
+        assertEquals("/storage/emulated/0/TCP Clips/Replay_20261114_101500_Both.mp4", good)
         assertTrue(ScreenRecorderEngine.isValidReplayClipOutputPath(good))
         assertTrue(ScreenRecorderEngine.isValidReplayClipOutputPath("/sdcard/game_clips/Replay_20261114_101500_Top.mp4"))
         val bad = listOf(
@@ -246,5 +246,34 @@ class ReplayRingBufferTest {
     fun `bitrate presets round trip with a safe default`() {
         for (p in ReplayBitratePreset.entries) assertEquals(p, ReplayBitratePreset.fromKey(p.key))
         assertEquals(ReplayBitratePreset.BALANCED, ReplayBitratePreset.fromKey("ultra"))
+    }
+
+    @Test
+    fun `picked folders map to clip folders with room for the screen subfolder`() {
+        val pick = ScreenRecorderEngine::replayClipsDirFromTreeDocId
+        assertEquals("Movies/My Clips", pick("primary:Movies/My Clips"))
+        assertEquals("TCP Clips", pick("primary:TCP Clips"))
+        for (bad in listOf("primary:", "1234-5678:DCIM", "primary:Android/data/x", "primary:.hidden", "Movies", "primary:a/b/c/d/e/f/g/h")) {
+            assertEquals(bad, null, pick(bad))
+        }
+        assertEquals("a/b/c/d/e/f/g", pick("primary:a/b/c/d/e/f/g"))
+    }
+
+    @Test
+    fun `clips go in a per-screen subfolder that passes validation`() {
+        val modes = mapOf(
+            ScreenRecorderEngine.TARGET_TOP to "Top",
+            ScreenRecorderEngine.TARGET_BOTTOM to "Bottom",
+            ScreenRecorderEngine.TARGET_BOTH to "Both",
+        )
+        for ((mode, folder) in modes) {
+            assertEquals(folder, ScreenRecorderEngine.replayTargetFolder(mode))
+            for (dir in listOf(ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR, "a/b/c/d/e/f/g")) {
+                val path = ScreenRecorderEngine.buildReplayClipPath(
+                    "20261118_130500", mode, baseDir = "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$dir/$folder",
+                )
+                assertTrue(path, ScreenRecorderEngine.isValidReplayClipOutputPath(path))
+            }
+        }
     }
 }

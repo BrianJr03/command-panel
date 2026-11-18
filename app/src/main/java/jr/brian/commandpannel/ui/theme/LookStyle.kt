@@ -16,7 +16,7 @@ import jr.brian.commandpannel.R
  */
 enum class TccUiLook {
     AUTO,
-    AURORA_GLASS, CARTRIDGE, TACTICAL_HUD,
+    AURORA_GLASS, AURORA_BLUR, CARTRIDGE, TACTICAL_HUD,
     SOFT_CONSOLE, SOFT_CONSOLE_OLED, SEGMENT_LCD, BLOOM, NEON_ARCADE,
     TERMINAL, COCKPIT, STICKER_BOOK, INDUSTRIAL,
     JELLY, COMIC_PANEL, Y2K_CHROME, E_INK;
@@ -25,6 +25,7 @@ enum class TccUiLook {
     val labelRes: Int get() = when (this) {
         AUTO -> R.string.look_auto
         AURORA_GLASS -> R.string.look_aurora_glass
+        AURORA_BLUR -> R.string.look_aurora_blur
         CARTRIDGE -> R.string.look_cartridge
         TACTICAL_HUD -> R.string.look_tactical_hud
         SOFT_CONSOLE -> R.string.look_soft_console
@@ -137,4 +138,13 @@ data class LookTraits(
     val oledBackdrop: Boolean = false,
     /** Multiplier on pattern backdrop alpha (paper dots for Sticker Book). */
     val backdropPatternAlpha: Float = 1f,
+    /**
+     * Aurora Blur: the overlay window blurs whatever is behind it on the bottom screen (wallpaper or app) and the
+     * backdrop turns translucent so it shows through. Previews, and devices with window blur off, stay opaque.
+     */
+    val blurBehind: Boolean = false,
+    /** Blur radius for [blurBehind], in dp. */
+    val blurRadiusDp: Float = 32f,
+    /** Opacity of the backdrop fill over the blurred screen ([blurBehind]); lower shows more of what's behind. */
+    val blurTint: Float = 0.45f,
 )

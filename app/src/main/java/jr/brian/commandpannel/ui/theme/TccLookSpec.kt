@@ -85,6 +85,11 @@ val AuroraGlassLookSpec: TccLookSpec = StockLookSpec.copy(
     ),
 )
 
+val AuroraBlurLookSpec: TccLookSpec = AuroraGlassLookSpec.copy(
+    look = TccUiLook.AURORA_BLUR,
+    traits = AuroraGlassLookSpec.traits.copy(blurBehind = true),
+)
+
 val CartridgeLookSpec: TccLookSpec = StockLookSpec.copy(
     look = TccUiLook.CARTRIDGE,
     panelCardShape = RectangleShape,
@@ -305,6 +310,7 @@ val EInkLookSpec: TccLookSpec = StockLookSpec.copy(
 fun specForLook(look: TccUiLook): TccLookSpec = when (look) {
     TccUiLook.AUTO -> StockLookSpec
     TccUiLook.AURORA_GLASS -> AuroraGlassLookSpec
+    TccUiLook.AURORA_BLUR -> AuroraBlurLookSpec
     TccUiLook.CARTRIDGE -> CartridgeLookSpec
     TccUiLook.TACTICAL_HUD -> TacticalHudLookSpec
     TccUiLook.SOFT_CONSOLE -> SoftConsoleLookSpec

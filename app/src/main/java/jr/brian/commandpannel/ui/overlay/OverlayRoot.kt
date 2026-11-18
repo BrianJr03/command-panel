@@ -59,6 +59,10 @@ fun OverlayRoot(
       ) {
         val spec = jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current
         val lookColors = jr.brian.commandpannel.ui.theme.tccLookColors()
+        // Aurora Blur asks the overlay window to blur what's behind it; previews have no window and stay opaque.
+        val windowBlur = jr.brian.commandpannel.overlay.LocalOverlayWindowBlur.current
+        val blurRadius = spec.traits.blurRadiusDp.takeIf { spec.traits.blurBehind }
+        androidx.compose.runtime.LaunchedEffect(windowBlur, blurRadius) { windowBlur?.request(blurRadius) }
         val arrange = rememberArrangeController(state.layout) { actions.setOverlayLayout(it) }
         // Open on the last-used tab and persist changes, so a reopen lands where the user left off. Keyed on navTab so a
         // caller that picks the tab (Theme Studio's preview) switches it.
@@ -103,7 +107,7 @@ fun OverlayRoot(
         Box(Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize()
-                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors)
+                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true)
                     .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))

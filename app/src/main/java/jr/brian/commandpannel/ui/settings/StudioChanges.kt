@@ -14,7 +14,7 @@ private fun CustomLook.changed(c: StudioCategory): Boolean = when (c) {
     StudioCategory.SHAPES -> listOf(panelCardShape, tileShape, sliderControlShape, sliderTrackShape, dialogShape, fpsBadgeShape).any { it != null }
     StudioCategory.COLORS -> colors != PinnedColors()
     StudioCategory.TEXT -> labelCase != null || letterSpacingEm != null || qsLabelFontSize != null
-    StudioCategory.EFFECTS -> listOf(glow, scanlines, animate, liftedBackdrop, oledBackdrop, ghostSegments, outlineWidth, shadowOffset, backdropPatternAlpha).any { it != null }
+    StudioCategory.EFFECTS -> listOf(glow, scanlines, animate, liftedBackdrop, oledBackdrop, ghostSegments, outlineWidth, shadowOffset, backdropPatternAlpha, blurBehind, blurRadius, blurTint).any { it != null }
     StudioCategory.FIT -> listOf(ringDiameterRatio, ringValueScale, ringTitleScale, ringUnitScale, infoValueScale).any { it != null }
 }
 
@@ -28,7 +28,7 @@ internal fun CustomLook.resetCategory(c: StudioCategory): CustomLook = when (c) 
     StudioCategory.TEXT -> copy(labelCase = null, letterSpacingEm = null, qsLabelFontSize = null)
     StudioCategory.EFFECTS -> copy(
         glow = null, scanlines = null, animate = null, liftedBackdrop = null, oledBackdrop = null, ghostSegments = null,
-        outlineWidth = null, shadowOffset = null, backdropPatternAlpha = null,
+        outlineWidth = null, shadowOffset = null, backdropPatternAlpha = null, blurBehind = null, blurRadius = null, blurTint = null,
     )
     StudioCategory.FIT -> copy(ringDiameterRatio = null, ringValueScale = null, ringTitleScale = null, ringUnitScale = null, infoValueScale = null)
 }

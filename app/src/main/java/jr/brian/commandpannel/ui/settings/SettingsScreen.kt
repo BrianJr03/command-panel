@@ -512,6 +512,20 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         jr.brian.commandpannel.privileged.ReplayBitratePreset.entries.forEach { preset ->
             RadioRow(stringResource(preset.labelRes), state.replayPreset == preset) { vm.setReplayPreset(preset) }
         }
+        Spacer(Modifier.height(14.dp))
+        CardTitle(stringResource(R.string.settings_replay_location))
+        Spacer(Modifier.height(10.dp))
+        // The system folder picker; clips are written by the root helper, so no lasting folder permission is needed.
+        val pickFolder = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+        ) { uri -> if (uri != null) vm.onReplayFolderPicked(uri) }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Chip(stringResource(R.string.settings_replay_location_default), selected = state.replayClipsDir == null) { vm.setReplayClipsDir(null) }
+            Chip(stringResource(R.string.settings_replay_location_custom), selected = state.replayClipsDir != null) { pickFolder.launch(null) }
+            Chip(stringResource(R.string.settings_replay_location_open)) { vm.openReplayClipsFolder() }
+        }
+        Spacer(Modifier.height(8.dp))
+        InfoLine(stringResource(R.string.settings_replay_location_current, replayClipsPath(state.replayClipsDir)))
         Spacer(Modifier.height(12.dp))
         AccentButton(stringResource(R.string.settings_replay_save_now), enabled = state.replayEnabled, onClick = vm::saveReplayClip)
         state.replayMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }

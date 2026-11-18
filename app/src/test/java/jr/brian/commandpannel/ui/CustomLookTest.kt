@@ -88,6 +88,29 @@ class CustomLookTest {
     }
 
     @Test
+    fun `blur behind round trips, clamps and applies on any base`() {
+        val look = CustomLook(id = "b", name = "b", baseLook = TccUiLook.AURORA_GLASS, blurBehind = true, blurRadius = 20f, blurTint = 0.3f)
+        val decoded = CustomLookJson.decode(CustomLookJson.encode(look))!!
+        assertEquals(look, decoded)
+        val traits = decoded.toSpec().traits
+        assertTrue(traits.blurBehind)
+        assertEquals(20f, traits.blurRadiusDp)
+        assertEquals(0.3f, traits.blurTint)
+
+        val wild = JSONObject().put("id", "x").put("name", "x").put("blurRadius", 999.0).put("blurTint", 5.0)
+        val clamped = CustomLookJson.decode(wild)!!
+        assertEquals(64f, clamped.blurRadius)
+        assertEquals(0.9f, clamped.blurTint)
+    }
+
+    @Test
+    fun `aurora blur blurs by default and a custom look can turn it off`() {
+        assertTrue(specForLook(TccUiLook.AURORA_BLUR).traits.blurBehind)
+        val off = CustomLook(id = "o", name = "o", baseLook = TccUiLook.AURORA_BLUR, blurBehind = false)
+        assertTrue(!off.toSpec().traits.blurBehind)
+    }
+
+    @Test
     fun `look refs parse both kinds`() {
         assertEquals(LookRef.Custom("abc"), LookRef.parse("custom:abc"))
         assertEquals(LookRef.BuiltIn(TccUiLook.TERMINAL), LookRef.parse("TERMINAL"))

@@ -54,6 +54,9 @@ data class CustomLook(
     val liftedBackdrop: Boolean? = null,
     val oledBackdrop: Boolean? = null,
     val backdropPatternAlpha: Float? = null,
+    val blurBehind: Boolean? = null,
+    val blurRadius: Float? = null,
+    val blurTint: Float? = null,
     val ghostSegments: Boolean? = null,
     val ringDiameterRatio: Float? = null,
     val ringTitleScale: Float? = null,
@@ -189,6 +192,9 @@ fun CustomLook.toSpec(fonts: UserFontResolver = UserFontResolver.None): TccLookS
         liftedBackdrop = liftedBackdrop ?: (t.liftedBackdrop || (card == CardStyle.SOFT_EXTRUDED && oledBackdrop != true && !t.oledBackdrop)),
         oledBackdrop = oledBackdrop ?: t.oledBackdrop,
         backdropPatternAlpha = backdropPatternAlpha ?: t.backdropPatternAlpha,
+        blurBehind = blurBehind ?: t.blurBehind,
+        blurRadiusDp = blurRadius ?: t.blurRadiusDp,
+        blurTint = blurTint ?: t.blurTint,
         ghostSegments = ghostSegments ?: t.ghostSegments,
     )
     return base.copy(
@@ -286,6 +292,9 @@ object CustomLookJson {
         putOpt("liftedBackdrop", look.liftedBackdrop)
         putOpt("oledBackdrop", look.oledBackdrop)
         putOpt("backdropPatternAlpha", look.backdropPatternAlpha?.toDouble())
+        putOpt("blurBehind", look.blurBehind)
+        putOpt("blurRadius", look.blurRadius?.toDouble())
+        putOpt("blurTint", look.blurTint?.toDouble())
         putOpt("ghostSegments", look.ghostSegments)
         putOpt("ringDiameterRatio", look.ringDiameterRatio?.toDouble())
         putOpt("ringTitleScale", look.ringTitleScale?.toDouble())
@@ -336,6 +345,9 @@ object CustomLookJson {
             liftedBackdrop = o.boolOrNull("liftedBackdrop"),
             oledBackdrop = o.boolOrNull("oledBackdrop"),
             backdropPatternAlpha = o.floatOrNull("backdropPatternAlpha", 0f, 1f),
+            blurBehind = o.boolOrNull("blurBehind"),
+            blurRadius = o.floatOrNull("blurRadius", BLUR_RADIUS_MIN, BLUR_RADIUS_MAX),
+            blurTint = o.floatOrNull("blurTint", 0f, BLUR_TINT_MAX),
             ghostSegments = o.boolOrNull("ghostSegments"),
             ringDiameterRatio = o.floatOrNull("ringDiameterRatio", 0.5f, 1f),
             ringTitleScale = o.floatOrNull("ringTitleScale", 0.05f, 0.25f),
@@ -408,3 +420,8 @@ object CustomLookJson {
     private fun JSONObject.floatOrNull(key: String, min: Float, max: Float): Float? =
         if (has(key)) optDouble(key).takeIf { !it.isNaN() }?.toFloat()?.coerceIn(min, max) else null
 }
+
+/** Theme Studio's blur strength range (dp) and tint ceiling; a fully opaque tint would hide the blur. */
+internal const val BLUR_RADIUS_MIN = 4f
+internal const val BLUR_RADIUS_MAX = 64f
+internal const val BLUR_TINT_MAX = 0.9f

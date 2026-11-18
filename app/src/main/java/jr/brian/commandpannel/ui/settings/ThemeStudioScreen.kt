@@ -52,6 +52,7 @@ import jr.brian.commandpannel.R
 import androidx.compose.foundation.shape.RoundedCornerShape
 import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import jr.brian.commandpannel.ui.overlay.arrange.LocalPreviewHighlight
 import kotlin.math.roundToInt
@@ -488,21 +489,46 @@ private fun PartSample(part: StudioPart, spec: jr.brian.commandpannel.ui.theme.T
     jr.brian.commandpannel.ui.theme.TccTheme(colors) {
         CompositionLocalProvider(LocalTccLookSpec provides spec) {
             when (part) {
-                StudioPart.CARDS -> jr.brian.commandpannel.ui.components.TccCard(Modifier.size(34.dp, 22.dp)) {}
+                StudioPart.CARDS -> jr.brian.commandpannel.ui.components.TccCard(Modifier.size(28.dp, 18.dp)) {}
                 StudioPart.TILES -> jr.brian.commandpannel.ui.components.TccIconButton(
-                    "ic_qs_vibrate", "", circleSize = 24.dp, active = true, showLabel = false,
+                    "ic_qs_vibrate", "", circleSize = 20.dp, active = true, showLabel = false,
                 )
-                StudioPart.GAUGES -> jr.brian.commandpannel.ui.components.RingGauge(0.65f, colors.accent, "", "", "", Modifier.size(26.dp))
-                StudioPart.NAV -> jr.brian.commandpannel.ui.components.TccIconButton(
-                    "ic_system_set", "", circleSize = 24.dp, active = true, showLabel = false,
-                    variant = jr.brian.commandpannel.ui.components.TccTileVariant.NAV_BAR,
-                )
+                StudioPart.GAUGES -> jr.brian.commandpannel.ui.components.RingGauge(0.65f, colors.accent, "", "", "", Modifier.size(21.dp))
+                // Nav highlights draw at a fixed size whatever the button's size (Jelly's capsule, Neon's underline), so
+                // draw one at full size and scale it into the chip instead of letting it spill over the label.
+                StudioPart.NAV -> FitSample(NAV_SAMPLE_W, NAV_SAMPLE_H, jr.brian.commandpannel.ui.theme.aynDp(64f), jr.brian.commandpannel.ui.theme.aynDp(40f)) {
+                    jr.brian.commandpannel.ui.components.TccIconButton(
+                        "ic_system_set", "", circleSize = jr.brian.commandpannel.ui.theme.aynDp(32f), active = true, showLabel = false,
+                        variant = jr.brian.commandpannel.ui.components.TccTileVariant.NAV_BAR,
+                    )
+                }
                 StudioPart.BACKDROP -> Box(
-                    Modifier.size(34.dp, 22.dp).clip(RoundedCornerShape(5.dp)).tccLookBackdrop(spec, colors, tccLookColors()),
+                    Modifier.size(28.dp, 18.dp).clip(RoundedCornerShape(4.dp)).tccLookBackdrop(spec, colors, tccLookColors()),
                 )
                 else -> Unit
             }
         }
+    }
+}
+
+private val NAV_SAMPLE_W = 30.dp
+private val NAV_SAMPLE_H = 19.dp
+
+/** Lays [content] out at [naturalW] x [naturalH] and scales it down to fit a [width] x [height] slot. */
+@Composable
+private fun FitSample(
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    naturalW: androidx.compose.ui.unit.Dp,
+    naturalH: androidx.compose.ui.unit.Dp,
+    content: @Composable () -> Unit,
+) {
+    val scale = minOf(width / naturalW, height / naturalH)
+    Box(Modifier.size(width, height), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.requiredSize(naturalW, naturalH).graphicsLayer { scaleX = scale; scaleY = scale },
+            contentAlignment = Alignment.Center,
+        ) { content() }
     }
 }
 

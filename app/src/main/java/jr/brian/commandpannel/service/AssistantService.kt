@@ -15,7 +15,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import jr.brian.commandpannel.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -62,6 +61,8 @@ class AssistantService : Service() {
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
     private lateinit var bdsa: BdsaDetector
     private val handler = Handler(Looper.getMainLooper())
+    /** Double-press feedback; our own window, since system toasts are dropped while the app has no window showing. */
+    private val toast by lazy { jr.brian.commandpannel.overlay.OverlayToast(applicationContext) }
 
     /**
      * True while Better Dual Screen Assistant, or the other Command Panel build (debug / release), claims the hardware.
@@ -226,17 +227,22 @@ class AssistantService : Service() {
     /** AYN double press: arms the Replay Buffer if it's off, otherwise saves a clip. Either way, a toast says so. */
     private fun onAynDoublePress() {
         scope.launch(Dispatchers.IO) {
-            val msg = if (!replay.isArmed) {
+            if (!replay.isArmed) {
                 replay.setEnabled(true)
-                getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed)
-            } else {
-                val result = replay.save()
-                Log.i(TAG, "replay save (double press): $result")
-                sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
-                if (result.startsWith("error:")) getString(R.string.msg_save_failed, result.removePrefix("error:"))
-                else getString(R.string.msg_saved_to, result)
+                toast.show(getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed))
+                return@launch
             }
-            withContext(Dispatchers.Main) { Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show() }
+            // Say it right away; a second toast follows only if the save fails.
+            val saving = when (replay.armedTarget) {
+                jr.brian.commandpannel.privileged.ReplayTarget.TOP -> R.string.msg_replay_double_saving_top
+                jr.brian.commandpannel.privileged.ReplayTarget.BOTTOM -> R.string.msg_replay_double_saving_bottom
+                jr.brian.commandpannel.privileged.ReplayTarget.BOTH -> R.string.msg_replay_double_saving_both
+            }
+            toast.show(getString(saving, replay.clipSeconds()))
+            val result = replay.save()
+            Log.i(TAG, "replay save (double press): $result")
+            sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
+            if (result.startsWith("error:")) toast.show(getString(R.string.msg_save_failed, result.removePrefix("error:")))
         }
     }
 
