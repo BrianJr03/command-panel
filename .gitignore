@@ -19,3 +19,6 @@ keystore.properties
 
 # Local planning scratch — not for the repo
 PLAN.md
+
+# Local Claude Code instructions
+CLAUDE.md
