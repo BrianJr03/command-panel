@@ -121,6 +121,10 @@ data class SettingsState(
     val tourStep: Int? = null,
     /** The look Theme Studio is editing (possibly not saved yet), or null when it isn't open. */
     val studioDraft: jr.brian.commandpannel.ui.theme.CustomLook? = null,
+    /** Studio was opened on [unsavedDraft] (Resume), so it starts with unsaved changes. */
+    val studioResumed: Boolean = false,
+    /** Unsaved Studio work kept from a session that didn't end normally (the app was closed or killed). */
+    val unsavedDraft: jr.brian.commandpannel.ui.theme.CustomLook? = null,
 )
 
 @HiltViewModel
@@ -213,7 +217,18 @@ class SettingsViewModel @Inject constructor(
 
     /** Hands Theme Studio the look to edit; a new one (Mix, Customize, Start from) isn't saved until the user saves. */
     fun openStudio(look: jr.brian.commandpannel.ui.theme.CustomLook) {
-        _state.value = _state.value.copy(studioDraft = look)
+        _state.value = _state.value.copy(studioDraft = look, studioResumed = look == _state.value.unsavedDraft)
+    }
+
+    /** Keeps Studio's unsaved [look] (or forgets it, for null) in case the app closes before it's saved. */
+    fun persistStudioDraft(look: jr.brian.commandpannel.ui.theme.CustomLook?) {
+        if (look == null) prefs.edit().remove(KEY_STUDIO_DRAFT).apply()
+        else prefs.edit().putString(KEY_STUDIO_DRAFT, jr.brian.commandpannel.ui.theme.CustomLookJson.encode(look).toString()).apply()
+        _state.value = _state.value.copy(unsavedDraft = look)
+    }
+
+    private fun readStudioDraft(): jr.brian.commandpannel.ui.theme.CustomLook? = prefs.getString(KEY_STUDIO_DRAFT, null)?.let {
+        runCatching { jr.brian.commandpannel.ui.theme.CustomLookJson.decode(org.json.JSONObject(it)) }.getOrNull()
     }
 
     fun closeStudio() {
@@ -760,7 +775,7 @@ class SettingsViewModel @Inject constructor(
             prefs, fresh = !prefs.getBoolean(KEY_TOUR_SEEN, false) && !prefs.getBoolean(OverlayOnboarding.KEY_SEEN, false),
         )
         prefs.registerOnSharedPreferenceChangeListener(onboardingListener)
-        _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck)
+        _state.value = _state.value.copy(updateLastCheck = updatePrefs.lastCheck, unsavedDraft = readStudioDraft())
         // One guide at a time: the companion tour pauses while the overlay's onboarding is on screen, then resumes.
         viewModelScope.launch {
             OverlayOnboarding.commands.subscriptionCount.map { it > 0 }.distinctUntilChanged().collect { onScreen ->
@@ -1020,5 +1035,7 @@ class SettingsViewModel @Inject constructor(
         const val KEY_BDSA_DISABLED = "bdsa_disabled_by_command_panel"
         /** The companion tour was finished or skipped. Not backed up, so a restored backup still gets the tour. */
         const val KEY_TOUR_SEEN = "companion_tour_seen"
+        /** Theme Studio's unsaved draft, autosaved while it's open. Not backed up. */
+        const val KEY_STUDIO_DRAFT = "studio_draft"
     }
 }

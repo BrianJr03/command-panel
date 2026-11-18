@@ -85,6 +85,8 @@ enum class GamepadButton(@StringRes val letterRes: Int) {
     Y(R.string.gamepad_button_y),
     SELECT(R.string.gamepad_button_select),
     START(R.string.gamepad_button_start),
+    L3(R.string.gamepad_button_l3),
+    R3(R.string.gamepad_button_r3),
 }
 
 /** A round gamepad-button badge ("A", "B", "Y", "−", "+") in [color], drawn before a control's label. */

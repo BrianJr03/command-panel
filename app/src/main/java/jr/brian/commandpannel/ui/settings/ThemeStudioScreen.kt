@@ -49,6 +49,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.foundation.shape.RoundedCornerShape
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import jr.brian.commandpannel.ui.overlay.arrange.LocalPreviewHighlight
@@ -123,13 +126,40 @@ internal fun ThemeStudioScreen(
     // Select (−) jumps to the save button, Start (+) to Save and apply; A then presses it.
     val saveFocus = remember { FocusRequester() }
     val applyFocus = remember { FocusRequester() }
-    // The version last saved (or opened): Back only asks to discard when the draft differs from it.
-    var lastSaved by remember(initial.id) { mutableStateOf(initial) }
+    // The version last saved (or opened): Back only asks to discard when the draft differs from it. A resumed draft
+    // starts out unsaved: its baseline is the saved look (or, for one never saved, nothing).
+    var lastSaved by remember(initial.id) {
+        mutableStateOf(
+            if (state.studioResumed) state.customLooks.firstOrNull { it.id == initial.id } ?: initial.resetAll().copy(name = "")
+            else initial,
+        )
+    }
+    // Undo / redo over every edit (quick runs of changes count as one step).
+    val history = remember(initial.id) { StudioHistory<CustomLook>() }
+    var historyTick by remember { mutableIntStateOf(0) }
+    fun edit(next: CustomLook) {
+        if (next == draft) return
+        history.record(draft, android.os.SystemClock.uptimeMillis())
+        draft = next
+        historyTick++
+    }
+    fun undo() { history.undo(draft)?.let { draft = it; historyTick++ } }
+    fun redo() { history.redo(draft)?.let { draft = it; historyTick++ } }
     var confirmDiscard by remember { mutableStateOf(false) }
     val dirty = draft != lastSaved
     val requestClose: () -> Unit = { if (draft != lastSaved) confirmDiscard = true else onClose() }
     LaunchedEffect(draft) { StudioDraft.look.value = draft }
-    DisposableEffect(Unit) { onDispose { StudioDraft.look.value = null } }
+    // Unsaved work is kept (half a second after the last change) in case the app closes; any normal exit forgets it.
+    LaunchedEffect(draft, lastSaved) {
+        kotlinx.coroutines.delay(500)
+        vm.persistStudioDraft(if (draft != lastSaved) draft else null)
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            StudioDraft.look.value = null
+            vm.persistStudioDraft(null)
+        }
+    }
     // The NavHost's own back handling can run first, so B / Back keys are caught in the key handler below, and this
     // (for the back gesture) is only enabled while there's something to lose: enabled after the NavHost's, it wins.
     BackHandler(enabled = dirty) { confirmDiscard = true }
@@ -147,6 +177,9 @@ internal fun ThemeStudioScreen(
         Modifier.background(p.bg)
     }
     val savedMsg = stringResource(R.string.theme_saved)
+    // The Thor's LED color, offered as an accent pick (read once; it's the system setting the LED picker writes).
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val ledColor = remember { jr.brian.commandpannel.privileged.ThorRgbController.accentOverride(context, syncEnabled = true) }
     PaddedBringIntoView {
     Column(
         Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
@@ -162,6 +195,8 @@ internal fun ThemeStudioScreen(
                     Key.ButtonR1 -> { { preview = kinds[(preview.ordinal + 1) % kinds.size]; previewPinned = true } }
                     Key.ButtonL2 -> { { category = cats[Math.floorMod(category.ordinal - 1, cats.size)] } }
                     Key.ButtonR2 -> { { category = cats[(category.ordinal + 1) % cats.size] } }
+                    Key.ButtonThumbLeft -> { { undo() } }
+                    Key.ButtonThumbRight -> { { redo() } }
                     Key.ButtonSelect -> { { runCatching { saveFocus.requestFocus() } } }
                     Key.ButtonStart -> { { runCatching { applyFocus.requestFocus() } } }
                     else -> null
@@ -179,9 +214,14 @@ internal fun ThemeStudioScreen(
         // ---- top bar: back, name, save actions ----
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Chip(stringResource(R.string.theme_back), onClick = requestClose)
+            // Read through the tick, so these update with the history.
+            val canUndo = historyTick.let { history.canUndo }
+            val canRedo = historyTick.let { history.canRedo }
+            Chip(stringResource(R.string.theme_undo), enabled = canUndo, glyph = GamepadButton.L3, focusableWhenDisabled = true) { undo() }
+            Chip(stringResource(R.string.theme_redo), enabled = canRedo, glyph = GamepadButton.R3, focusableWhenDisabled = true) { redo() }
             GamepadTextField(
                 value = draft.name,
-                onValueChange = { draft = draft.copy(name = it.take(40)) },
+                onValueChange = { edit(draft.copy(name = it.take(40))) },
                 textStyle = tccDisplayTextStyle().merge(TextStyle(color = p.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)),
                 modifier = Modifier.weight(1f),
                 verticalPadding = 8.dp,
@@ -246,14 +286,14 @@ internal fun ThemeStudioScreen(
                     }
                 }
                 val base = draft.baseSpec()
-                val update: (CustomLook) -> Unit = { draft = it }
+                val update: (CustomLook) -> Unit = { edit(it) }
                 CompositionLocalProvider(LocalStudioPartFocus provides onFocusPart) {
                 when (category) {
                     StudioCategory.PARTS -> PartsControls(draft, update)
                     StudioCategory.CUSTOM -> CustomPartControls(draft, update)
                     StudioCategory.FONTS -> FontControls(draft, state, vm, onMessage = { message = it }, onChange = update)
                     StudioCategory.SHAPES -> ShapeControls(draft, update)
-                    StudioCategory.COLORS -> ColorControls(draft, update)
+                    StudioCategory.COLORS -> ColorControls(draft, ledColor, update)
                     StudioCategory.TEXT -> TextControls(draft, base, update)
                     StudioCategory.EFFECTS -> EffectControls(draft, base, update)
                     StudioCategory.FIT -> FitControls(draft, base, update)
@@ -262,7 +302,7 @@ internal fun ThemeStudioScreen(
                 // Parts has its own reset (and Reset everything) in its card.
                 if (category != StudioCategory.PARTS && category in changed) {
                     Chip(stringResource(R.string.theme_reset_category, stringResource(category.titleRes))) {
-                        draft = draft.resetCategory(category)
+                        edit(draft.resetCategory(category))
                     }
                 }
             }
@@ -416,10 +456,42 @@ private fun <T> PartRow(part: Part<T>, traits: LookTraits, draft: CustomLook, on
             Text(lookLabelText(part.titleRes), color = p.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
             if (part.isSet(draft)) InfoLine(stringResource(R.string.theme_changed), p.accent)
         }
+        // Each option shows a tiny sample of the part in that style (in this look's colors), where one reads at chip size.
+        val palette = remember(draft.colors) { resolveLookPalette(4, nightActive = true, accentOverride = null, pinned = draft.colors) }
         ChipRow {
             // Presets (and extras) alphabetically, then Custom last.
             (sortedByLabel(part.presets + part.extras) + listOfNotNull(part.custom)).forEach { (value, labelRes) ->
-                OptionChip(stringResource(labelRes), current == value) { onChange(part.set(draft, value)) }
+                val sample: (@Composable () -> Unit)? = part.studio?.takeIf { it in SAMPLED_PARTS }?.let { kind ->
+                    { PartSample(kind, remember(draft, value) { part.set(draft, value).toSpec() }, palette) }
+                }
+                OptionChip(stringResource(labelRes), current == value, leading = sample) { onChange(part.set(draft, value)) }
+            }
+        }
+    }
+}
+
+/** The parts whose option chips carry a sample (sliders and headers don't read at chip size). */
+private val SAMPLED_PARTS = setOf(StudioPart.CARDS, StudioPart.TILES, StudioPart.GAUGES, StudioPart.NAV, StudioPart.BACKDROP)
+
+/** A chip-sized sample of [part] drawn with [spec] (the look with that option applied) in [colors]. */
+@Composable
+private fun PartSample(part: StudioPart, spec: jr.brian.commandpannel.ui.theme.TccLookSpec, colors: jr.brian.commandpannel.ui.theme.TccColors) {
+    jr.brian.commandpannel.ui.theme.TccTheme(colors) {
+        CompositionLocalProvider(LocalTccLookSpec provides spec) {
+            when (part) {
+                StudioPart.CARDS -> jr.brian.commandpannel.ui.components.TccCard(Modifier.size(34.dp, 22.dp)) {}
+                StudioPart.TILES -> jr.brian.commandpannel.ui.components.TccIconButton(
+                    "ic_qs_vibrate", "", circleSize = 24.dp, active = true, showLabel = false,
+                )
+                StudioPart.GAUGES -> jr.brian.commandpannel.ui.components.RingGauge(0.65f, colors.accent, "", "", "", Modifier.size(26.dp))
+                StudioPart.NAV -> jr.brian.commandpannel.ui.components.TccIconButton(
+                    "ic_system_set", "", circleSize = 24.dp, active = true, showLabel = false,
+                    variant = jr.brian.commandpannel.ui.components.TccTileVariant.NAV_BAR,
+                )
+                StudioPart.BACKDROP -> Box(
+                    Modifier.size(34.dp, 22.dp).clip(RoundedCornerShape(5.dp)).tccLookBackdrop(spec, colors, tccLookColors()),
+                )
+                else -> Unit
             }
         }
     }
@@ -490,7 +562,14 @@ private fun FontRow(@StringRes titleRes: Int, current: FontRef?, state: Settings
  * current choice stays readable while the D-pad moves across a row.
  */
 @Composable
-internal fun OptionChip(text: String, selected: Boolean, marked: Boolean = false, onClick: () -> Unit) {
+internal fun OptionChip(
+    text: String,
+    selected: Boolean,
+    marked: Boolean = false,
+    /** Drawn before the label (Parts options show a sample of the style). */
+    leading: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val f = focusState()
     // Inside a ChipRow, the picked option is where D-pad entry lands and what the row first scrolls to.
     val row = LocalChipRowSelection.current
@@ -512,6 +591,7 @@ internal fun OptionChip(text: String, selected: Boolean, marked: Boolean = false
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            leading?.invoke()
             Text(
                 text, color = if (selected) p.onAccent else if (f.value) p.textPrimary else p.textSecondary,
                 fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, style = tccTextStyle(),

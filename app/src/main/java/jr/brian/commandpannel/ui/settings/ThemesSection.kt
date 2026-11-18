@@ -89,6 +89,18 @@ internal fun Themes(
             }
         }
     }
+    // Studio work that didn't get saved (the app closed mid-edit): pick it back up or let it go.
+    state.unsavedDraft?.takeIf { state.studioDraft == null }?.let { unsaved ->
+        Card {
+            CardTitle(stringResource(R.string.theme_unsaved_title, unsaved.name))
+            CardDesc(stringResource(R.string.theme_unsaved_desc))
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AccentButton(stringResource(R.string.theme_unsaved_resume)) { onOpenStudio(unsaved) }
+                Chip(stringResource(R.string.theme_unsaved_discard)) { vm.persistStudioDraft(null) }
+            }
+        }
+    }
     FocusCard(onActivate = { onOpenStudio(newCustomLook(newName, TccUiLook.AUTO)) }, modifier = Modifier.tourTarget(TourSpot.MIX)) {
         CardTitle(stringResource(R.string.theme_mix))
         CardDesc(stringResource(R.string.theme_mix_desc))

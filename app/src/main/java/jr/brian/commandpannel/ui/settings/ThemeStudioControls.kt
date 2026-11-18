@@ -27,6 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.compositeOver
 import jr.brian.commandpannel.ui.theme.contrastRatio
 import jr.brian.commandpannel.ui.theme.resolveLookPalette
@@ -163,7 +170,7 @@ private val COLOR_ROLES = listOf(
 )
 
 @Composable
-internal fun ColorControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
+internal fun ColorControls(draft: CustomLook, ledColor: Int?, onChange: (CustomLook) -> Unit) {
     Card {
         CardDesc(stringResource(R.string.theme_colors_desc))
         // A pick that makes text or the accent hard to see on the panel gets a gentle warning.
@@ -181,9 +188,33 @@ internal fun ColorControls(draft: CustomLook, onChange: (CustomLook) -> Unit) {
                 role.swatches.forEach { color ->
                     Swatch(color, current == color) { onChange(draft.copy(colors = role.set(draft.colors, color))) }
                 }
+                // The accents can also take the Thor's LED color.
+                if (ledColor != null && role.swatches === ACCENT_SWATCHES) {
+                    Chip(stringResource(R.string.theme_color_led)) { onChange(draft.copy(colors = role.set(draft.colors, Color(ledColor)))) }
+                }
             }
+            if (current != null) ColorTuning(current) { onChange(draft.copy(colors = role.set(draft.colors, it))) }
         }
     }
+}
+
+/** Fine-tunes a picked color: hue, saturation and brightness steppers, and an exact hex value. */
+@Composable
+private fun ColorTuning(color: Color, onChange: (Color) -> Unit) {
+    val hsv = argbToHsv(color.toArgb())
+    Stepper(R.string.theme_color_hue, hsv.h, 0f, 350f, 10f, ValueUnit.DEGREES) { onChange(Color(hsvToArgb(hsv.copy(h = it)))) }
+    Stepper(R.string.theme_color_saturation, hsv.s, 0f, 1f, 0.05f, ValueUnit.PERCENT) { onChange(Color(hsvToArgb(hsv.copy(s = it)))) }
+    Stepper(R.string.theme_color_brightness, hsv.v, 0f, 1f, 0.05f, ValueUnit.PERCENT) { onChange(Color(hsvToArgb(hsv.copy(v = it)))) }
+    ControlLabel(R.string.theme_color_hex)
+    // Applied as soon as it's six hex digits; re-synced when the color changes another way.
+    var hex by remember(color) { mutableStateOf(formatHexColor(color.toArgb())) }
+    GamepadTextField(
+        value = hex,
+        onValueChange = { text -> hex = text.take(7); parseHexColor(hex)?.let { onChange(Color(it)) } },
+        textStyle = TextStyle(color = p.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+        modifier = Modifier.width(180.dp),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+    )
 }
 
 @Composable
@@ -399,7 +430,8 @@ private fun OverridableStepper(
 }
 
 internal enum class ValueUnit(@StringRes val res: Int) {
-    DP(R.string.theme_value_dp), SP(R.string.theme_value_sp), EM(R.string.theme_value_em), PERCENT(R.string.theme_value_percent);
+    DP(R.string.theme_value_dp), SP(R.string.theme_value_sp), EM(R.string.theme_value_em), PERCENT(R.string.theme_value_percent),
+    DEGREES(R.string.theme_value_degrees);
 
     @Composable
     fun format(v: Float): String = stringResource(
@@ -409,6 +441,7 @@ internal enum class ValueUnit(@StringRes val res: Int) {
             SP -> "%.1f".format(v)
             EM -> "%.2f".format(v)
             PERCENT -> (v * 100).roundToInt().toString()
+            DEGREES -> v.roundToInt().toString()
         },
     )
 }
