@@ -127,23 +127,16 @@ internal fun OverlayLookScope(state: SettingsState, content: @Composable () -> U
  */
 @Composable
 fun CompanionTheme(state: SettingsState, content: @Composable () -> Unit) {
-    if (!state.companionFollowLook) {
-        CompositionLocalProvider(
-            LocalTccLookSpec provides StockLookSpec,
-            LocalCompanionPalette provides CompanionPalette.Default,
-            LocalCompanionThemed provides false,
-            content = content,
-        )
-        return
-    }
-    val (colors, spec) = rememberOverlayLook(state)
-    TccTheme(colors) {
-        val palette = remember(colors) { companionPaletteFrom(colors) }
-        CompositionLocalProvider(
-            LocalTccLookSpec provides spec,
-            LocalCompanionPalette provides palette,
-            LocalCompanionThemed provides true,
-            content = content,
-        )
-    }
+    // One call site for [content] either way: toggling Follow look only changes what's provided. Two branches would make
+    // Compose rebuild the whole companion (its NavHost included), dropping the user back on General.
+    val followed = if (state.companionFollowLook) rememberOverlayLook(state) else null
+    val colors = followed?.first
+    val palette = remember(colors) { colors?.let(::companionPaletteFrom) ?: CompanionPalette.Default }
+    CompositionLocalProvider(
+        jr.brian.commandpannel.ui.theme.LocalTccColors provides (colors ?: jr.brian.commandpannel.ui.theme.LocalTccColors.current),
+        LocalTccLookSpec provides (followed?.second ?: StockLookSpec),
+        LocalCompanionPalette provides palette,
+        LocalCompanionThemed provides (followed != null),
+        content = content,
+    )
 }
