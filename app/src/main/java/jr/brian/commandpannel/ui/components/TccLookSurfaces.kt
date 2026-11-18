@@ -72,13 +72,18 @@ class ChamferShape(private val cut: Dp) : Shape {
 
 /**
  * Superellipse ("squircle") outline with continuous curvature (Aurora Glass tiles).
- * [radiusFraction] is the corner extent relative to the shorter side (`0.5f` ≈ full squircle).
+ * [radiusFraction] is the corner extent relative to the shorter side (`0.5f` ≈ full squircle); [maxRadius], when set,
+ * caps it so the corners stop growing on large surfaces.
  */
-class SquircleShape(private val radiusFraction: Float = 0.30f) : Shape {
+class SquircleShape(private val radiusFraction: Float = 0.30f, private val maxRadius: Dp = Dp.Unspecified) : Shape {
+    /** The same squircle with its corners resolved as if the shorter side were at most [shortSide]. */
+    fun capped(shortSide: Dp): SquircleShape = SquircleShape(radiusFraction, shortSide * radiusFraction.coerceIn(0f, 0.5f))
+
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val w = size.width
         val h = size.height
-        val r = (min(w, h) * radiusFraction.coerceIn(0f, 0.5f))
+        val cap = if (maxRadius == Dp.Unspecified) Float.MAX_VALUE else with(density) { maxRadius.toPx() }
+        val r = (min(w, h) * radiusFraction.coerceIn(0f, 0.5f)).coerceAtMost(cap)
         if (r < 1f) return Outline.Rectangle(Rect(0f, 0f, w, h))
         val path = Path()
         val steps = 12

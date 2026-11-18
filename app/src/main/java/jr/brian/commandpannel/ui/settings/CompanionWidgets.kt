@@ -10,7 +10,6 @@ import jr.brian.commandpannel.ui.components.tccCard
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
-import jr.brian.commandpannel.ui.theme.StockLookSpec
 import jr.brian.commandpannel.ui.theme.lookLabel
 import jr.brian.commandpannel.ui.theme.tccDisplayTextStyle
 import jr.brian.commandpannel.ui.theme.tccLookColors
@@ -80,6 +79,14 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import kotlin.math.abs
+import jr.brian.commandpannel.ui.components.SquircleShape
+import kotlin.math.min
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -178,15 +185,36 @@ internal fun controlShape(default: Dp): Shape =
     if (LocalCompanionThemed.current) LocalTccLookSpec.current.slider.controlShape else RoundedCornerShape(default)
 
 /**
- * The stock look's panel shape is a percentage radius (`RoundedCornerShape(16)`), sized for the overlay's small cards.
- * On a tall companion card that becomes a huge corner that clips the first and last rows, so stock (and custom looks
- * that keep its shape) use a fixed radius here instead, like the overlay's `TccCard`.
+ * The active look's card shape for companion cards. Looks size their card shapes for the overlay's small cards, and a
+ * percentage radius (stock's `RoundedCornerShape(16)`, pill) or a squircle grows with the card, so on a tall companion
+ * card the corners would clip its first and last rows. Corners are resolved as if the card's shorter side were at
+ * most [CARD_CORNER_REFERENCE], so every look keeps overlay-sized corners; fixed-dp and chamfer corners are unchanged.
  */
 @Composable
 internal fun cardShape(): Shape {
     if (!LocalCompanionThemed.current) return RoundedCornerShape(18.dp)
-    val spec = LocalTccLookSpec.current
-    return if (spec.panelCardShape == StockLookSpec.panelCardShape) RoundedCornerShape(18.dp) else spec.panelCardShape
+    val shape = LocalTccLookSpec.current.panelCardShape
+    return remember(shape) {
+        when (shape) {
+            is CornerBasedShape -> CappedCornerShape(shape, CARD_CORNER_REFERENCE)
+            is SquircleShape -> shape.capped(CARD_CORNER_REFERENCE)
+            else -> shape
+        }
+    }
+}
+
+/** Short side, roughly an overlay card's, that companion card corners are resolved against. */
+private val CARD_CORNER_REFERENCE = 120.dp
+
+/** [base] with each corner resolved as if the shape were at most [reference] on each side (see [cardShape]). */
+private class CappedCornerShape(private val base: CornerBasedShape, private val reference: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val refPx = with(density) { reference.toPx() }
+        val ref = Size(min(size.width, refPx), min(size.height, refPx))
+        fun fixed(corner: CornerSize) = CornerSize(corner.toPx(ref, density))
+        return base.copy(fixed(base.topStart), fixed(base.topEnd), fixed(base.bottomEnd), fixed(base.bottomStart))
+            .createOutline(size, layoutDirection, density)
+    }
 }
 
 /** Scale-on-focus animation; snaps for looks that opt out of motion (E-Ink). */
