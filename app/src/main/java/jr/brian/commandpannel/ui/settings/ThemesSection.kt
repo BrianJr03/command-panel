@@ -146,6 +146,31 @@ internal fun Themes(
     }
 }
 
+/**
+ * Looks synced from GitHub repos, grouped under each repo's card (link, last sync, Update / Remove), with Sync repos
+ * above them. Looks whose repo is no longer followed are grouped under the repo id.
+ */
+@Composable
+internal fun RepoPacks(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
+    val bySource = state.customLooks.filter { it.source != null }.groupBy { it.source!! }
+    val ids = state.themeSources.map { it.id } + (bySource.keys - state.themeSources.map { it.id }.toSet())
+    if (ids.isEmpty()) return
+    SectionHeader(stringResource(R.string.theme_repos))
+    if (state.themeSources.isNotEmpty()) {
+        Card {
+            Chip(stringResource(R.string.theme_repos_sync_all), enabled = !state.themeBusy) { vm.syncAllSources() }
+            state.repoMessage?.let { InfoLine(it) }
+        }
+    }
+    ids.forEach { id ->
+        val source = state.themeSources.firstOrNull { it.id == id }
+        if (source != null) SourceCard(source, state, vm) else Card { CardTitle(id) }
+        bySource[id].orEmpty().forEach { look ->
+            SavedLookCard(look, state, vm, onOpenStudio) { vm.exportLooks(listOf(look), look.name) }
+        }
+    }
+}
+
 /** More saved looks than this collapse into [SavedLooksDeck]. */
 private const val DECK_THRESHOLD = 3
 
@@ -167,13 +192,18 @@ internal fun MyLooksHeaderCard(state: SettingsState, vm: SettingsViewModel, modi
     }
 }
 
-/** Every saved look as its own card, or the empty-state card. */
+/** [looks] (default: every saved look) as their own cards, or the empty-state card. */
 @Composable
-internal fun SavedLooksList(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (CustomLook) -> Unit) {
-    if (state.customLooks.isEmpty()) {
+internal fun SavedLooksList(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    onOpenStudio: (CustomLook) -> Unit,
+    looks: List<CustomLook> = state.customLooks,
+) {
+    if (looks.isEmpty()) {
         Card(Modifier.tourTarget(TourSpot.MY_LOOKS)) { CardDesc(stringResource(R.string.theme_my_looks_empty)) }
     }
-    state.customLooks.forEach { look ->
+    looks.forEach { look ->
         SavedLookCard(look, state, vm, onOpenStudio) { vm.exportLooks(listOf(look), look.name) }
     }
 }
@@ -343,7 +373,7 @@ internal fun FolderPackCard(fp: FolderPack, state: SettingsState, vm: SettingsVi
 
 /** A followed theme repo: its link, last sync, and update / remove. */
 @Composable
-private fun SourceCard(source: ThemeSource, state: SettingsState, vm: SettingsViewModel) {
+internal fun SourceCard(source: ThemeSource, state: SettingsState, vm: SettingsViewModel) {
     var confirmRemove by remember(source.id) { mutableStateOf(false) }
     val count = state.customLooks.count { it.source == source.id }
     Card {

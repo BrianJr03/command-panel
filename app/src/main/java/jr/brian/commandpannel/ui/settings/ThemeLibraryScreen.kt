@@ -139,11 +139,14 @@ internal fun ThemeLibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     when (tabs[page]) {
+                        // Local is what the user made or imported on the device; anything synced from a repo is a pack.
                         ThemeLibraryTab.LOCAL -> {
                             MyLooksHeaderCard(state, vm)
-                            SavedLooksList(state, vm, onOpenStudio)
+                            SavedLooksList(state, vm, onOpenStudio, looks = state.customLooks.filter { it.source == null })
                         }
                         ThemeLibraryTab.PACKS -> {
+                            RepoPacks(state, vm, onOpenStudio)
+                            SectionHeader(stringResource(R.string.theme_packs))
                             PacksHeaderCard(state, vm)
                             state.folderPacks.forEach { fp -> FolderPackCard(fp, state, vm, onOpenStudio) }
                         }
