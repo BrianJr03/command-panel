@@ -58,8 +58,9 @@ fun OverlayRoot(
         val spec = jr.brian.commandpannel.ui.theme.LocalTccLookSpec.current
         val lookColors = jr.brian.commandpannel.ui.theme.tccLookColors()
         val arrange = rememberArrangeController(state.layout) { actions.setOverlayLayout(it) }
-        // Open on the last-used tab and persist changes, so a reopen lands where the user left off.
-        var tab by remember { mutableStateOf(state.navTab) }
+        // Open on the last-used tab and persist changes, so a reopen lands where the user left off. Keyed on navTab so a
+        // caller that picks the tab (Theme Studio's preview) switches it.
+        var tab by remember(state.navTab) { mutableStateOf(state.navTab) }
         val selectTab: (OverlayTab) -> Unit = { tab = it; actions.setNavTab(it) }
         var dialog by remember { mutableStateOf(OverlayDialogKind.NONE) }
         var showBottomTip by remember { mutableStateOf(false) }
