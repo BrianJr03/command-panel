@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/fe6379b3-bcc7-4a41-be42-1eb2219ed595
 Thor Command Panel stands on the shoulders of two projects:
 
 - **AYN's stock Dual-Screen Assistant** (`com.odin.dualscreen.assistant`) — the built-in app this replaces. Thor Command Panel rebuilds its layout, behavior and hardware integration so it feels native on the Thor.
-- **[Better Dual Screen Assistant](https://github.com/stormpanda) by stormpanda** — the source-available project that first showed how a normal app can stand in for the system assistant on this hardware. Everything shipped here is either my own work or re-derived from AYN's stock app. See [Upstream & licensing](#upstream--licensing) at the bottom.
+- **[Better Dual Screen Assistant]([https://github.com/stormpanda](https://github.com/stormpanda/better-dual-screen-assistant)) by stormpanda** — the source-available project that first showed how a normal app can stand in for the system assistant on this hardware. Everything shipped here is either my own work or re-derived from AYN's stock app. See [Upstream & licensing](#upstream--licensing) at the bottom.
 
 ---
 
