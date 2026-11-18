@@ -104,8 +104,6 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 
 **Coming from Better Dual Screen Assistant?** You can keep it installed. Both apps answer the same AYN button and drive the same screens, so Command Panel detects BDSA and **stands by** while BDSA's *Replace stock assistant* is on: it ignores the button, leaves the stock assistant and screens alone, and its companion shows a banner. To switch, turn that option off in BDSA, or press **Disable BDSA** in the banner (re-enable it later from the note in Command Panel's General section). Command Panel takes over automatically, and goes back to standby if BDSA takes control again.
 
-> ⚠️ Personal, non-commercial project for my own device. No warranty — use at your own risk.
-
 ---
 
 ## Build
