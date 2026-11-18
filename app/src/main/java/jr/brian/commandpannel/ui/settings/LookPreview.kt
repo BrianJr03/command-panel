@@ -1,6 +1,5 @@
 package jr.brian.commandpannel.ui.settings
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -55,7 +54,7 @@ internal fun ScaledPreview(
     width: Dp,
     design: DpSize = OverlayScreenSize,
     modifier: Modifier = Modifier,
-    /** Space between the frame and the miniature, so the overlay's edges don't touch the border. */
+    /** Space around the miniature inside the preview's clipped frame. */
     padding: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
@@ -65,7 +64,6 @@ internal fun ScaledPreview(
         modifier
             .size(width, design.height * scale + padding * 2)
             .clip(cardShape())
-            .border(1.dp, p.border, cardShape())
             // The miniature overlay has focusable controls of its own. Fencing it in a group that can't be entered
             // keeps D-pad focus from landing on (invisible) controls inside a preview.
             .focusProperties { onEnter = { cancelFocusChange() } }

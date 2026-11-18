@@ -58,7 +58,7 @@ internal fun Themes(state: SettingsState, vm: SettingsViewModel, onOpenStudio: (
     val newName = stringResource(R.string.theme_new_look_name, state.customLooks.size + 1)
     Card {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OverlayLookPreview(state, state.overlayLook, state.overlayCustomLook, width = 250.dp)
+            OverlayLookPreview(state, state.overlayLook, state.overlayCustomLook, width = 250.dp, padding = LOOK_PREVIEW_PADDING)
             Spacer(Modifier.width(18.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(lookLabel(stringResource(R.string.theme_active)).uppercase(), color = p.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -182,7 +182,7 @@ private fun SavedLookCard(
     }
 }
 
-/** Breathing room between a look's preview frame and the miniature overlay inside it. */
+/** Breathing room around the miniature overlay inside a look's preview. */
 private val LOOK_PREVIEW_PADDING = 6.dp
 
 private val LOOK_MIME_TYPES = arrayOf("application/json", "text/plain", "application/octet-stream")
