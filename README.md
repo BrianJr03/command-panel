@@ -1,13 +1,13 @@
-https://github.com/user-attachments/assets/fe6379b3-bcc7-4a41-be42-1eb2219ed595
-
 <div align="center">
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Thor Command Panel (TCP)</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
   <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick-setting tiles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
-  <a href="assets/video/command-panel-reveal.mp4"><img src="assets/video/reveal-poster.jpg" width="720" alt="Watch the 60-second Command Panel reveal" /></a>
-  <p><sub>▶ <a href="assets/video/command-panel-reveal.mp4">Watch the 60-second reveal</a> · Music: “Careless Way” by Pecan Pie on <a href="https://uppbeat.io/c/pecan-pie">Uppbeat</a></sub></p>
 </div>
+
+https://github.com/user-attachments/assets/fe6379b3-bcc7-4a41-be42-1eb2219ed595
+
+<p align="center"><sub>Music: “Careless Way” by Pecan Pie on <a href="https://uppbeat.io/c/pecan-pie">Uppbeat</a></sub></p>
 
 ---
 
