@@ -450,7 +450,8 @@ class SettingsRepository(
     }
 
     override fun quickLaunch() {
-        QuickLaunch.launch(context)
+        // Out of the way once the app is opening, like Task and the stock panel's own launches.
+        if (QuickLaunch.launch(context)) onHideOverlay()
     }
 
     override fun openRecents() {
