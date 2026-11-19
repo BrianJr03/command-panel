@@ -73,6 +73,7 @@ import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.WebAsset
 import androidx.compose.material3.Icon
@@ -130,6 +131,7 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
     QUICK_TOGGLES(SettingsCategory.QUICK_TOGGLES, Icons.Rounded.ViewAgenda, R.string.settings_cat_quick_toggles_desc),
     APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, R.string.settings_cat_appearance_desc),
     THEMES(SettingsCategory.THEMES, Icons.Rounded.Brush, R.string.settings_cat_themes_desc),
+    REPLAY(SettingsCategory.REPLAY, Icons.Rounded.Videocam, R.string.settings_cat_replay_desc),
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, R.string.settings_cat_diagnostics_desc),
 }
 
@@ -233,7 +235,7 @@ internal fun SettingsContent(
     ) {
     CompositionLocalProvider(LocalTourTargets provides if (touring || followingLook) tourTargets else null) {
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
-        NavRail(nav, railRequesters) { nav = it }
+        NavRail(nav, state.railOrder, railRequesters, onReorder = vm::reorderRail) { nav = it }
         PaddedBringIntoView {
         // Marks the pane's controls, so the one you leave is remembered for D-pad Right from the rail.
         CompositionLocalProvider(LocalInContentPane provides true) {
@@ -267,6 +269,7 @@ internal fun SettingsContent(
                     returnToDeck = true
                     openThemes(ThemeLibraryTab.LOCAL)
                 }
+                SettingsCategory.REPLAY -> ReplayBufferCard(state, vm)
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
             }
         }
@@ -348,11 +351,25 @@ private fun TourDriver(
 }
 
 @Composable
-private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>, onSelect: (NavItem) -> Unit) {
+private fun NavRail(
+    selected: NavItem,
+    order: List<SettingsCategory>,
+    requesters: Map<NavItem, FocusRequester>,
+    onReorder: (List<String>) -> Unit,
+    onSelect: (NavItem) -> Unit,
+) {
     val focusedBounds = LocalFocusedBounds.current
     LaunchedEffect(Unit) { runCatching { requesters.getValue(selected).requestFocus() } }
     val themed = LocalCompanionThemed.current
     val navShape = controlShape(13.dp)
+    // Scrolls when the sections don't all fit; its bounds drive edge auto-scroll while a section is dragged.
+    val railScroll = rememberScrollState()
+    val railBounds = remember { mutableStateOf(Rect.Zero) }
+    val scope = rememberCoroutineScope()
+    val keys = order.map { it.key }
+    val reorder = remember(railScroll) { ReorderListState(keys, scope, railScroll) { railBounds.value } }
+    reorder.onCommit = onReorder
+    LaunchedEffect(keys) { reorder.sync(keys) }
     Column(
         // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
         modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
@@ -365,8 +382,10 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
             .onKeyEvent { e ->
                 e.key == Key.DirectionRight && e.type == KeyEventType.KeyDown && focusedBounds?.returnToPane() == true
             }
+            .onGloballyPositioned { railBounds.value = it.boundsInRoot() }
+            .verticalScroll(railScroll)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(RAIL_ITEM_SPACING),
     ) {
         Row(Modifier.padding(start = 6.dp, top = 8.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIconBadge(if (themed) LocalTccLookSpec.current.tile.buttonShape else RoundedCornerShape(11.dp))
@@ -377,40 +396,116 @@ private fun NavRail(selected: NavItem, requesters: Map<NavItem, FocusRequester>,
                 Text(lookLabel(stringResource(R.string.navigation_system_set_text)), color = p.textTertiary, fontSize = 11.sp, style = tccTextStyle())
             }
         }
-        NavItem.entries.forEach { item ->
-            val on = item == selected
-            val f = focusState()
-            val scale by focusScale(f.value, 1.04f, "navScale")
-            val bg by focusColor(
-                when { f.value -> p.surfaceHigh; on -> p.accentSoft; else -> Color.Transparent },
-                "navBg",
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .tourTarget(TourSpot.railItem(item.category))
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .clip(navShape).background(bg)
-                    .then(if (f.value) Modifier.border(1.5.dp, p.accent, navShape) else Modifier)
-                    .focusRequester(requesters.getValue(item))
-                    .onFocusChanged { if (it.isFocused) onSelect(item) }
-                    .focusControl(f) { onSelect(item) }
-                    .noRippleClickable { onSelect(item) }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(item.icon, null, tint = if (on || f.value) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(13.dp))
-                Text(
-                    lookLabel(stringResource(item.category.titleRes)),
-                    color = if (on || f.value) p.textPrimary else p.textSecondary,
-                    fontSize = 15.sp,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    style = tccTextStyle(),
-                )
-            }
+        reorder.items.forEach { k ->
+            val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
+            key(k) { RailItem(item, item == selected, requesters.getValue(item), reorder, navShape, onSelect) }
         }
     }
 }
+
+/**
+ * One rail section. Focus selects it; A picks it up, the D-pad moves it, and A (or B) drops it, like Button Order.
+ * Touch: tap selects, and dragging the trailing handle moves it.
+ */
+@Composable
+private fun RailItem(
+    item: NavItem,
+    on: Boolean,
+    requester: FocusRequester,
+    reorder: ReorderListState,
+    shape: Shape,
+    onSelect: (NavItem) -> Unit,
+) {
+    val key = item.category.key
+    val f = focusState()
+    val lifted = reorder.isLifted(key)
+    val grabbed = reorder.grabbed == key
+    val scale by focusScale(f.value || lifted, if (lifted) 1.06f else 1.04f, "navScale")
+    val bg by focusColor(
+        when { f.value || lifted -> p.surfaceHigh; on -> p.accentSoft; else -> Color.Transparent },
+        "navBg",
+    )
+    val spacingPx = with(LocalDensity.current) { RAIL_ITEM_SPACING.toPx() }
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val bring = remember { BringIntoViewRequester() }
+    val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    // Losing focus while picked up (e.g. a tap elsewhere) drops the section where it is.
+    LaunchedEffect(f.value) { if (!f.value && reorder.grabbed == key) reorder.drop() }
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .tourTarget(TourSpot.railItem(item.category))
+            .onSizeChanged { reorder.slotPx = it.height + spacingPx }
+            .zIndex(if (lifted) 1f else 0f)
+            .graphicsLayer {
+                translationY = reorder.translationOf(key)
+                scaleX = scale; scaleY = scale
+                shadowElevation = if (lifted) 10.dp.toPx() else 0f
+                this.shape = shape
+            }
+            .bringIntoViewRequester(bring)
+            .clip(shape).background(bg)
+            .then(
+                when {
+                    grabbed -> Modifier.border(2.dp, p.accent, shape)
+                    f.value -> Modifier.border(1.5.dp, p.accent, shape)
+                    else -> Modifier
+                },
+            )
+            .focusRequester(requester)
+            .onFocusChanged { if (it.isFocused) onSelect(item) }
+            .onKeyEvent { e ->
+                if (!grabbed || e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key) {
+                    Key.DirectionUp, Key.DirectionDown -> {
+                        reorder.moveGrabbed(up = e.key == Key.DirectionUp)
+                        scope.launch { bring.bringIntoView() }
+                        true
+                    }
+                    // Stays on the rail while a section is picked up.
+                    Key.DirectionLeft, Key.DirectionRight -> true
+                    Key.Back, Key.ButtonB, Key.Escape -> { reorder.drop(); true }
+                    else -> false
+                }
+            }
+            .focusControl(f) { if (grabbed) reorder.drop() else reorder.grab(key) }
+            .noRippleClickable { onSelect(item) }
+            .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(item.icon, null, tint = if (on || f.value || lifted) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(13.dp))
+        Text(
+            lookLabel(stringResource(item.category.titleRes)),
+            color = if (on || f.value || lifted) p.textPrimary else p.textSecondary,
+            fontSize = 15.sp,
+            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+            style = tccTextStyle(),
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Rounded.DragHandle,
+            contentDescription = stringResource(R.string.settings_rail_move, stringResource(item.category.titleRes)),
+            tint = if (lifted || f.value) p.accent else p.textTertiary,
+            modifier = Modifier.size(36.dp)
+                .onGloballyPositioned { handleCoords[0] = it }
+                .pointerInput(key) {
+                    detectDragGestures(
+                        onDragStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            reorder.startDrag(key, handleCoords[0]?.localToRoot(it)?.y ?: 0f)
+                        },
+                        onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
+                        onDragEnd = reorder::endDrag,
+                        onDragCancel = reorder::endDrag,
+                    )
+                }
+                .padding(6.dp),
+        )
+    }
+}
+
+private val RAIL_ITEM_SPACING = 6.dp
 
 /**
  * The launcher icon (its adaptive background + foreground layers) clipped to [shape]. The background is drawn at the
@@ -469,7 +564,6 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         state.backupMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
     UpdatesCard(state, vm)
-    ReplayBufferCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.PREVIEW)) {
         CardTitle(stringResource(R.string.settings_preview_title))
         CardDesc(stringResource(R.string.settings_preview_desc))
@@ -486,6 +580,8 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         state.replayEnabled, vm::setReplayEnabled,
         Modifier.tourTarget(TourSpot.REPLAY),
     )
+    // First after the main switch: the way to save clips from Back Button Hero.
+    SaveClipCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_options))
         Spacer(Modifier.height(6.dp))
@@ -505,7 +601,6 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
             state.replayMic, vm::setReplayMic,
         )
     }
-    SaveClipCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_capture))
         Spacer(Modifier.height(10.dp))

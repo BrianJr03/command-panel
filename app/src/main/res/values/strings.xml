@@ -137,12 +137,15 @@
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_diagnostics">Diagnostics</string>
     <string name="settings_cat_themes">Themes</string>
+    <string name="settings_cat_replay">Replay Buffer</string>
     <string name="settings_cat_general_desc">Core behavior and companion features</string>
     <string name="settings_cat_nav_bar_desc">Arrange the overlay nav bar and its Quick Launch button</string>
     <string name="settings_cat_quick_toggles_desc">Pick and order the overlay\'s quick tiles</string>
     <string name="settings_cat_appearance_desc">Theme and look of the bottom-screen overlay</string>
     <string name="settings_cat_diagnostics_desc">Check the privileged access layer</string>
     <string name="settings_cat_themes_desc">Mix, build and save your own overlay looks</string>
+    <string name="settings_cat_replay_desc">Save clips of what just happened, from the overlay, a double press or TCP SC</string>
+    <string name="settings_rail_move">Move %1$s</string>
 
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>
@@ -629,14 +632,15 @@
     <string name="tour_welcome_title">Welcome to %1$s</string>
     <string name="tour_welcome_body">This quick tour goes through each section of the companion and what it controls. Press A for the next step, B to go back, and Y to skip.</string>
     <string name="tour_rail_title">Sections</string>
-    <string name="tour_rail_body">Settings are grouped into sections here. Moving through the list switches the pane on the right, and D-pad Right jumps into that section\'s settings.</string>
-    <string name="tour_general_body">Core behavior: taking over the AYN button, status bar extras, backups, updates and the replay buffer.</string>
+    <string name="tour_rail_body">Settings are grouped into sections here. Moving through the list switches the pane on the right, and D-pad Right jumps into that section\'s settings. To rearrange them, press A on a section, move it with the D-pad and press A again, or drag its handle.</string>
+    <string name="tour_general_body">Core behavior: taking over the AYN button, status bar extras, backups and updates.</string>
     <string name="tour_replace_stock_body">Turn this on so the AYN button opens Command Panel\'s overlay instead of the built-in dual-screen assistant. Turning it off gives the button back.</string>
     <string name="tour_overlay_extras_title">Overlay extras</string>
     <string name="tour_overlay_extras_body">Fine-tune the overlay: show a battery time estimate, hide the network speed readout, and choose which apps Clear All Tasks leaves running.</string>
     <string name="tour_backup_body">Save every companion setting to a JSON file, or restore your most recent backup after a reinstall.</string>
     <string name="tour_updates_body">See which version you\'re on, check for a new release and reopen the patch notes. Command Panel downloads and installs updates itself.</string>
     <string name="tour_replay_body">Keep the last few seconds in memory, then save a clip after something happens. Capture the top screen, the bottom one, or both stacked into one video, and pick how far back it reaches and the clip quality.</string>
+    <string name="tour_replay_section_body">Everything for saving clips: the buffer itself, TCP SC for Back Button Hero, the double press, audio, and where clips go.</string>
     <string name="tour_save_clip_body">Save clips from a shortcut in another app, like Back Button Hero. This shows whether TCP SC is installed, and installs the one that matches your version of Command Panel.</string>
     <string name="tour_preview_body">Open the overlay on the bottom screen to try your changes for real.</string>
     <string name="tour_nav_bar_body">Arrange the buttons along the bottom of the overlay and set up a Quick Launch shortcut.</string>

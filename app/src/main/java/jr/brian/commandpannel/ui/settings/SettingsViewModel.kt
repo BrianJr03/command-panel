@@ -41,13 +41,35 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-enum class SettingsCategory(@StringRes val titleRes: Int) {
-    GENERAL(R.string.settings_cat_general),
-    NAV_BAR(R.string.settings_cat_nav_bar),
-    QUICK_TOGGLES(R.string.settings_cat_quick_toggles),
-    APPEARANCE(R.string.settings_cat_appearance),
-    THEMES(R.string.settings_cat_themes),
-    DIAGNOSTICS(R.string.settings_cat_diagnostics),
+/** The companion's sections, in their default rail order; [key] is what the saved order (`rail_order`) stores. */
+enum class SettingsCategory(val key: String, @StringRes val titleRes: Int) {
+    GENERAL("general", R.string.settings_cat_general),
+    NAV_BAR("nav_bar", R.string.settings_cat_nav_bar),
+    QUICK_TOGGLES("tiles", R.string.settings_cat_quick_toggles),
+    APPEARANCE("appearance", R.string.settings_cat_appearance),
+    THEMES("themes", R.string.settings_cat_themes),
+    REPLAY("replay", R.string.settings_cat_replay),
+    DIAGNOSTICS("diagnostics", R.string.settings_cat_diagnostics);
+
+    companion object {
+        fun fromKey(key: String): SettingsCategory? = entries.firstOrNull { it.key == key }
+
+        /**
+         * The rail order saved as a CSV of keys. Unknown keys and repeats are dropped; sections missing from it (new
+         * ones, or an older saved order) go in at their default position relative to the saved ones.
+         */
+        fun ordered(csv: String?): List<SettingsCategory> {
+            val saved = csv?.split(",")?.mapNotNull { fromKey(it.trim()) }?.distinct().orEmpty()
+            val out = saved.toMutableList()
+            for (cat in entries) {
+                if (cat in out) continue
+                // After the nearest section that comes before it by default (or first, if none is placed yet).
+                val prev = entries.subList(0, cat.ordinal).lastOrNull { it in out }
+                out.add(if (prev == null) 0 else out.indexOf(prev) + 1, cat)
+            }
+            return out
+        }
+    }
 }
 
 data class SettingsState(
@@ -110,6 +132,8 @@ data class SettingsState(
     val updateMessage: String? = null,
     /** When updates were last checked (ms), 0 if never. */
     val updateLastCheck: Long = 0L,
+    /** The companion rail's section order (rearranged with the move handle on each section). */
+    val railOrder: List<SettingsCategory> = SettingsCategory.entries,
     /** TCP Save Clip (the Back Button Hero trigger): installed, and paired with this build. */
     val saveClip: jr.brian.commandpannel.system.update.SaveClipStatus = jr.brian.commandpannel.system.update.SaveClipStatus.Missing,
     /** A TCP Save Clip download or install is running. */
@@ -190,6 +214,7 @@ class SettingsViewModel @Inject constructor(
         replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
+        railOrder = SettingsCategory.ordered(prefs.getString(KEY_RAIL_ORDER, null)),
     )
 
     /** The service reads this pref on each AYN press, so saving it is enough. */
@@ -702,6 +727,13 @@ class SettingsViewModel @Inject constructor(
         }
         prefs.edit().putString("nav_bar_order", order).apply()
         _state.value = _state.value.copy(navOrder = order.split(","))
+    }
+
+    /** Saves a new section order for the companion's rail. */
+    fun reorderRail(keys: List<String>) {
+        val order = SettingsCategory.ordered(keys.joinToString(","))
+        prefs.edit().putString(KEY_RAIL_ORDER, order.joinToString(",") { it.key }).apply()
+        _state.value = _state.value.copy(railOrder = order)
     }
 
     fun setQuickLaunchShowApp(enable: Boolean) {
@@ -1226,6 +1258,8 @@ class SettingsViewModel @Inject constructor(
         const val KEY_TOUR_SEEN = "companion_tour_seen"
         /** Theme Studio's unsaved draft, autosaved while it's open. Not backed up. */
         const val KEY_STUDIO_DRAFT = "studio_draft"
+        /** The companion rail's section order, as a CSV of [SettingsCategory] keys. Backed up. */
+        const val KEY_RAIL_ORDER = "rail_order"
     }
 }
 

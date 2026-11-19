@@ -99,7 +99,7 @@ import kotlin.math.roundToInt
 /** A region the tour can spotlight. [inPane] regions live in the scrolling content pane (the rest are on the rail). */
 internal enum class TourSpot(val inPane: Boolean = true) {
     RAIL(false),
-    RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_DIAGNOSTICS(false),
+    RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_REPLAY(false), RAIL_DIAGNOSTICS(false),
     REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, SAVE_CLIP, PREVIEW,
     BUTTON_ORDER, QUICK_LAUNCH,
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
@@ -117,6 +117,7 @@ internal enum class TourSpot(val inPane: Boolean = true) {
             SettingsCategory.QUICK_TOGGLES -> RAIL_TILES
             SettingsCategory.APPEARANCE -> RAIL_APPEARANCE
             SettingsCategory.THEMES -> RAIL_THEMES
+            SettingsCategory.REPLAY -> RAIL_REPLAY
             SettingsCategory.DIAGNOSTICS -> RAIL_DIAGNOSTICS
         }
     }
@@ -139,6 +140,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
     val tiles = SettingsCategory.QUICK_TOGGLES
     val appearance = SettingsCategory.APPEARANCE
     val themes = SettingsCategory.THEMES
+    val replay = SettingsCategory.REPLAY
     val diagnostics = SettingsCategory.DIAGNOSTICS
     listOf(
         TourStep(null, null, R.string.tour_welcome_title, R.string.tour_welcome_body),
@@ -149,8 +151,6 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(general, TourSpot.OVERLAY_EXTRAS, R.string.tour_overlay_extras_title, R.string.tour_overlay_extras_body),
         TourStep(general, TourSpot.BACKUP, R.string.settings_backup_title, R.string.tour_backup_body),
         TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
-        TourStep(general, TourSpot.REPLAY, R.string.tile_name_replay_buffer, R.string.tour_replay_body),
-        TourStep(general, TourSpot.SAVE_CLIP, R.string.settings_save_clip_title, R.string.tour_save_clip_body),
         TourStep(general, TourSpot.PREVIEW, R.string.settings_preview_title, R.string.tour_preview_body),
 
         sectionIntro(navBar, R.string.tour_nav_bar_body),
@@ -175,6 +175,10 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(themes, TourSpot.REPOS, R.string.theme_repos, R.string.tour_repos_body),
         TourStep(themes, TourSpot.DEFAULT_REPO, R.string.tour_default_repo_title, R.string.tour_default_repo_body),
         TourStep(themes, TourSpot.BUILTIN, R.string.theme_builtin, R.string.tour_builtin_body),
+
+        sectionIntro(replay, R.string.tour_replay_section_body),
+        TourStep(replay, TourSpot.SAVE_CLIP, R.string.settings_save_clip_title, R.string.tour_save_clip_body),
+        TourStep(replay, TourSpot.REPLAY, R.string.tile_name_replay_buffer, R.string.tour_replay_body),
 
         sectionIntro(diagnostics, R.string.tour_diagnostics_body),
         TourStep(diagnostics, TourSpot.PRIVILEGED, R.string.settings_privileged_layer, R.string.tour_privileged_body),
