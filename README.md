@@ -119,12 +119,24 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 
 ---
 
+## Save clips from Back Button Hero
+
+Thor Back Button Hero can save a Replay Buffer clip through **TCP Save Clip** (`tcp-save-clip.apk` in each release), a tiny app that opens invisibly, asks Command Panel to save, and closes.
+
+1. Install TCP Save Clip **after** Command Panel. If you installed it first, reinstall it: Android only grants the permission it needs if Command Panel is already installed.
+2. In Back Button Hero, pick a gesture or a Back + button combo, then **Launch app** → **TCP Save Clip** → **bottom screen**, so the game on the top screen keeps focus.
+
+It works like an AYN double press: the first press turns the Replay Buffer on, later presses save a clip. It does nothing while Command Panel stands by, and shows a short message if Command Panel isn't running. Only a TCP Save Clip signed with the same key as your Command Panel works, so the release trigger pairs with the release app, and a locally built debug trigger pairs with a debug build.
+
+---
+
 ## Build
 
 ```sh
 ./gradlew :app:assembleDebug        # build the debug APK
 ./gradlew :app:installDebug         # install on a connected Thor
 ./gradlew :app:testDebugUnitTest    # unit tests
+./gradlew :trigger:assembleDebug    # build TCP Save Clip (Back Button Hero trigger)
 ```
 
 Signed release builds are produced by CI (`.github/workflows/build-release.yml`) from a keystore in repo secrets; release notes come from `app/src/main/res/raw/patch_notes.md`.
