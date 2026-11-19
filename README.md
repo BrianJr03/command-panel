@@ -137,6 +137,7 @@ It works like an AYN double press: the first press turns the Replay Buffer on, l
 ./gradlew :app:installDebug         # install on a connected Thor
 ./gradlew :app:testDebugUnitTest    # unit tests
 ./gradlew :trigger:assembleDebug    # build TCP Save Clip (Back Button Hero trigger)
+scripts/verify-trigger.sh           # verify TCP Save Clip (builds, lint, then on a connected Thor; see the script)
 ```
 
 Signed release builds are produced by CI (`.github/workflows/build-release.yml`) from a keystore in repo secrets; release notes come from `app/src/main/res/raw/patch_notes.md`.
