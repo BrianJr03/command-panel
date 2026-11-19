@@ -53,6 +53,8 @@ val LocalOverlayWindowBlur = staticCompositionLocalOf<OverlayWindowBlur?> { null
 class OverlayHost(
     private val context: Context,
     private val content: @Composable (dismiss: () -> Unit) -> Unit,
+    /** Called on the main thread when the panel is shown (true) or hidden / destroyed (false). */
+    private val onVisibilityChanged: (visible: Boolean) -> Unit = {},
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val topology = DisplayTopology(context)
@@ -112,6 +114,7 @@ class OverlayHost(
         lifecycleOwner = owner
         layoutParams = lp
         isShowing = true
+        onVisibilityChanged(true)
         wm.addCrossWindowBlurEnabledListener(main::post, blurEnabledListener)
         applyBlur()
         owner.onResume()
@@ -125,6 +128,7 @@ class OverlayHost(
         val view = composeView ?: return@onMain
         val owner = lifecycleOwner
         isShowing = false
+        onVisibilityChanged(false)
         releaseBlur(view)
         view.animate()
             .alpha(0f).translationY(view.height * SLIDE_FRACTION)
@@ -142,6 +146,7 @@ class OverlayHost(
     }
 
     fun destroy() = onMain {
+        if (isShowing) onVisibilityChanged(false)
         composeView?.let { view ->
             releaseBlur(view)
             runCatching {

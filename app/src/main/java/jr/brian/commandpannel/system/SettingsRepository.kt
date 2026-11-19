@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,6 +78,17 @@ class SettingsRepository(
     }
 
     private var fastJob: Job? = null
+    private val main = Handler(Looper.getMainLooper())
+
+    // Bottom volume (#6): a drag only writes the setting when its 0..15 step changes, at most every
+    // BOTTOM_WRITE_INTERVAL_MS, off the main thread and in order; the slider ignores its own echoes meanwhile.
+    private val bottomThrottle = SteppedWriteThrottle(BOTTOM_WRITE_INTERVAL_MS)
+    private val bottomGuard = VolumeEchoGuard(ECHO_HOLD_MS)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val bottomWrites = Dispatchers.IO.limitedParallelism(1)
+    private var bottomWritesInFlight = 0
+    private val bottomFlush = Runnable { bottomThrottle.flush(now())?.let(::writeBottomLevel) }
+    private val bottomCatchUp = Runnable { refreshBottomVolume() }
     private var scope: CoroutineScope? = null
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
     private var lastRxTime = System.currentTimeMillis()
@@ -120,6 +132,36 @@ class SettingsRepository(
         telemetry.stop()
         batteryEstimate.stop()
         fastJob?.cancel(); fastJob = null
+        main.removeCallbacks(bottomFlush)
+        main.removeCallbacks(bottomCatchUp)
+    }
+
+    private fun now() = android.os.SystemClock.uptimeMillis()
+
+    /** Called by the service on the main thread when the overlay is shown or hidden. */
+    fun onOverlayVisibilityChanged(visible: Boolean) {
+        if (visible) {
+            refreshBottomVolume()
+        } else {
+            endBottomDragIfAny()
+        }
+    }
+
+    /**
+     * The bottom volume to show: the setting, unless the slider is ignoring its own echoes (then [current]). Reading
+     * the setting also re-bases the throttle, so a level changed elsewhere is written again by the next drag.
+     */
+    private fun bottomVolumeFor(current: Float): Float {
+        if (bottomGuard.ignoring(now())) return current
+        val level = settings.getInt(Keys.SECONDARY_VOLUME, 7).coerceIn(0, BOTTOM_VOLUME_MAX)
+        if (bottomWritesInFlight == 0) bottomThrottle.sync(level)
+        return level / BOTTOM_VOLUME_MAX.toFloat()
+    }
+
+    private fun refreshBottomVolume() {
+        val shown = uiState.value.bottomVolume
+        val next = bottomVolumeFor(shown)
+        if (next != shown) _uiState.update { it.copy(bottomVolume = next) }
     }
 
     // ---- reads ----
@@ -153,7 +195,7 @@ class SettingsRepository(
                 quickLaunchLabel = QuickLaunch.savedLabel(context),
                 quickLaunchApp = if (prefs.getBoolean("quick_launch_show_app", true)) QuickLaunch.savedComponent(context) else null,
                 navOrder = NavBarButton.ordered(prefs.getString("nav_bar_order", null)),
-                bottomVolume = settings.getInt(Keys.SECONDARY_VOLUME, 7) / 15f,
+                bottomVolume = bottomVolumeFor(it.bottomVolume),
                 dualBrightness = settings.getInt(Keys.DUAL_BRIGHTNESS, 50) / 100f,
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,
                 bottomBrightness = (privileged.getDisplayBrightness(4) ?: it.bottomBrightness).coerceIn(0f, 1f),
@@ -330,8 +372,50 @@ class SettingsRepository(
     }
 
     override fun setBottomVolume(fraction: Float, committed: Boolean) {
-        settings.putInt(Keys.SECONDARY_VOLUME, (fraction * 15).toInt())
-        _uiState.update { it.copy(bottomVolume = fraction) }
+        val level = bottomVolumeLevel(fraction)
+        val t = now()
+        if (committed) {
+            main.removeCallbacks(bottomFlush)
+            bottomGuard.onRelease(t)
+            bottomThrottle.onCommit(level, t)?.let(::writeBottomLevel)
+            // Settle on the step that was written, like the stock slider.
+            _uiState.update { it.copy(bottomVolume = level / BOTTOM_VOLUME_MAX.toFloat()) }
+            scheduleBottomCatchUp()
+        } else {
+            bottomGuard.onDrag()
+            _uiState.update { it.copy(bottomVolume = fraction.coerceIn(0f, 1f)) }
+            val write = bottomThrottle.onDrag(level, t)
+            if (write != null) writeBottomLevel(write)
+            main.removeCallbacks(bottomFlush)
+            bottomThrottle.flushDelay(t)?.let { main.postDelayed(bottomFlush, it) }
+        }
+    }
+
+    /** Writes the bottom level through the root shell, off the main thread and in the order requested. */
+    private fun writeBottomLevel(level: Int) {
+        val scope = scope ?: return
+        bottomWritesInFlight++
+        scope.launch {
+            withContext(bottomWrites) { settings.putInt(Keys.SECONDARY_VOLUME, level) }
+            bottomWritesInFlight--
+            bottomGuard.onWriteDone(now())
+            scheduleBottomCatchUp()
+        }
+    }
+
+    /** Once the echo hold ends, reads the setting back once so a change made meanwhile (elsewhere) isn't missed. */
+    private fun scheduleBottomCatchUp() {
+        val at = bottomGuard.holdEndsAt() ?: return
+        main.removeCallbacks(bottomCatchUp)
+        main.postAtTime(bottomCatchUp, at + 1)
+    }
+
+    /**
+     * The overlay was hidden, possibly in the middle of a drag whose release never arrives: commit what the slider
+     * shows so the guard doesn't keep ignoring the setting.
+     */
+    private fun endBottomDragIfAny() {
+        if (bottomGuard.dragging) setBottomVolume(uiState.value.bottomVolume, committed = true)
     }
 
     override fun toggleRefreshRate() {
@@ -510,6 +594,12 @@ class SettingsRepository(
      * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED color becomes the
      * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
      */
+    private companion object {
+        const val BOTTOM_WRITE_INTERVAL_MS = 100L
+        /** How long a slider keeps ignoring change notifications after its release or last write. */
+        const val ECHO_HOLD_MS = 400L
+    }
+
     private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController
         .accentOverride(context, prefs.getBoolean("rgb_accent_sync", false))
 }

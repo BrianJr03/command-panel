@@ -153,6 +153,7 @@ class AssistantService : Service() {
                     actions = repository,
                 )
             },
+            onVisibilityChanged = { repository.onOverlayVisibilityChanged(it) },
         )
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -50,6 +52,9 @@ fun TccSliderRow(
     val spec = LocalTccLookSpec.current
     val lookColors = tccLookColors()
     val sliderRenderer = spec.traits.slider.renderer()
+    // The gesture handlers below live across recompositions; read the latest value and callback through these.
+    val currentFraction by rememberUpdatedState(fraction)
+    val currentOnChange by rememberUpdatedState(onChange)
     val displayProgress = (fraction.coerceIn(0f, 1f) * 100f).toInt()
     val stockFill = if (dimmed) colors.tertiary.copy(alpha = 0.38f) else colors.tertiary
     val sliderPaint = SliderPaint(
@@ -82,17 +87,20 @@ fun TccSliderRow(
                 .then(sliderRenderer.track(sliderPaint))
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
-                        onChange((offset.x / size.width).coerceIn(0f, 1f), true)
+                        currentOnChange((offset.x / size.width).coerceIn(0f, 1f), true)
                     }
                 }
                 .pointerInput(Unit) {
-                    var last = fraction
+                    var last = currentFraction
                     detectDragGestures(
+                        onDragStart = { last = currentFraction },
                         onDrag = { change, _ ->
                             last = (change.position.x / size.width).coerceIn(0f, 1f)
-                            onChange(last, false)
+                            currentOnChange(last, false)
                         },
-                        onDragEnd = { onChange(last, true) },
+                        onDragEnd = { currentOnChange(last, true) },
+                        // A canceled drag still has to commit, or the value is left mid-drag.
+                        onDragCancel = { currentOnChange(last, true) },
                     )
                 },
         ) {
