@@ -89,6 +89,18 @@ class SettingsRepository(
     private var bottomWritesInFlight = 0
     private val bottomFlush = Runnable { bottomThrottle.flush(now())?.let(::writeBottomLevel) }
     private val bottomCatchUp = Runnable { refreshBottomVolume() }
+
+    // Top volume (#5): music volume changes (keys, other apps) reach the open panel through VOLUME_CHANGED_ACTION.
+    private val topGuard = VolumeEchoGuard(ECHO_HOLD_MS)
+    private val topCatchUp = Runnable { refreshTopVolume() }
+    private var volumeReceiverRegistered = false
+    private val volumeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            if (intent.action != ACTION_VOLUME_CHANGED) return
+            if (intent.getIntExtra(EXTRA_VOLUME_STREAM_TYPE, -1) != AudioManager.STREAM_MUSIC) return
+            refreshTopVolume()
+        }
+    }
     private var scope: CoroutineScope? = null
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
     private var lastRxTime = System.currentTimeMillis()
@@ -134,6 +146,8 @@ class SettingsRepository(
         fastJob?.cancel(); fastJob = null
         main.removeCallbacks(bottomFlush)
         main.removeCallbacks(bottomCatchUp)
+        main.removeCallbacks(topCatchUp)
+        unregisterVolumeReceiver()
     }
 
     private fun now() = android.os.SystemClock.uptimeMillis()
@@ -141,10 +155,40 @@ class SettingsRepository(
     /** Called by the service on the main thread when the overlay is shown or hidden. */
     fun onOverlayVisibilityChanged(visible: Boolean) {
         if (visible) {
+            registerVolumeReceiver()
+            refreshTopVolume()
             refreshBottomVolume()
         } else {
+            unregisterVolumeReceiver()
             endBottomDragIfAny()
+            // A drag cut short by the hide never sends its release.
+            if (topGuard.dragging) topGuard.onRelease(now())
         }
+    }
+
+    private fun registerVolumeReceiver() {
+        if (volumeReceiverRegistered) return
+        // A protected system broadcast, so the receiver needn't be exported.
+        context.registerReceiver(volumeReceiver, IntentFilter(ACTION_VOLUME_CHANGED), Context.RECEIVER_NOT_EXPORTED)
+        volumeReceiverRegistered = true
+    }
+
+    private fun unregisterVolumeReceiver() {
+        if (!volumeReceiverRegistered) return
+        runCatching { context.unregisterReceiver(volumeReceiver) }
+        volumeReceiverRegistered = false
+    }
+
+    /** The music volume as a 0..1 fraction, unless the top slider is ignoring its own echoes (then [current]). */
+    private fun topVolumeFor(current: Float): Float =
+        if (topGuard.ignoring(now())) current
+        else audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() /
+            audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+
+    private fun refreshTopVolume() {
+        val shown = uiState.value.topVolume
+        val next = topVolumeFor(shown)
+        if (next != shown) _uiState.update { it.copy(topVolume = next) }
     }
 
     /**
@@ -199,8 +243,7 @@ class SettingsRepository(
                 dualBrightness = settings.getInt(Keys.DUAL_BRIGHTNESS, 50) / 100f,
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,
                 bottomBrightness = (privileged.getDisplayBrightness(4) ?: it.bottomBrightness).coerceIn(0f, 1f),
-                topVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() /
-                    audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
+                topVolume = topVolumeFor(it.topVolume),
                 tiles = buildTiles(mode, focus),
                 layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
                 look = activeLook.first,
@@ -367,8 +410,16 @@ class SettingsRepository(
 
     override fun setTopVolume(fraction: Float, committed: Boolean) {
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        audio.setStreamVolume(AudioManager.STREAM_MUSIC, (fraction * max).toInt(), 0)
-        _uiState.update { it.copy(topVolume = fraction) }
+        val index = (fraction.coerceIn(0f, 1f) * max).toInt()
+        if (index != audio.getStreamVolume(AudioManager.STREAM_MUSIC)) audio.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+        if (committed) {
+            topGuard.onRelease(now())
+            main.removeCallbacks(topCatchUp)
+            topGuard.holdEndsAt()?.let { main.postAtTime(topCatchUp, it + 1) }
+        } else {
+            topGuard.onDrag()
+        }
+        _uiState.update { it.copy(topVolume = fraction.coerceIn(0f, 1f)) }
     }
 
     override fun setBottomVolume(fraction: Float, committed: Boolean) {
@@ -598,6 +649,9 @@ class SettingsRepository(
         const val BOTTOM_WRITE_INTERVAL_MS = 100L
         /** How long a slider keeps ignoring change notifications after its release or last write. */
         const val ECHO_HOLD_MS = 400L
+        // AudioManager's hidden VOLUME_CHANGED_ACTION and its stream extra.
+        const val ACTION_VOLUME_CHANGED = "android.media.VOLUME_CHANGED_ACTION"
+        const val EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE"
     }
 
     private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController
