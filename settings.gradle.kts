@@ -23,3 +23,5 @@ rootProject.name = "CommandPanel"
 include(":app")
 // Capability probe for the Thor firmware. Separate debug tool, never part of the app release.
 include(":probe")
+// TCP Save Clip: a launcher-only app that asks Command Panel to save a replay (for Back Button Hero's "Launch app").
+include(":trigger")
