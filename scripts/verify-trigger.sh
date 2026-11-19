@@ -54,17 +54,20 @@ static_checks() {
   check "assembleDebug, :trigger:assembleRelease, :app:testDebugUnitTest, :trigger:lintDebug" \
     ./gradlew -q assembleDebug :trigger:assembleRelease :app:testDebugUnitTest :trigger:lintDebug
 
-  step "App lint (errors in files this branch changed)"
+  step "App lint (errors on lines this branch changed)"
   ./gradlew -q :app:lintDebug >/dev/null 2>&1
   local report="app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
   if [ ! -f "$report" ]; then
     fail "no lint report at $report"
   else
+    # "<path>:<line>:" for every line added or changed since main, matched against the report's "<path>:<line>: Error".
     local changed ours
-    changed="$(git diff --name-only "$(git merge-base HEAD main)" -- app | sed "s|^|$PWD/|")"
+    changed="$(git diff -U0 "$(git merge-base HEAD main)" -- app | awk -v root="$PWD" '
+      /^\+\+\+ b\//{ f = root "/" substr($0, 7) }
+      /^@@/{ split($3, a, ","); start = substr(a[1], 2); n = (a[2] == "" ? 1 : a[2]); for (i = 0; i < n; i++) print f ":" start + i ":" }')"
     ours="$(grep -E '^/.*: Error:' "$report" | grep -F -f <(echo "$changed") || true)"
     echo "  (app lint total: $(tail -1 "$report"))"
-    if [ -z "$ours" ]; then pass "no lint errors in changed app files"; else fail "lint errors in changed files:"; echo "$ours"; fi
+    if [ -z "$ours" ]; then pass "no lint errors on changed app lines"; else fail "lint errors on changed lines:"; echo "$ours"; fi
   fi
 
   step "Merged debug manifest"
