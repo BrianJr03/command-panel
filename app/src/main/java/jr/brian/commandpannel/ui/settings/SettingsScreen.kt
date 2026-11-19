@@ -374,6 +374,19 @@ private fun NavRail(
     val reorder = remember(railScroll) { ReorderListState(keys, scope, railScroll) { railBounds.value } }
     reorder.onCommit = onReorder
     LaunchedEffect(keys) { reorder.sync(keys) }
+    val motion = LocalTccLookSpec.current.traits.animate
+    // The focused item's own bring-into-view stops it flush with the padded edge, which leaves the header scrolled
+    // off. Focusing the first (or last) section scrolls the rail all the way to that end instead. Skipped while a
+    // section is picked up, since moving it already brings it into view.
+    val edgeScroll: (String) -> Unit = { k ->
+        val atTop = k == reorder.items.firstOrNull()
+        if (reorder.grabbed == null && (atTop || k == reorder.items.lastOrNull())) scope.launch {
+            // Wait a frame so this runs after (and cancels) the focus bring-into-view instead of being undone by it.
+            androidx.compose.runtime.withFrameNanos { }
+            val target = if (atTop) 0 else railScroll.maxValue
+            if (motion) railScroll.animateScrollTo(target) else railScroll.scrollTo(target)
+        }
+    }
     Column(
         // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
         modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
@@ -402,7 +415,7 @@ private fun NavRail(
         }
         reorder.items.forEach { k ->
             val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
-            key(k) { RailItem(item, item == selected, requesters.getValue(item), reorder, navShape, onSelect) }
+            key(k) { RailItem(item, item == selected, requesters.getValue(item), reorder, navShape, onSelect) { edgeScroll(k) } }
         }
     }
 }
@@ -419,6 +432,7 @@ private fun RailItem(
     reorder: ReorderListState,
     shape: Shape,
     onSelect: (NavItem) -> Unit,
+    onFocused: () -> Unit,
 ) {
     val key = item.category.key
     val f = focusState()
@@ -457,7 +471,7 @@ private fun RailItem(
                 },
             )
             .focusRequester(requester)
-            .onFocusChanged { if (it.isFocused) onSelect(item) }
+            .onFocusChanged { if (it.isFocused) { onSelect(item); onFocused() } }
             .onKeyEvent { e ->
                 if (!grabbed || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
