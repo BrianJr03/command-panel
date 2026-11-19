@@ -55,4 +55,16 @@ class QuickSettingTileIdTest {
         QuickSettingTileId.entries.forEach { csv = QuickSettingTileId.toggle(csv, it.key, enable = false) }
         assertEquals(1, QuickSettingTileId.enabledKeys(csv).size)
     }
+
+    @Test
+    fun keyboardTileIsOffByDefaultAndJoinsASavedOrderAtTheEnd() {
+        // A tile order and enabled list saved before the Keyboard tile existed (#41).
+        val savedOrder = QuickSettingTileId.entries.filter { it != QuickSettingTileId.KEYBOARD }.reversed().joinToString(",") { it.key }
+        val savedEnabled = "fan,wifi"
+        assertTrue("keyboard" !in QuickSettingTileId.enabledKeys(null))
+        assertEquals("keyboard", QuickSettingTileId.orderedKeys(savedOrder).last())
+        assertEquals(listOf("wifi", "fan"), QuickSettingTileId.enabledKeys(savedEnabled, savedOrder))
+        val withKeyboard = QuickSettingTileId.toggle(savedEnabled, "keyboard", enable = true)
+        assertEquals(listOf("wifi", "fan", "keyboard"), QuickSettingTileId.enabledKeys(withKeyboard, savedOrder))
+    }
 }

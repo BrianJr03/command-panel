@@ -25,6 +25,9 @@ import jr.brian.commandpannel.plugin.PanelPluginRegistry
 import jr.brian.commandpannel.plugin.PanelPluginSession
 import jr.brian.commandpannel.plugin.PanelPluginSwap.EndReason
 import jr.brian.commandpannel.system.DisplayTopology
+import jr.brian.commandpannel.system.KeyboardTile
+import jr.brian.commandpannel.system.QuickSettingTileId
+import jr.brian.commandpannel.ui.settings.SettingsCategory
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.BdsaDetector
 import jr.brian.commandpannel.system.Prefs
@@ -200,6 +203,9 @@ class AssistantService : Service() {
         )
         val overlayActions = object : OverlayActions by repository {
             override fun openPanelPlugin(key: String) = startPanelPlugin(key)
+            override fun onTileClick(id: String) {
+                if (id == QuickSettingTileId.KEYBOARD.key) openKeyboard() else repository.onTileClick(id)
+            }
         }
         overlay = OverlayHost(
             this,
@@ -339,6 +345,34 @@ class AssistantService : Service() {
     }
 
     /** A plugin's nav button: hands it the bottom screen, unless Command Panel is on standby or the screen is blanked. */
+    /**
+     * The panel's Keyboard tile (#41): swaps in a ThorKBM with plugin mode, else opens the ThorKBM app on the top screen
+     * (its keyboard comes up on the bottom screen, so the panel closes), else opens the companion's Keyboard section.
+     */
+    private fun openKeyboard() {
+        val launchable = KeyboardTile.THORKBM_PACKAGES.filter { packageManager.getLaunchIntentForPackage(it) != null }.toSet()
+        val action = KeyboardTile.decide(plugins.plugins.value.map { it.key }, launchable)
+        Log.i(TAG, "keyboard tile: $action")
+        when (action) {
+            is KeyboardTile.Action.Swap -> startPanelPlugin(action.pluginKey)
+            is KeyboardTile.Action.OpenApp -> {
+                val launch = packageManager.getLaunchIntentForPackage(action.packageName) ?: return
+                val opts = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                val started = runCatching {
+                    startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), opts.toBundle())
+                }.onFailure { Log.w(TAG, "keyboard tile: couldn't open ${action.packageName}", it) }.isSuccess
+                if (started) overlay.hide()
+            }
+            KeyboardTile.Action.OpenCompanion -> runCatching {
+                startActivity(
+                    Intent(this, jr.brian.commandpannel.MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                        .putExtra(jr.brian.commandpannel.MainActivity.EXTRA_SECTION, SettingsCategory.KEYBOARD.key),
+                )
+            }
+        }
+    }
+
     private fun startPanelPlugin(key: String) {
         if (standby || screenMode.isBottomBlanked()) {
             Log.i(TAG, "plugin $key not started: standby=$standby blanked=${screenMode.isBottomBlanked()}")

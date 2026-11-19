@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -58,7 +59,9 @@ enum class QuickSettingTileId(
     SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG),
     CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION),
     REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE),
-    STICK_LED("stick_led", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.SportsEsports), TileInteraction.TOGGLE);
+    STICK_LED("stick_led", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.SportsEsports), TileInteraction.TOGGLE),
+    /** Opens ThorKBM: a plugin swap, its app, or the companion's Keyboard section ([KeyboardTile]). */
+    KEYBOARD("keyboard", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Keyboard), TileInteraction.ACTION);
 
     /** Display name for the companion app's enable/disable list. */
     @get:StringRes
@@ -86,6 +89,7 @@ enum class QuickSettingTileId(
         CLEAR_ALL_TASKS -> R.string.tile_name_clear_all_tasks
         REPLAY_BUFFER -> R.string.tile_name_replay_buffer
         STICK_LED -> R.string.text_joystick_lights
+        KEYBOARD -> R.string.virtual_keyboard_text
     }
 
     companion object {

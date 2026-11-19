@@ -23,6 +23,9 @@ import jr.brian.commandpannel.ui.settings.SettingsViewModel
 /** Whether the companion is in front (resumed). The overlay's onboarding brings it up when it isn't (same process). */
 object CompanionPresence {
     val resumed = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** A section ([jr.brian.commandpannel.ui.settings.SettingsCategory.key]) to open, from [MainActivity.EXTRA_SECTION]. */
+    val requestedSection = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 }
 
 @AndroidEntryPoint
@@ -37,6 +40,17 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeSection(intent)
+    }
+
+    /** Opens the section the intent asks for (the panel's Keyboard tile, #41), once. */
+    private fun takeSection(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_SECTION)?.let { CompanionPresence.requestedSection.value = it }
+        intent?.removeExtra(EXTRA_SECTION)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The companion UI is designed for the top screen; if it was launched on the bottom (or any other)
@@ -48,7 +62,8 @@ class MainActivity : ComponentActivity() {
                 val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
                 startActivity(
                     Intent(this, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        .apply { intent?.getStringExtra(EXTRA_SECTION)?.let { putExtra(EXTRA_SECTION, it) } },
                     opts.toBundle(),
                 )
             }.isSuccess
@@ -56,6 +71,7 @@ class MainActivity : ComponentActivity() {
             finish()
             return
         }
+        if (savedInstanceState == null) takeSection(intent)
         AssistantService.start(this)
         // Opening the companion also brings up the overlay on the bottom screen to preview changes. On first launch it
         // isn't marked automatic, so standby doesn't skip it: the overlay's onboarding runs before the companion tour.
@@ -73,4 +89,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    companion object {
+        /** Opens the companion on this section: a [jr.brian.commandpannel.ui.settings.SettingsCategory.key]. */
+        const val EXTRA_SECTION = "section"
+    }
 }

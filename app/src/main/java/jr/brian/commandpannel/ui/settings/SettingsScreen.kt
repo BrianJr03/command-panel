@@ -182,6 +182,13 @@ internal fun SettingsContent(
 ) {
     // Saveable, so coming back from Theme Studio or the Themes library lands on the same section (and scroll).
     var nav by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavItem.GENERAL) }
+    // A section asked for from outside (the panel's Keyboard tile opens Keyboard), taken once.
+    val requestedSection by jr.brian.commandpannel.CompanionPresence.requestedSection.collectAsState()
+    LaunchedEffect(requestedSection) {
+        val item = requestedSection?.let { key -> NavItem.entries.firstOrNull { it.category.key == key } } ?: return@LaunchedEffect
+        nav = item
+        jr.brian.commandpannel.CompanionPresence.requestedSection.value = null
+    }
     // Hoisted so the content pane can send D-pad Left back to the selected rail item.
     val railRequesters = remember { NavItem.entries.associateWith { FocusRequester() } }
     val headerRequesters = remember { RailGroup.entries.associateWith { FocusRequester() } }
