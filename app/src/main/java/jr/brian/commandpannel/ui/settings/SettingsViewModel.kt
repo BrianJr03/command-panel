@@ -50,6 +50,7 @@ enum class SettingsCategory(val key: String, @StringRes val titleRes: Int) {
     APPEARANCE("appearance", R.string.settings_cat_appearance),
     THEMES("themes", R.string.settings_cat_themes),
     REPLAY("replay", R.string.settings_cat_replay),
+    KEYBOARD("keyboard", R.string.virtual_keyboard_text),
     DIAGNOSTICS("diagnostics", R.string.settings_cat_diagnostics),
     EXPERIMENTAL("experimental", R.string.settings_cat_experimental);
 
@@ -145,6 +146,12 @@ data class SettingsState(
     val saveClipBusy: Boolean = false,
     /** Result of the last TCP Save Clip install, shown in its card. */
     val saveClipMessage: String? = null,
+    /** ThorKBM (the keyboard and mouse app): which builds are installed. */
+    val thorKbm: jr.brian.commandpannel.system.update.ThorKbmStatus = jr.brian.commandpannel.system.update.ThorKbmStatus(),
+    /** A ThorKBM download or install is running. */
+    val thorKbmBusy: Boolean = false,
+    /** Result of the last ThorKBM install, shown in its card. */
+    val thorKbmMessage: String? = null,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -225,6 +232,7 @@ class SettingsViewModel @Inject constructor(
         replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
+        thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
         railOrder = SettingsCategory.ordered(prefs.getString(KEY_RAIL_ORDER, null)),
     )
 
@@ -786,6 +794,9 @@ class SettingsViewModel @Inject constructor(
             val pkg = i.data?.schemeSpecificPart
             if (pkg in BdsaDetector.PACKAGES || pkg == sibling.siblingPackage) refreshBdsa(keepMessage = true)
             if (pkg == jr.brian.commandpannel.system.update.SaveClipInstaller.PACKAGE) refreshSaveClip()
+            if (pkg == jr.brian.commandpannel.system.update.ThorKbmInstaller.PACKAGE ||
+                pkg == jr.brian.commandpannel.system.update.ThorKbmInstaller.DEBUG_PACKAGE
+            ) refreshThorKbm()
         }
     }
 
@@ -1187,6 +1198,70 @@ class SettingsViewModel @Inject constructor(
             .fold({ app.getString(R.string.msg_save_clip_finish_in_installer) }) { e ->
                 app.getString(R.string.msg_save_clip_failed, e.message ?: e.javaClass.simpleName)
             }
+    }
+
+    // ---- ThorKBM ----
+
+    /** Re-reads whether ThorKBM is installed (companion resume, package changes). */
+    fun refreshThorKbm() {
+        val status = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(app)
+        val message = _state.value.thorKbmMessage.takeIf { _state.value.thorKbm == status || _state.value.thorKbmBusy }
+        _state.value = _state.value.copy(thorKbm = status, thorKbmMessage = message)
+    }
+
+    /**
+     * Installs ThorKBM from its latest GitHub release, like TCP SC: through the root shell, or else Android's
+     * installer. First install only; once it's there, ThorKBM's own updater takes over.
+     */
+    fun installThorKbm() {
+        if (_state.value.thorKbmBusy || _state.value.thorKbm.releaseInstalled) return
+        _state.value = _state.value.copy(thorKbmBusy = true, thorKbmMessage = null)
+        viewModelScope.launch {
+            val installer = jr.brian.commandpannel.system.update.ThorKbmInstaller
+            var handOff: java.io.File? = null
+            val failure = withContext(Dispatchers.IO) {
+                runCatching {
+                    val release = installer.latest() ?: return@runCatching app.getString(R.string.msg_thorkbm_no_release)
+                    val apk = installer.download(app, release)
+                    val out = installer.installWithRoot(privileged, apk)
+                    when {
+                        out == null -> { handOff = apk; null }
+                        out.lines().any { it.trim() == "Success" } -> null
+                        else -> app.getString(R.string.msg_thorkbm_failed, out.lines().lastOrNull { it.isNotBlank() } ?: "")
+                    }
+                }.getOrElse { e ->
+                    if (e is jr.brian.commandpannel.system.GitHubRateLimitedException) {
+                        val minutes = ((e.retryAtMs - System.currentTimeMillis() + 59_999) / 60_000).toInt().coerceAtLeast(1)
+                        app.resources.getQuantityString(R.plurals.msg_thorkbm_rate_limited, minutes, minutes)
+                    } else {
+                        app.getString(R.string.msg_thorkbm_failed, e.message ?: e.javaClass.simpleName)
+                    }
+                }
+            }
+            val message = failure ?: handOff?.let(::installThorKbmWithSystemInstaller) ?: app.getString(R.string.msg_thorkbm_installed)
+            _state.value = _state.value.copy(thorKbmBusy = false, thorKbmMessage = message, thorKbm = installer.status(app))
+        }
+    }
+
+    /** No root shell: hands the APK to Android's installer (asking for "install unknown apps" first). Returns the message. */
+    private fun installThorKbmWithSystemInstaller(apk: java.io.File): String {
+        val updates = jr.brian.commandpannel.system.update.UpdateInstaller
+        if (!updates.canUseSystemInstaller(app)) {
+            runCatching { app.startActivity(updates.installerPermissionIntent(app)) }
+            return app.getString(R.string.msg_thorkbm_allow_installs)
+        }
+        return runCatching { app.startActivity(updates.systemInstallerIntent(app, apk)) }
+            .fold({ app.getString(R.string.msg_thorkbm_finish_in_installer) }) { e ->
+                app.getString(R.string.msg_thorkbm_failed, e.message ?: e.javaClass.simpleName)
+            }
+    }
+
+    /** Opens ThorKBM on the top screen. */
+    fun openThorKbm() {
+        val pkg = _state.value.thorKbm.openPackage ?: return
+        if (!jr.brian.commandpannel.system.update.ThorKbmInstaller.open(app, pkg)) {
+            _state.value = _state.value.copy(thorKbmMessage = app.getString(R.string.msg_thorkbm_open_failed))
+        }
     }
 
     // ---- companion tour ----

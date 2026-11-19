@@ -70,6 +70,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Science
@@ -133,6 +134,7 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
     APPEARANCE(SettingsCategory.APPEARANCE, Icons.Rounded.Palette, R.string.settings_cat_appearance_desc),
     THEMES(SettingsCategory.THEMES, Icons.Rounded.Brush, R.string.settings_cat_themes_desc),
     REPLAY(SettingsCategory.REPLAY, Icons.Rounded.Videocam, R.string.settings_cat_replay_desc),
+    KEYBOARD(SettingsCategory.KEYBOARD, Icons.Rounded.Keyboard, R.string.settings_cat_keyboard_desc),
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, R.string.settings_cat_diagnostics_desc),
     EXPERIMENTAL(SettingsCategory.EXPERIMENTAL, Icons.Rounded.Science, R.string.settings_cat_experimental_desc),
 }
@@ -166,6 +168,7 @@ internal fun SettingsContent(
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         vm.refreshBdsa()
         vm.refreshSaveClip()
+        vm.refreshThorKbm()
         onPauseOrDispose { }
     }
     val scroll = rememberScrollState()
@@ -273,6 +276,7 @@ internal fun SettingsContent(
                     openThemes(ThemeLibraryTab.LOCAL)
                 }
                 SettingsCategory.REPLAY -> ReplayBufferCard(state, vm)
+                SettingsCategory.KEYBOARD -> ThorKbmCard(state, vm)
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
                 SettingsCategory.EXPERIMENTAL -> Experimental(state, vm)
             }
@@ -726,7 +730,47 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
 }
 
 /**
- * The TCP SC card's controls: the Install button ([filled]) and the "Installed" status pill. Focus is unmistakable on
+ * ThorKBM, the keyboard and mouse app: Install fetches its latest release once; after that the card shows the
+ * installed version and Open, and ThorKBM's own updater takes over. Status and Install follow the release only; a
+ * debug build gets a note, and Open falls back to it when it's the only one.
+ */
+@Composable
+private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
+    val status = state.thorKbm
+    Card {
+        CardTitle(stringResource(R.string.settings_thorkbm_title))
+        CardDesc(stringResource(R.string.settings_thorkbm_desc))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            status.releaseVersion?.let { stringResource(R.string.settings_thorkbm_installed, it) }
+                ?: stringResource(R.string.settings_thorkbm_missing),
+            color = if (status.releaseInstalled) p.accent else p.textSecondary,
+            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+        )
+        status.debugVersion?.let {
+            Spacer(Modifier.height(6.dp))
+            InfoLine(stringResource(R.string.settings_thorkbm_debug_also, it))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (!status.releaseInstalled) {
+                // Stays pressable while busy (a disabled control drops gamepad focus); installThorKbm ignores repeats.
+                SaveClipAction(
+                    stringResource(if (state.thorKbmBusy) R.string.settings_thorkbm_installing else R.string.settings_thorkbm_install),
+                    filled = true,
+                    onClick = vm::installThorKbm,
+                )
+            }
+            if (status.openPackage != null) {
+                SaveClipAction(stringResource(R.string.settings_thorkbm_open), filled = status.releaseInstalled, onClick = vm::openThorKbm)
+            }
+        }
+        state.thorKbmMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
+    }
+}
+
+/**
+ * The TCP SC and ThorKBM cards' controls: the Install button ([filled]) and the "Installed" status pill. Focus is unmistakable on
  * any look: a solid accent fill, a bright outline and a bigger scale.
  */
 @Composable

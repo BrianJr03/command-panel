@@ -151,6 +151,7 @@
     <string name="settings_cat_themes_desc">Mix, build and save your own overlay looks</string>
     <string name="settings_cat_experimental_desc">Features still being tested</string>
     <string name="settings_cat_replay_desc">Save clips of what just happened, from the overlay, a double press or TCP SC</string>
+    <string name="settings_cat_keyboard_desc">Get ThorKBM, the keyboard and mouse app for the Thor</string>
     <string name="settings_rail_move">Move %1$s</string>
 
     <!-- Companion: General -->
@@ -211,6 +212,14 @@
     <string name="settings_save_clip_reinstall">Reinstall</string>
     <string name="settings_save_clip_installing">Installing…</string>
     <string name="settings_save_clip_debug_note">This is a debug build: it only works with a TCP SC you build yourself, so installing from GitHub is off here.</string>
+    <string name="settings_thorkbm_title">ThorKBM</string>
+    <string name="settings_thorkbm_desc">ThorKBM turns the bottom screen into a keyboard and trackpad for the top screen. Install it here once; after that it keeps itself up to date.</string>
+    <string name="settings_thorkbm_installed">Installed (%1$s)</string>
+    <string name="settings_thorkbm_debug_also">Debug build also installed (%1$s)</string>
+    <string name="settings_thorkbm_missing">Not installed</string>
+    <string name="settings_thorkbm_install">Install</string>
+    <string name="settings_thorkbm_installing">Installing…</string>
+    <string name="settings_thorkbm_open">Open</string>
     <string name="settings_replay_location">Save location</string>
     <string name="settings_replay_location_default">TCP Clips</string>
     <string name="settings_replay_location_custom">Choose folder…</string>
@@ -586,6 +595,16 @@
     <string name="msg_save_clip_failed">Couldn\'t install TCP SC (%1$s)</string>
     <string name="msg_save_clip_allow_installs">Allow Command Panel to install apps in the screen that just opened, then press Install again.</string>
     <string name="msg_save_clip_finish_in_installer">Finish installing TCP SC in Android\'s installer.</string>
+    <string name="msg_thorkbm_installed">ThorKBM is installed.</string>
+    <string name="msg_thorkbm_no_release">The latest ThorKBM release doesn\'t include an APK. Try again later.</string>
+    <string name="msg_thorkbm_failed">Couldn\'t install ThorKBM (%1$s)</string>
+    <string name="msg_thorkbm_allow_installs">Allow Command Panel to install apps in the screen that just opened, then press Install again.</string>
+    <string name="msg_thorkbm_finish_in_installer">Finish installing ThorKBM in Android\'s installer.</string>
+    <string name="msg_thorkbm_open_failed">Couldn\'t open ThorKBM.</string>
+    <plurals name="msg_thorkbm_rate_limited">
+        <item quantity="one">GitHub\'s hourly limit is used up. Try again in %1$d minute.</item>
+        <item quantity="other">GitHub\'s hourly limit is used up. Try again in %1$d minutes.</item>
+    </plurals>
     <string name="msg_save_failed">Save failed (%1$s)</string>
     <string name="msg_saved_to">Saved to %1$s</string>
     <string name="msg_export_failed">Export failed</string>

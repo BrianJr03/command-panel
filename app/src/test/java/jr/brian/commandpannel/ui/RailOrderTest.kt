@@ -5,6 +5,7 @@ import jr.brian.commandpannel.ui.settings.SettingsCategory.APPEARANCE
 import jr.brian.commandpannel.ui.settings.SettingsCategory.DIAGNOSTICS
 import jr.brian.commandpannel.ui.settings.SettingsCategory.EXPERIMENTAL
 import jr.brian.commandpannel.ui.settings.SettingsCategory.GENERAL
+import jr.brian.commandpannel.ui.settings.SettingsCategory.KEYBOARD
 import jr.brian.commandpannel.ui.settings.SettingsCategory.NAV_BAR
 import jr.brian.commandpannel.ui.settings.SettingsCategory.QUICK_TOGGLES
 import jr.brian.commandpannel.ui.settings.SettingsCategory.REPLAY
@@ -19,14 +20,14 @@ class RailOrderTest {
     fun `nothing saved is the default order, with Replay after Themes and Experimental last`() {
         assertEquals(SettingsCategory.entries, SettingsCategory.ordered(null))
         assertEquals(
-            listOf(GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY, DIAGNOSTICS, EXPERIMENTAL),
+            listOf(GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY, KEYBOARD, DIAGNOSTICS, EXPERIMENTAL),
             SettingsCategory.ordered(""),
         )
     }
 
     @Test
     fun `a full saved order round-trips`() {
-        val order = listOf(REPLAY, EXPERIMENTAL, THEMES, GENERAL, DIAGNOSTICS, NAV_BAR, APPEARANCE, QUICK_TOGGLES)
+        val order = listOf(REPLAY, EXPERIMENTAL, KEYBOARD, THEMES, GENERAL, DIAGNOSTICS, NAV_BAR, APPEARANCE, QUICK_TOGGLES)
         assertEquals(order, SettingsCategory.ordered(order.joinToString(",") { it.key }))
     }
 
@@ -34,7 +35,7 @@ class RailOrderTest {
     fun `a section missing from an older save goes after the one before it by default`() {
         // Saved before Replay existed, with Themes moved to the top.
         assertEquals(
-            listOf(THEMES, REPLAY, GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, DIAGNOSTICS, EXPERIMENTAL),
+            listOf(THEMES, REPLAY, KEYBOARD, GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, DIAGNOSTICS, EXPERIMENTAL),
             SettingsCategory.ordered("themes,general,nav_bar,tiles,appearance,diagnostics"),
         )
     }
@@ -43,15 +44,24 @@ class RailOrderTest {
     fun `Experimental joins an order saved before it existed, right after Diagnostics`() {
         // A v0.8.0-style save with every other section, Diagnostics moved up.
         assertEquals(
-            listOf(GENERAL, DIAGNOSTICS, EXPERIMENTAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY),
+            listOf(GENERAL, DIAGNOSTICS, EXPERIMENTAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY, KEYBOARD),
             SettingsCategory.ordered("general,diagnostics,nav_bar,tiles,appearance,themes,replay"),
+        )
+    }
+
+    @Test
+    fun `Keyboard joins an order saved before it existed, right after Replay`() {
+        // A v0.9.1-style save with Replay moved to the top.
+        assertEquals(
+            listOf(REPLAY, KEYBOARD, GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, DIAGNOSTICS, EXPERIMENTAL),
+            SettingsCategory.ordered("replay,general,nav_bar,tiles,appearance,themes,diagnostics,experimental"),
         )
     }
 
     @Test
     fun `unknown keys and repeats are dropped`() {
         assertEquals(
-            listOf(DIAGNOSTICS, EXPERIMENTAL, GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY),
+            listOf(DIAGNOSTICS, EXPERIMENTAL, GENERAL, NAV_BAR, QUICK_TOGGLES, APPEARANCE, THEMES, REPLAY, KEYBOARD),
             SettingsCategory.ordered("diagnostics, bogus,diagnostics,general"),
         )
     }

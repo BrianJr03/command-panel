@@ -38,6 +38,9 @@
         <!-- Better Dual Screen Assistant: detected so Command Panel stands by instead of fighting over the button. -->
         <package android:name="com.stormpanda.betterdualscreenassistant" />
         <package android:name="com.stormpanda.betterdualscreenassistant.debug" />
+        <!-- ThorKBM: the Keyboard section installs and opens it. -->
+        <package android:name="jr.brian.thorkbm" />
+        <package android:name="jr.brian.thorkbm.debug" />
     </queries>
 
     <application
