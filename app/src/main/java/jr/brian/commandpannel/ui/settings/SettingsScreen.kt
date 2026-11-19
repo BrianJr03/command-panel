@@ -645,17 +645,19 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
 }
 
 /**
- * TCP Save Clip, the trigger app Back Button Hero launches to save a clip: whether it's installed and paired with this
- * build, and an Install / Reinstall button that fetches the one from this version's release. Debug builds pair only
- * with a locally built trigger (signature permission), so they get a note instead of the button.
+ * TCP SC (TCP Save Clip), the trigger app Back Button Hero launches to save a clip: whether it's installed and paired
+ * with this build. While it needs installing (or reinstalling), the whole card is the button: A or a tap fetches the
+ * one from this version's release. Debug builds pair only with a locally built trigger (signature permission), so
+ * they get a note instead.
  */
 @Composable
 private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
-    Card(Modifier.tourTarget(TourSpot.SAVE_CLIP)) {
+    val status = state.saveClip
+    val installable = !BuildConfig.DEBUG && status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready
+    val content: @Composable () -> Unit = {
         CardTitle(stringResource(R.string.settings_save_clip_title))
         CardDesc(stringResource(R.string.settings_save_clip_desc))
         Spacer(Modifier.height(10.dp))
-        val status = state.saveClip
         val (line, tone) = when (status) {
             is jr.brian.commandpannel.system.update.SaveClipStatus.Ready ->
                 stringResource(R.string.settings_save_clip_ready, status.version) to p.accent
@@ -668,21 +670,35 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
         if (BuildConfig.DEBUG) {
             Spacer(Modifier.height(6.dp))
             InfoLine(stringResource(R.string.settings_save_clip_debug_note))
-        } else if (status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready) {
+        } else if (installable) {
             Spacer(Modifier.height(10.dp))
-            // Stays enabled while busy (a disabled button drops gamepad focus); installSaveClip ignores repeats.
-            AccentButton(
-                stringResource(
-                    when {
-                        state.saveClipBusy -> R.string.settings_save_clip_installing
-                        status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission -> R.string.settings_save_clip_reinstall
-                        else -> R.string.settings_save_clip_install
-                    },
-                ),
-                onClick = vm::installSaveClip,
-            )
+            // A label, not a second focus stop: the card itself installs.
+            Box(Modifier.clip(controlShape(12.dp)).background(p.accent).padding(horizontal = 20.dp, vertical = 11.dp)) {
+                Text(
+                    lookLabel(
+                        stringResource(
+                            when {
+                                state.saveClipBusy -> R.string.settings_save_clip_installing
+                                status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission -> R.string.settings_save_clip_reinstall
+                                else -> R.string.settings_save_clip_install
+                            },
+                        ),
+                    ),
+                    color = p.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+                )
+            }
         }
         state.saveClipMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
+    }
+    if (installable) {
+        // installSaveClip ignores presses while an install is running.
+        FocusCard(
+            onActivate = vm::installSaveClip,
+            modifier = Modifier.tourTarget(TourSpot.SAVE_CLIP).noRippleClickable(onClick = vm::installSaveClip),
+            content = content,
+        )
+    } else {
+        Card(Modifier.tourTarget(TourSpot.SAVE_CLIP), content = content)
     }
 }
 
