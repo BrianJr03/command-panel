@@ -128,8 +128,11 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${APK_NAME}"
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
           echo "Renamed APK to: ${APK_NAME}"
-          # TCP Save Clip (Back Button Hero trigger): same key, fixed name so release links stay stable.
-          mv trigger/build/outputs/apk/release/trigger-release.apk trigger/build/outputs/apk/release/tcp-sc.apk
+          # TCP SC (Back Button Hero trigger): same key, named for the release it ships with (the app installs that one).
+          SC_NAME="tcp-sc-${VERSION_NAME}.apk"
+          mv trigger/build/outputs/apk/release/trigger-release.apk "trigger/build/outputs/apk/release/${SC_NAME}"
+          echo "sc_name=${SC_NAME}" >> $GITHUB_OUTPUT
+          echo "Renamed trigger APK to: ${SC_NAME}"
 
       # --- Manual release flow (workflow_dispatch) ---
 
@@ -143,7 +146,7 @@ jobs:
           body_path: app/src/main/res/raw/patch_notes.md
           files: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-sc.apk
+            trigger/build/outputs/apk/release/${{ steps.rename.outputs.sc_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -154,7 +157,7 @@ jobs:
           tag_name: ${{ inputs.release_tag }}
           files: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-sc.apk
+            trigger/build/outputs/apk/release/${{ steps.rename.outputs.sc_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -167,7 +170,7 @@ jobs:
           name: command-panel-${{ steps.version.outputs.version_name }}
           path: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-sc.apk
+            trigger/build/outputs/apk/release/${{ steps.rename.outputs.sc_name }}
           retention-days: 90
 
       - name: Cleanup keystore

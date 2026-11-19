@@ -15,7 +15,7 @@ sealed interface SaveClipStatus {
     data class NoPermission(val version: String) : SaveClipStatus
 }
 
-/** The `tcp-sc.apk` asset of a release. */
+/** The `tcp-sc-<version>.apk` asset of a release. */
 data class SaveClipAsset(val url: String, val size: Long)
 
 /**
@@ -25,7 +25,8 @@ data class SaveClipAsset(val url: String, val size: Long)
  */
 object SaveClipInstaller {
     const val PACKAGE = "jr.brian.tcp.saveclip"
-    const val ASSET_NAME = "tcp-sc.apk"
+    /** The trigger's asset in release `v<version>`, named for that release like `command-panel-<version>.apk`. */
+    fun assetName(version: String) = "tcp-sc-$version.apk"
     private const val TAGS = "https://api.github.com/repos/BrianJr03/command-panel/releases/tags"
     private const val MAX_APK_BYTES = 10L * 1024 * 1024
     private const val STAGED = "/data/local/tmp/tcp-sc.apk"
@@ -40,18 +41,18 @@ object SaveClipInstaller {
 
     /** The trigger APK attached to release `v<version>`, or null if that release has none. */
     fun asset(version: String): SaveClipAsset? =
-        parseAsset(JSONObject(Http.getText("$TAGS/v$version", 512 * 1024, "application/vnd.github+json")))
+        parseAsset(JSONObject(Http.getText("$TAGS/v$version", 512 * 1024, "application/vnd.github+json")), version)
 
-    internal fun parseAsset(release: JSONObject): SaveClipAsset? {
+    internal fun parseAsset(release: JSONObject, version: String): SaveClipAsset? {
         val assets = release.optJSONArray("assets") ?: return null
         return (0 until assets.length()).mapNotNull { assets.optJSONObject(it) }
-            .firstOrNull { it.optString("name") == ASSET_NAME }
+            .firstOrNull { it.optString("name") == assetName(version) }
             ?.let { a -> a.optString("browser_download_url").takeIf { it.startsWith("https://") }?.let { SaveClipAsset(it, a.optLong("size")) } }
     }
 
     /** Downloads [asset] into the updates cache (shared with Android's installer) and checks it's TCP Save Clip. */
     fun download(context: Context, asset: SaveClipAsset): File {
-        val dest = File(File(context.cacheDir, "updates"), ASSET_NAME)
+        val dest = File(File(context.cacheDir, "updates"), "tcp-sc.apk")
         Http.download(asset.url, dest, MAX_APK_BYTES)
         if (asset.size > 0 && dest.length() != asset.size) {
             dest.delete()

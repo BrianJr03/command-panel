@@ -18,21 +18,27 @@ class SaveClipInstallerTest {
         val asset = SaveClipInstaller.parseAsset(
             release(
                 "command-panel-0.7.1.apk" to "https://github.com/x/command-panel-0.7.1.apk",
-                "tcp-sc.apk" to "https://github.com/x/tcp-sc.apk",
+                "tcp-sc-0.7.1.apk" to "https://github.com/x/tcp-sc-0.7.1.apk",
             ),
+            "0.7.1",
         )
-        assertEquals("https://github.com/x/tcp-sc.apk", asset?.url)
+        assertEquals("https://github.com/x/tcp-sc-0.7.1.apk", asset?.url)
         assertEquals(20126L, asset?.size)
     }
 
     @Test
     fun `a release without the trigger has no asset`() {
-        assertNull(SaveClipInstaller.parseAsset(release("command-panel-0.7.0.apk" to "https://github.com/x/a.apk")))
-        assertNull(SaveClipInstaller.parseAsset(JSONObject()))
+        assertNull(SaveClipInstaller.parseAsset(release("command-panel-0.7.0.apk" to "https://github.com/x/a.apk"), "0.7.0"))
+        assertNull(SaveClipInstaller.parseAsset(JSONObject(), "0.7.0"))
+    }
+
+    @Test
+    fun `only the trigger for this version counts`() {
+        assertNull(SaveClipInstaller.parseAsset(release("tcp-sc-0.7.1.apk" to "https://github.com/x/tcp-sc-0.7.1.apk"), "0.7.2"))
     }
 
     @Test
     fun `only https downloads are used`() {
-        assertNull(SaveClipInstaller.parseAsset(release("tcp-sc.apk" to "http://github.com/x/tcp-sc.apk")))
+        assertNull(SaveClipInstaller.parseAsset(release("tcp-sc-0.7.1.apk" to "http://github.com/x/tcp-sc-0.7.1.apk"), "0.7.1"))
     }
 }

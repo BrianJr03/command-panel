@@ -121,7 +121,7 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 
 ## Save clips from Back Button Hero
 
-Thor Back Button Hero can save a Replay Buffer clip through **TCP SC** (TCP Save Clip, `tcp-sc.apk` in each release), a tiny app that opens invisibly, asks Command Panel to save, and closes.
+Thor Back Button Hero can save a Replay Buffer clip through **TCP SC** (TCP Save Clip, `tcp-sc-<version>.apk` in each release), a tiny app that opens invisibly, asks Command Panel to save, and closes.
 
 1. Install TCP SC **after** Command Panel, or press **Install** on the TCP SC card in General. If you installed it first, reinstall it: Android only grants the permission it needs if Command Panel is already installed.
 2. In Back Button Hero, pick a gesture or a Back + button combo, then **Launch app** → **TCP SC** → **bottom screen**, so the game on the top screen keeps focus.
