@@ -149,4 +149,17 @@ class ThorKbmInstallerTest {
     fun `asset name follows ThorKBM's release naming`() {
         assertEquals("ThorKBM-v2.2.1.apk", ThorKbmInstaller.assetName("2.2.1"))
     }
+
+    @Test
+    fun `the GitHub page and the release API point at the same repo`() {
+        assertEquals("https://github.com/BrianJr03/Thor-Ergo-Android", ThorKbmInstaller.REPO_URL)
+        assertEquals(
+            "https://api.github.com/repos/BrianJr03/Thor-Ergo-Android/releases/latest",
+            ThorKbmInstaller.latestReleaseApi(ThorKbmInstaller.REPO_URL),
+        )
+        assertEquals(
+            "https://api.github.com/repos/a/b/releases/latest",
+            ThorKbmInstaller.latestReleaseApi("https://github.com/a/b/"),
+        )
+    }
 }

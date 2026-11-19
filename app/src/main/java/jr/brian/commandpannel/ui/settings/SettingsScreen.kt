@@ -40,6 +40,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
 import androidx.compose.ui.zIndex
@@ -736,38 +739,85 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
  */
 @Composable
 private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
-    val status = state.thorKbm
     Card {
-        CardTitle(stringResource(R.string.settings_thorkbm_title))
-        CardDesc(stringResource(R.string.settings_thorkbm_desc))
-        Spacer(Modifier.height(10.dp))
-        Text(
-            status.releaseVersion?.let { stringResource(R.string.settings_thorkbm_installed, it) }
-                ?: stringResource(R.string.settings_thorkbm_missing),
-            color = if (status.releaseInstalled) p.accent else p.textSecondary,
-            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
-        )
-        status.debugVersion?.let {
-            Spacer(Modifier.height(6.dp))
-            InfoLine(stringResource(R.string.settings_thorkbm_debug_also, it))
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (!status.releaseInstalled) {
-                // Stays pressable while busy (a disabled control drops gamepad focus); installThorKbm ignores repeats.
-                SaveClipAction(
-                    stringResource(if (state.thorKbmBusy) R.string.settings_thorkbm_installing else R.string.settings_thorkbm_install),
-                    filled = true,
-                    onClick = vm::installThorKbm,
-                )
-            }
-            if (status.openPackage != null) {
-                SaveClipAction(stringResource(R.string.settings_thorkbm_open), filled = status.releaseInstalled, onClick = vm::openThorKbm)
+        // The preview sits beside the details so the whole card fits on the top screen; on a card too narrow for that
+        // (a wide look, a big font scale) it goes above them instead of squeezing the text.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val fontScale = LocalDensity.current.fontScale
+            if (maxWidth >= THORKBM_PREVIEW_WIDTH + THORKBM_PREVIEW_GAP + THORKBM_MIN_DETAILS_WIDTH * fontScale) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ThorKbmDetails(state, vm, previewAbove = false)
+                    }
+                    Spacer(Modifier.width(THORKBM_PREVIEW_GAP))
+                    ThorKbmPreview()
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { ThorKbmDetails(state, vm, previewAbove = true) }
             }
         }
-        state.thorKbmMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
 }
+
+/** The ThorKBM card's text and buttons, with the preview between the description and the status when [previewAbove]. */
+@Composable
+private fun ThorKbmDetails(state: SettingsState, vm: SettingsViewModel, previewAbove: Boolean) {
+    val status = state.thorKbm
+    CardTitle(stringResource(R.string.settings_thorkbm_title))
+    CardDesc(stringResource(R.string.settings_thorkbm_desc))
+    if (previewAbove) {
+        Spacer(Modifier.height(10.dp))
+        ThorKbmPreview()
+    }
+    Spacer(Modifier.height(10.dp))
+    Text(
+        status.releaseVersion?.let { stringResource(R.string.settings_thorkbm_installed, it) }
+            ?: stringResource(R.string.settings_thorkbm_missing),
+        color = if (status.releaseInstalled) p.accent else p.textSecondary,
+        fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+    )
+    status.debugVersion?.let {
+        Spacer(Modifier.height(6.dp))
+        InfoLine(stringResource(R.string.settings_thorkbm_debug_also, it))
+    }
+    Spacer(Modifier.height(10.dp))
+    // Wraps on a narrow column (Open on GitHub drops to its own row); the D-pad moves across and down between them.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (!status.releaseInstalled) {
+            // Stays pressable while busy (a disabled control drops gamepad focus); installThorKbm ignores repeats.
+            SaveClipAction(
+                stringResource(if (state.thorKbmBusy) R.string.settings_thorkbm_installing else R.string.settings_thorkbm_install),
+                filled = true,
+                onClick = vm::installThorKbm,
+            )
+        }
+        if (status.openPackage != null) {
+            SaveClipAction(stringResource(R.string.settings_thorkbm_open), filled = status.releaseInstalled, onClick = vm::openThorKbm)
+        }
+        SaveClipAction(stringResource(R.string.settings_thorkbm_github), filled = false, onClick = vm::openThorKbmGitHub)
+    }
+    state.thorKbmMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
+}
+
+/** ThorKBM on the bottom screen, shown whether or not it's installed. Not a focus target. */
+@Composable
+private fun ThorKbmPreview() {
+    Image(
+        painterResource(R.drawable.thorkbm_preview),
+        contentDescription = stringResource(R.string.settings_thorkbm_preview_desc),
+        modifier = Modifier.size(THORKBM_PREVIEW_WIDTH, THORKBM_PREVIEW_HEIGHT).clip(cardShape()),
+        contentScale = ContentScale.Fit,
+    )
+}
+
+/**
+ * The ThorKBM preview's size (its asset is a 1240x1080 bottom-screen capture), sized so the card fits on the 1080px top
+ * screen under the section header, and the narrowest the details column may get (times the font scale) beside it.
+ */
+private val THORKBM_PREVIEW_HEIGHT = 200.dp
+private val THORKBM_PREVIEW_WIDTH = THORKBM_PREVIEW_HEIGHT * (1240f / 1080f)
+private val THORKBM_PREVIEW_GAP = 20.dp
+private val THORKBM_MIN_DETAILS_WIDTH = 220.dp
 
 /**
  * The TCP SC and ThorKBM cards' controls: the Install button ([filled]) and the "Installed" status pill. Focus is unmistakable on

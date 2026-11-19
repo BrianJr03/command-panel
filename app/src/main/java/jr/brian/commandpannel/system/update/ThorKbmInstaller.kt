@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.view.Display
 import jr.brian.commandpannel.plugin.PanelPluginTrust
 import jr.brian.commandpannel.privileged.PrivilegedAccess
@@ -39,7 +40,10 @@ data class ThorKbmRelease(val version: String, val url: String, val size: Long)
 object ThorKbmInstaller {
     const val PACKAGE = PanelPluginTrust.THORKBM_PACKAGE
     const val DEBUG_PACKAGE = "$PACKAGE.debug"
-    private const val LATEST = "https://api.github.com/repos/BrianJr03/Thor-Ergo-Android/releases/latest"
+
+    /** ThorKBM's GitHub page: the card's Open on GitHub button, and where [latest] looks for releases. */
+    const val REPO_URL = "https://github.com/BrianJr03/Thor-Ergo-Android"
+    private val LATEST = latestReleaseApi(REPO_URL)
     private const val MAX_APK_BYTES = 40L * 1024 * 1024
     private const val STAGED = "/data/local/tmp/thorkbm.apk"
 
@@ -50,6 +54,10 @@ object ThorKbmInstaller {
     private val VERSION = Regex("""\d+(\.\d+)*(-[A-Za-z0-9.]+)?""")
 
     fun assetName(version: String) = "ThorKBM-v$version.apk"
+
+    /** The GitHub API's latest-release URL for the repo at [repoUrl] (`https://github.com/<owner>/<repo>`). */
+    internal fun latestReleaseApi(repoUrl: String) =
+        "https://api.github.com/repos/${repoUrl.removePrefix("https://github.com/").trimEnd('/')}/releases/latest"
 
     fun status(context: Context): ThorKbmStatus {
         val pm = context.packageManager
@@ -180,6 +188,13 @@ object ThorKbmInstaller {
     fun open(context: Context, packageName: String): Boolean {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return false
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle()
+        return runCatching { context.startActivity(intent, opts) }.isSuccess
+    }
+
+    /** Opens [REPO_URL] in the browser on the top display. False when no app can show it. */
+    fun openRepoPage(context: Context): Boolean {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle()
         return runCatching { context.startActivity(intent, opts) }.isSuccess
     }

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Verifies installing and opening ThorKBM from the companion's Keyboard section (#20).
+# Verifies installing and opening ThorKBM from the companion's Keyboard section (#20), and the card's preview and
+# Open on GitHub button (#32).
 #   scripts/verify-thorkbm.sh [static|device|all] [--uninstall-first] [--no-build]
 #
 # static  Builds, unit tests, and the merged manifest's <queries> for ThorKBM. No device needed.
 # device  On the connected Thor, against the debug build (the only one with this branch's code): opens the companion
 #         on the top screen, goes to Keyboard, presses Install, then checks that ThorKBM was installed by the root
 #         shell, is the release package signed with ThorKBM's release key, matches GitHub's latest tag, that the card
-#         now offers Open instead of Install, and that Open starts ThorKBM on the top screen.
+#         now offers Open instead of Install, and that Open starts ThorKBM on the top screen. Then checks the card's
+#         preview image (shown, not focusable) and that Open on GitHub brings ThorKBM's GitHub page up in a browser on
+#         the top screen (or, with no browser installed, the card's no-browser message).
 #   --uninstall-first  Removes an installed jr.brian.thorkbm first so the install can run. This DELETES ThorKBM's
 #                      settings on the device: only with the PM's OK. Without it, an installed ThorKBM gets the
 #                      Open checks only.
@@ -33,6 +36,8 @@ done
 PKG="jr.brian.commandpannel.debug"
 COMPANION="$PKG/jr.brian.commandpannel.MainActivity"
 KBM="jr.brian.thorkbm"
+KBM_REPO="https://github.com/BrianJr03/Thor-Ergo-Android"
+PREVIEW_DESC="ThorKBM on the bottom screen: a keyboard with a trackpad beside it"
 # ThorKBM's release signing certificate (PanelPluginTrust.THORKBM_CERT_SHA256).
 KBM_CERT="988a63897e69f0e080d6a9cb8acf5a0d1e01deb6fd8c6337a33778b5cbf44379"
 APP_APK="app/build/outputs/apk/debug/app-debug.apk"
@@ -87,6 +92,16 @@ tap_text() {
 # Some node's text matches the extended regex $1 (e.g. "Installed \([^\"]+\)").
 ui_matches() { dump_ui; grep -qE "text=\"$1\"" "$OUT_DIR/ui.xml"; }
 
+# Swipes the settings pane (right of the rail) to its top or end. The ThorKBM card fits on the top screen, but
+# uiautomator leaves off-screen nodes out of the dump, so the card_* helpers below scroll to the end and look again
+# when something isn't found (a bigger font scale, the stacked fallback layout).
+pane_swipe() { sh_dev input -d 0 swipe 1240 "$1" 1240 "$2" 250 >/dev/null; }
+pane_to_top() { pane_swipe 300 1000; pane_swipe 300 1000; sleep 1; }
+pane_to_end() { pane_swipe 1000 300; pane_swipe 1000 300; sleep 1; }
+card_has() { ui_has "$1" || { pane_to_end; ui_has "$1"; }; }
+card_matches() { ui_matches "$1" || { pane_to_end; ui_matches "$1"; }; }
+card_tap() { tap_text "$1" || { pane_to_end; tap_text "$1"; }; }
+
 # Screenshot of the top screen to $OUT_DIR/<name>.png.
 shot() { adb exec-out screencap -p > "$OUT_DIR/$1.png" 2>/dev/null && echo "  screenshot: $OUT_DIR/$1.png"; }
 
@@ -100,7 +115,13 @@ open_keyboard_section() {
     elif ui_has "Skip tour"; then tap_text "Skip tour"; sleep 2
     else break; fi
   done
-  tap_text "Keyboard" && sleep 1 && ui_has "ThorKBM"
+  tap_text "Keyboard" && sleep 1 && pane_to_top && ui_has "ThorKBM"
+}
+
+# Packages that can show ThorKBM's GitHub page (browsers, or the GitHub app), one per line.
+repo_handlers() {
+  sh_dev cmd package query-activities --brief -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$KBM_REPO" |
+    grep -oE '[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+' | cut -d/ -f1 | sort -u
 }
 
 # The debug build's ThorKBM overrides file (ThorKbmInstaller.DebugOverrides), in its own storage.
@@ -211,10 +232,10 @@ device_checks() {
   installed "$KBM.debug" && had_debug=true
   check "companion opens on Keyboard with the ThorKBM card" open_keyboard_section
   if $had_debug; then
-    check "card notes the debug build ($(version_of "$KBM.debug"))" ui_matches "Debug build also installed \\([^\"]+\\)"
+    check "card notes the debug build ($(version_of "$KBM.debug"))" card_matches "Debug build also installed \\([^\"]+\\)"
   fi
   if ! installed "$KBM"; then
-    check "card says Not installed" ui_has "Not installed"
+    check "card says Not installed" card_has "Not installed"
     shot card-before-install
     $had_debug && check "card offers Install next to Open for the debug build" \
       sh -c "grep -q 'text=\"Install\"' '$OUT_DIR/ui.xml' && grep -q 'text=\"Open\"' '$OUT_DIR/ui.xml'"
@@ -223,7 +244,7 @@ device_checks() {
     if $no_root; then
       install_without_root
     else
-      check "pressed Install" tap_text "Install"
+      check "pressed Install" card_tap "Install"
     fi
     if $no_root; then
       :
@@ -253,12 +274,43 @@ device_checks() {
   if installed "$KBM"; then
     step "Open"
     open_keyboard_section >/dev/null
-    check "card shows Installed ($(version_of "$KBM"))" ui_has "Installed ($(version_of "$KBM"))"
+    check "card shows Installed ($(version_of "$KBM"))" card_has "Installed ($(version_of "$KBM"))"
     check "card offers Open, not Install" sh -c "grep -q 'text=\"Open\"' '$OUT_DIR/ui.xml' && ! grep -q 'text=\"Install\"' '$OUT_DIR/ui.xml'"
     shot card-installed
-    check "pressed Open" tap_text "Open"
+    check "pressed Open" card_tap "Open"
     check "ThorKBM is in front on the top screen" wait_for 10 "top_focus | grep -q '$KBM/'"
     sleep 1; shot thorkbm-opened
+    sh_dev input keyevent KEYCODE_HOME >/dev/null
+  fi
+
+  step "Preview and Open on GitHub (#32)"
+  check "companion opens on Keyboard with the ThorKBM card" open_keyboard_section
+  check "card shows the ThorKBM preview" grep -q "content-desc=\"$PREVIEW_DESC\"" "$OUT_DIR/ui.xml"
+  check "preview isn't a focus target" sh -c \
+    "grep -o '<node [^>]*content-desc=\"$PREVIEW_DESC\"[^>]*>' '$OUT_DIR/ui.xml' | grep -q 'focusable=\"false\"'"
+  check "whole card fits on the top screen (preview and Open on GitHub in one unscrolled dump)" \
+    grep -q 'text="Open on GitHub"' "$OUT_DIR/ui.xml"
+  check "preview is beside the details (right of the title)" sh -c "
+    t=\$(grep -o '<node [^>]*text=\"ThorKBM\"[^>]*>' '$OUT_DIR/ui.xml' | head -1 | grep -o 'bounds=\"[^\"]*\"' | grep -oE '[0-9]+' | sed -n 3p)
+    i=\$(grep -o '<node [^>]*content-desc=\"$PREVIEW_DESC\"[^>]*>' '$OUT_DIR/ui.xml' | grep -o 'bounds=\"[^\"]*\"' | grep -oE '[0-9]+' | sed -n 1p)
+    [ -n \"\$t\" ] && [ -n \"\$i\" ] && [ \"\$i\" -gt \"\$t\" ]"
+  shot card-preview
+  check "card offers Open on GitHub" card_has "Open on GitHub"
+  local handlers; handlers="$(repo_handlers)"
+  echo "  apps that can show $KBM_REPO: $(echo $handlers)"
+  check "pressed Open on GitHub" card_tap "Open on GitHub"
+  if [ -z "$handlers" ]; then
+    check "card says no browser is installed" wait_for 5 "card_matches '[^\"]*No browser is installed\\.'"
+  else
+    local front=""
+    wait_for 15 "[ -n \"\$(top_focus)\" ] && ! top_focus | grep -q '^$PKG/'" && front="$(top_focus)"
+    if echo "$front" | grep -qE 'ResolverActivity|ChooserActivity'; then
+      skip "Android asked which app opens the link ($front): pick a browser by hand, then rerun"
+    else
+      check "a browser shows the page on the top screen (${front:-nothing in front})" \
+        sh -c "[ -n '$front' ] && echo '$handlers' | grep -qx '${front%%/*}'"
+    fi
+    sleep 2; shot github-opened
     sh_dev input keyevent KEYCODE_HOME >/dev/null
   fi
 }

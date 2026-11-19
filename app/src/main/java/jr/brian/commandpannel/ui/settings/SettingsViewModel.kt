@@ -1262,6 +1262,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** Opens ThorKBM's GitHub page in the browser on the top screen. */
+    fun openThorKbmGitHub() {
+        if (!jr.brian.commandpannel.system.update.ThorKbmInstaller.openRepoPage(app)) {
+            _state.value = _state.value.copy(thorKbmMessage = app.getString(R.string.msg_thorkbm_no_browser))
+        }
+    }
+
     // ---- companion tour ----
 
     /** The first-run tour is waiting for the What's New dialog to close. */

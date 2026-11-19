@@ -225,6 +225,8 @@
     <string name="settings_thorkbm_install">Install</string>
     <string name="settings_thorkbm_installing">Installing…</string>
     <string name="settings_thorkbm_open">Open</string>
+    <string name="settings_thorkbm_github">Open on GitHub</string>
+    <string name="settings_thorkbm_preview_desc">ThorKBM on the bottom screen: a keyboard with a trackpad beside it</string>
     <string name="settings_replay_location">Save location</string>
     <string name="settings_replay_location_default">TCP Clips</string>
     <string name="settings_replay_location_custom">Choose folder…</string>
@@ -606,6 +608,7 @@
     <string name="msg_thorkbm_allow_installs">Allow Command Panel to install apps in the screen that just opened, then press Install again.</string>
     <string name="msg_thorkbm_finish_in_installer">Finish installing ThorKBM in Android\'s installer.</string>
     <string name="msg_thorkbm_open_failed">Couldn\'t open ThorKBM.</string>
+    <string name="msg_thorkbm_no_browser">Couldn\'t open ThorKBM\'s GitHub page. No browser is installed.</string>
     <plurals name="msg_thorkbm_rate_limited">
         <item quantity="one">GitHub\'s hourly limit is used up. Try again in %1$d minute.</item>
         <item quantity="other">GitHub\'s hourly limit is used up. Try again in %1$d minutes.</item>
