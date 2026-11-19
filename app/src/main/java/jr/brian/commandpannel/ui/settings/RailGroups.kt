@@ -123,3 +123,43 @@ data class RailLayout(
             if (KEY_LEGACY_ORDER in restored && KEYS.none { it in restored }) KEYS else emptySet()
     }
 }
+
+/** One row on the rail: the pinned section, a group header, or a section inside an expanded group. */
+sealed interface RailRow {
+    /** Stable identity, for `key(...)` and edge scrolling. */
+    val id: String
+
+    data class Section(val category: SettingsCategory) : RailRow {
+        override val id: String get() = category.key
+    }
+
+    data class Header(val group: RailGroup) : RailRow {
+        override val id: String get() = "group:${group.key}"
+    }
+}
+
+/** Which groups are expanded on the rail, saved in `rail_expanded` as a CSV of group keys. */
+object RailExpanded {
+    const val KEY = "rail_expanded"
+
+    /** Unknown keys are dropped; nothing saved means every group starts collapsed. */
+    fun parse(csv: String?): Set<RailGroup> =
+        csv?.split(",")?.mapNotNull { RailGroup.fromKey(it.trim()) }?.toSet().orEmpty()
+
+    fun encode(groups: Set<RailGroup>): String = RailGroup.entries.filter { it in groups }.joinToString(",") { it.key }
+}
+
+/** The rows on screen, top to bottom: sections of collapsed groups aren't there, so focus can't land on them. */
+fun RailLayout.visibleRows(expanded: Set<RailGroup>): List<RailRow> = buildList {
+    add(RailRow.Section(RailGroup.PINNED))
+    for (g in groups) {
+        add(RailRow.Header(g))
+        if (g in expanded) sectionsOf(g).forEach { add(RailRow.Section(it)) }
+    }
+}
+
+/** Where rail focus goes for the [selected] section: the section itself, or its group's header while collapsed. */
+fun railFocusTarget(selected: SettingsCategory, expanded: Set<RailGroup>): RailRow {
+    val group = RailGroup.of(selected)
+    return if (group == null || group in expanded) RailRow.Section(selected) else RailRow.Header(group)
+}

@@ -5,7 +5,11 @@ import jr.brian.commandpannel.ui.settings.RailGroup.ADVANCED
 import jr.brian.commandpannel.ui.settings.RailGroup.EXTRAS
 import jr.brian.commandpannel.ui.settings.RailGroup.LOOK
 import jr.brian.commandpannel.ui.settings.RailGroup.PANEL
+import jr.brian.commandpannel.ui.settings.RailExpanded
 import jr.brian.commandpannel.ui.settings.RailLayout
+import jr.brian.commandpannel.ui.settings.RailRow
+import jr.brian.commandpannel.ui.settings.railFocusTarget
+import jr.brian.commandpannel.ui.settings.visibleRows
 import jr.brian.commandpannel.ui.settings.SettingsCategory
 import jr.brian.commandpannel.ui.settings.SettingsCategory.APPEARANCE
 import jr.brian.commandpannel.ui.settings.SettingsCategory.DIAGNOSTICS
@@ -183,5 +187,44 @@ class RailOrderTest {
         // Keyboard as before, so Advanced comes second.
         val restored = mapOf("rail_order" to "keyboard,general")
         assertEquals(listOf(EXTRAS, ADVANCED, PANEL, LOOK), RailLayout.read { restored[it] }.groups)
+    }
+
+    // ---- grouped rail rows and focus (#29) ----
+
+    @Test
+    fun `collapsed groups show only their header, and General is always first`() {
+        val rows = RailLayout.DEFAULT.withGroupOrder(listOf("look", "extras", "advanced", "panel")).visibleRows(setOf(PANEL))
+        assertEquals(
+            listOf(
+                RailRow.Section(GENERAL), RailRow.Header(LOOK), RailRow.Header(EXTRAS), RailRow.Header(ADVANCED),
+                RailRow.Header(PANEL), RailRow.Section(NAV_BAR), RailRow.Section(QUICK_TOGGLES),
+            ),
+            rows,
+        )
+        // All collapsed: General plus four headers.
+        assertEquals(5, RailLayout.DEFAULT.visibleRows(emptySet()).size)
+        // Row ids never collide (they key the composables).
+        val all = RailLayout.DEFAULT.visibleRows(RailGroup.entries.toSet())
+        assertEquals(all.size, all.map { it.id }.distinct().size)
+        assertEquals(13, all.size)
+    }
+
+    @Test
+    fun `rail focus goes to the selected section, or its header while the group is collapsed`() {
+        assertEquals(RailRow.Section(GENERAL), railFocusTarget(GENERAL, emptySet()))
+        assertEquals(RailRow.Section(THEMES), railFocusTarget(THEMES, setOf(LOOK)))
+        assertEquals(RailRow.Header(LOOK), railFocusTarget(THEMES, setOf(PANEL)))
+        // The target is always a row that is on screen.
+        for (cat in SettingsCategory.entries) for (open in listOf(emptySet(), setOf(EXTRAS), RailGroup.entries.toSet())) {
+            assertTrue(railFocusTarget(cat, open) in RailLayout.DEFAULT.visibleRows(open))
+        }
+    }
+
+    @Test
+    fun `expanded groups round-trip and are read tolerantly`() {
+        assertEquals(emptySet<RailGroup>(), RailExpanded.parse(null))
+        assertEquals(setOf(LOOK, ADVANCED), RailExpanded.parse("advanced, bogus,look,look"))
+        assertEquals("look,advanced", RailExpanded.encode(setOf(ADVANCED, LOOK)))
+        assertEquals(setOf(PANEL, EXTRAS), RailExpanded.parse(RailExpanded.encode(setOf(PANEL, EXTRAS))))
     }
 }

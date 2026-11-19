@@ -128,8 +128,10 @@ data class SettingsState(
     val updateMessage: String? = null,
     /** When updates were last checked (ms), 0 if never. */
     val updateLastCheck: Long = 0L,
-    /** The companion rail's section order (rearranged with the move handle on each section). */
-    val railOrder: List<SettingsCategory> = SettingsCategory.entries,
+    /** The companion rail's groups and their sections, in the user's order (sections move with their handles). */
+    val railLayout: RailLayout = RailLayout.DEFAULT,
+    /** The rail groups that are open. */
+    val railExpanded: Set<RailGroup> = emptySet(),
     /** TCP Save Clip (the Back Button Hero trigger): installed, and paired with this build. */
     val saveClip: jr.brian.commandpannel.system.update.SaveClipStatus = jr.brian.commandpannel.system.update.SaveClipStatus.Missing,
     /** A TCP Save Clip download or install is running. */
@@ -223,7 +225,8 @@ class SettingsViewModel @Inject constructor(
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
         thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
-        railOrder = SettingsCategory.ordered(prefs.getString(KEY_RAIL_ORDER, null)),
+        railLayout = RailLayout.read { prefs.getString(it, null) },
+        railExpanded = RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)),
     )
 
     /** The service reads this pref on each AYN press, so saving it is enough. */
@@ -749,11 +752,21 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(navOrder = order.split(","))
     }
 
-    /** Saves a new section order for the companion's rail. */
-    fun reorderRail(keys: List<String>) {
-        val order = SettingsCategory.ordered(keys.joinToString(","))
-        prefs.edit().putString(KEY_RAIL_ORDER, order.joinToString(",") { it.key }).apply()
-        _state.value = _state.value.copy(railOrder = order)
+    /** Saves a new section order inside one rail group (TODO(#30): group order and moving groups). */
+    fun reorderRailSections(group: RailGroup, keys: List<String>) {
+        val layout = _state.value.railLayout.withSectionOrder(group, keys)
+        val edit = prefs.edit()
+        layout.prefs().forEach { (k, v) -> edit.putString(k, v) }
+        edit.apply()
+        _state.value = _state.value.copy(railLayout = layout)
+    }
+
+    /** Opens or closes a rail group, and remembers it. */
+    fun setRailGroupExpanded(group: RailGroup, expanded: Boolean) {
+        val now = _state.value.railExpanded.let { if (expanded) it + group else it - group }
+        if (now == _state.value.railExpanded) return
+        prefs.edit().putString(RailExpanded.KEY, RailExpanded.encode(now)).apply()
+        _state.value = _state.value.copy(railExpanded = now)
     }
 
     fun setQuickLaunchShowApp(enable: Boolean) {
@@ -1382,7 +1395,6 @@ class SettingsViewModel @Inject constructor(
         /** Theme Studio's unsaved draft, autosaved while it's open. Not backed up. */
         const val KEY_STUDIO_DRAFT = "studio_draft"
         /** The companion rail's section order, as a CSV of [SettingsCategory] keys. Backed up. */
-        const val KEY_RAIL_ORDER = "rail_order"
     }
 }
 

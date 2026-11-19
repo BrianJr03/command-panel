@@ -158,6 +158,8 @@
     <string name="settings_group_look">Look</string>
     <string name="settings_group_extras">Extras</string>
     <string name="settings_group_advanced">Advanced</string>
+    <string name="settings_rail_expand">Expand %1$s</string>
+    <string name="settings_rail_collapse">Collapse %1$s</string>
 
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>
