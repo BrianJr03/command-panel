@@ -158,6 +158,24 @@ object ThorKbmInstaller {
         )?.trim()
     }
 
+    /**
+     * The card's message after its status is re-read. When an install [handedOff] to Android's installer shows up,
+     * it's [installedMessage], like the root path. Otherwise the old message stays while the status is unchanged or
+     * an install is running, and is dropped once the status moves on.
+     */
+    internal fun messageAfterRefresh(
+        old: ThorKbmStatus,
+        new: ThorKbmStatus,
+        oldMessage: String?,
+        busy: Boolean,
+        handedOff: Boolean,
+        installedMessage: String,
+    ): String? = when {
+        handedOff && !old.releaseInstalled && new.releaseInstalled -> installedMessage
+        old == new || busy -> oldMessage
+        else -> null
+    }
+
     /** Opens ThorKBM's main screen on the top display. False when it isn't installed or can't be started. */
     fun open(context: Context, packageName: String): Boolean {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)

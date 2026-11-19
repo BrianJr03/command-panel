@@ -107,6 +107,30 @@ class ThorKbmInstallerTest {
         assertNull(ThorKbmStatus().openPackage)
     }
 
+    private fun refresh(old: ThorKbmStatus, new: ThorKbmStatus, oldMessage: String?, busy: Boolean = false, handedOff: Boolean = false) =
+        ThorKbmInstaller.messageAfterRefresh(old, new, oldMessage, busy, handedOff, installedMessage = "ThorKBM is installed.")
+
+    private val missing = ThorKbmStatus(debugVersion = "2.2.1-debug")
+    private val installed = ThorKbmStatus(releaseVersion = "2.2.1", debugVersion = "2.2.1-debug")
+    private val finish = "Finish installing ThorKBM in Android's installer."
+
+    @Test
+    fun `an install finished in Android's installer says it's installed`() {
+        assertEquals("ThorKBM is installed.", refresh(missing, installed, finish, handedOff = true))
+    }
+
+    @Test
+    fun `a status change without a handoff clears the message`() {
+        assertNull(refresh(missing, installed, finish))
+        assertNull(refresh(installed, missing, "ThorKBM is installed.", handedOff = true))
+    }
+
+    @Test
+    fun `the message stays while the status is unchanged or an install runs`() {
+        assertEquals(finish, refresh(missing, missing, finish, handedOff = true))
+        assertEquals("Installing", refresh(missing, installed, "Installing", busy = true))
+    }
+
     @Test
     fun `debug overrides read a release tag and the no-root switch`() {
         val o = ThorKbmInstaller.DebugOverrides.parse("# device check\nrelease_tag = v2.2\nno_root=true\n")

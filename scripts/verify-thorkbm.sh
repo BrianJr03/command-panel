@@ -127,6 +127,7 @@ card_message_is() { open_keyboard_section >/dev/null; grep -qF "text=\"$1\"" "$O
 # Card messages (strings.xml msg_thorkbm_*), with `'` as Android shows it.
 MSG_ALLOW="Allow Command Panel to install apps in the screen that just opened, then press Install again."
 MSG_FINISH="Finish installing ThorKBM in Android's installer."
+MSG_INSTALLED="ThorKBM is installed."
 # The APK the debug build handed to Android's installer (its updates cache), pulled for a signer check.
 handed_apk_ok() {
   local apk="$OUT_DIR/thorkbm-handed.apk"
@@ -182,6 +183,7 @@ install_without_root() {
   shot no-root-installer-done
   tap_text "DONE" || tap_text "Done"
   sleep 1
+  check "card says: $MSG_INSTALLED" card_message_is "$MSG_INSTALLED"
 }
 
 device_checks() {

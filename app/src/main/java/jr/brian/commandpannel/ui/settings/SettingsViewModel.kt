@@ -1195,9 +1195,17 @@ class SettingsViewModel @Inject constructor(
     /** Re-reads whether ThorKBM is installed (companion resume, package changes). */
     fun refreshThorKbm() {
         val status = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(app)
-        val message = _state.value.thorKbmMessage.takeIf { _state.value.thorKbm == status || _state.value.thorKbmBusy }
-        _state.value = _state.value.copy(thorKbm = status, thorKbmMessage = message)
+        val s = _state.value
+        val message = jr.brian.commandpannel.system.update.ThorKbmInstaller.messageAfterRefresh(
+            old = s.thorKbm, new = status, oldMessage = s.thorKbmMessage, busy = s.thorKbmBusy,
+            handedOff = thorKbmHandedOff, installedMessage = app.getString(R.string.msg_thorkbm_installed),
+        )
+        if (status.releaseInstalled) thorKbmHandedOff = false
+        _state.value = s.copy(thorKbm = status, thorKbmMessage = message)
     }
+
+    /** An install was handed to Android's installer and hasn't shown up yet (see [refreshThorKbm]). */
+    private var thorKbmHandedOff = false
 
     /**
      * Installs ThorKBM from its latest GitHub release, like TCP SC: through the root shell, or else Android's
@@ -1241,7 +1249,7 @@ class SettingsViewModel @Inject constructor(
             return app.getString(R.string.msg_thorkbm_allow_installs)
         }
         return runCatching { app.startActivity(updates.systemInstallerIntent(app, apk)) }
-            .fold({ app.getString(R.string.msg_thorkbm_finish_in_installer) }) { e ->
+            .fold({ thorKbmHandedOff = true; app.getString(R.string.msg_thorkbm_finish_in_installer) }) { e ->
                 app.getString(R.string.msg_thorkbm_failed, e.message ?: e.javaClass.simpleName)
             }
     }
