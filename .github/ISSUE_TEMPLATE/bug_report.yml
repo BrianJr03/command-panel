@@ -1,0 +1,35 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Press ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: v0.6.1
+  - type: dropdown
+    id: access
+    attributes:
+      label: Access mode
+      options: [Root, Shizuku, None, Not sure]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      render: text
