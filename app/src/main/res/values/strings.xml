@@ -184,6 +184,10 @@
     <string name="settings_replay_seconds">%1$ds</string>
     <string name="settings_replay_quality">Quality</string>
     <string name="settings_replay_save_now">Save clip now</string>
+    <string name="settings_replay_game_audio">Game audio</string>
+    <string name="settings_replay_game_audio_desc">Record what you hear, while it keeps playing. Some apps block recording, so their clips are silent.</string>
+    <string name="settings_replay_mic">Microphone</string>
+    <string name="settings_replay_mic_desc">Mix your voice into clips. Android shows the mic indicator while the buffer is on.</string>
     <string name="settings_replay_location">Save location</string>
     <string name="settings_replay_location_default">TCP Clips</string>
     <string name="settings_replay_location_custom">Choose folder…</string>

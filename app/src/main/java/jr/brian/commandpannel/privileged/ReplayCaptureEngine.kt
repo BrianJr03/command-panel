@@ -32,6 +32,7 @@ class ReplayCaptureEngine(
     private var codec: MediaCodec? = null
     private var compositor: StackedMirrorCompositor? = null
     private var ring: ReplayRingBuffer? = null
+    private var audio: ReplayAudioEncoder? = null
     private var drainThread: Thread? = null
     @Volatile private var running = false
 
@@ -42,13 +43,16 @@ class ReplayCaptureEngine(
 
     val isRunning: Boolean get() = running
 
+    /** Audio encoder output format while audio is being captured; `null` for a video-only capture. */
+    val audioFormat: MediaFormat? get() = audio?.format
+
     /** What the running capture records (names the saved clip). */
     @Volatile
     var target: ReplayTarget = ReplayTarget.DEFAULT
         private set
 
     @Synchronized
-    fun start(windowSeconds: Int, preset: ReplayBitratePreset, target: ReplayTarget, fps: Int = 30): Boolean {
+    fun start(windowSeconds: Int, preset: ReplayBitratePreset, target: ReplayTarget, sound: ReplayAudio = ReplayAudio.NONE, fps: Int = 30): Boolean {
         if (running) return true
         val top = topology.topDisplay?.let(::screenOf)
         val bottom = topology.bottomDisplay?.let(::screenOf)
@@ -61,7 +65,7 @@ class ReplayCaptureEngine(
         )
         val bitRate = ScreenRecorderEngine.replayVideoBitRate(target.mode, fps, preset)
         val capacity = ScreenRecorderEngine
-            .estimateReplayBufferBytes(target.mode, fps, preset, windowSeconds, withAudio = false)
+            .estimateReplayBufferBytes(target.mode, fps, preset, windowSeconds, withAudio = sound.any)
             .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         return try {
             val format = MediaFormat.createVideoFormat(MIME, layout.width, layout.height).apply {
@@ -88,10 +92,15 @@ class ReplayCaptureEngine(
                 stop()
                 return false
             }
+            // Audio is best effort: if the helper can't capture it, keep recording video.
+            if (sound.any) {
+                val enc = ReplayAudioEncoder(privileged, ring!!)
+                if (enc.start(sound.game, sound.mic)) audio = enc else Log.w(TAG, "audio capture unavailable; video only")
+            }
             this.target = target
             running = true
             drainThread = thread(name = "replay-drain") { drainLoop() }
-            Log.i(TAG, "replay capture armed: $target ${layout.width}x${layout.height} @ ${bitRate / 1_000_000}Mbps, cap=${capacity / 1024 / 1024}MB")
+            Log.i(TAG, "replay capture armed: $target audio=${audio != null} ${layout.width}x${layout.height} @ ${bitRate / 1_000_000}Mbps, cap=${capacity / 1024 / 1024}MB")
             true
         } catch (t: Throwable) {
             Log.w(TAG, "start failed", t)
@@ -154,6 +163,8 @@ class ReplayCaptureEngine(
     @Synchronized
     fun stop() {
         running = false
+        audio?.stop()
+        audio = null
         runCatching { drainThread?.join(500) }
         drainThread = null
         privileged.stopDisplayMirror()
@@ -185,5 +196,14 @@ class ReplayCaptureEngine(
     }.getOrElse {
         Log.w(TAG, "layer stack lookup failed for display ${display.displayId}", it)
         display.displayId
+    }
+}
+
+/** Which sounds the Replay Buffer records alongside the video. */
+data class ReplayAudio(val game: Boolean, val mic: Boolean) {
+    val any: Boolean get() = game || mic
+
+    companion object {
+        val NONE = ReplayAudio(game = false, mic = false)
     }
 }

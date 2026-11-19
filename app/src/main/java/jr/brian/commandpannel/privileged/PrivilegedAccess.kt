@@ -80,6 +80,14 @@ class PrivilegedAccess @Inject constructor() {
         RootHelper.binder?.let { runCatching { it.stopDisplayMirror() } }
     }
 
+    /** Has the root helper stream game audio and/or the mic into [out] as PCM (Replay Buffer); false if unavailable. */
+    fun startAudioCapture(out: android.os.ParcelFileDescriptor, game: Boolean, mic: Boolean): Boolean =
+        RootHelper.binder?.let { runCatching { it.startAudioCapture(out, game, mic) }.getOrDefault(false) } ?: false
+
+    fun stopAudioCapture() {
+        RootHelper.binder?.let { runCatching { it.stopAudioCapture() } }
+    }
+
     /** FPS of the game task on [displayId] (helper only); null when the helper is down or the call fails. */
     fun taskFps(displayId: Int): TaskFpsSample? =
         RootHelper.binder?.let { h ->

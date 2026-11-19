@@ -56,6 +56,7 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
                     Log.i(tag, "client gone; helper exiting")
                     TaskFps.stop()
                     DisplayMirror.stop()
+                    AudioCapture.stop()
                     exitProcess(0)
                 }
             }
@@ -140,6 +141,31 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
         DisplayMirror.add(surface, layerStack, srcW, srcH, dstW, dstH)
 
     override fun stopDisplayMirror() = DisplayMirror.stop()
+
+    override fun startAudioCapture(sink: android.os.ParcelFileDescriptor, game: Boolean, mic: Boolean): Boolean {
+        if (!callerIsApp()) {
+            Log.w(tag, "startAudioCapture refused for uid ${android.os.Binder.getCallingUid()}")
+            runCatching { sink.close() }
+            return false
+        }
+        return AudioCapture.start(sink, game, mic)
+    }
+
+    override fun stopAudioCapture() {
+        if (callerIsApp()) AudioCapture.stop()
+    }
+
+    /** The app's uid, from `pm`, looked up once; -1 if it can't be found. */
+    private val appUid: Int by lazy {
+        val out = RootHelperMain.runShell("pm list packages -U $appPackage", 5_000).second
+        Regex("package:${Regex.escape(appPackage)} uid:(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+    }
+
+    /** Audio capture can include the mic, so only the app itself (or root) may start or stop it. */
+    private fun callerIsApp(): Boolean {
+        val uid = android.os.Binder.getCallingUid()
+        return uid == 0 || uid == appUid
+    }
 
     override fun taskFps(displayId: Int): Bundle = TaskFps.sample(displayId)
 

@@ -491,6 +491,18 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         state.replayDoublePress, vm::setReplayDoublePress,
         Modifier.tourTarget(TourSpot.REPLAY),
     )
+    SwitchCard(
+        stringResource(R.string.settings_replay_game_audio),
+        stringResource(R.string.settings_replay_game_audio_desc),
+        state.replayGameAudio, vm::setReplayGameAudio,
+        Modifier.tourTarget(TourSpot.REPLAY),
+    )
+    SwitchCard(
+        stringResource(R.string.settings_replay_mic),
+        stringResource(R.string.settings_replay_mic_desc),
+        state.replayMic, vm::setReplayMic,
+        Modifier.tourTarget(TourSpot.REPLAY),
+    )
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_capture))
         Spacer(Modifier.height(10.dp))
