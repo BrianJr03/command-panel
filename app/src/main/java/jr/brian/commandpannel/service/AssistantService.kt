@@ -235,7 +235,9 @@ class AssistantService : Service() {
      */
     private fun saveOrArmReplay(source: String) {
         scope.launch(Dispatchers.IO) {
-            when (replayTriggerAction(replay.isArmed, standby = source == SOURCE_EXTERNAL && standby)) {
+            val action = replayTriggerAction(replay.isArmed, standby = source == SOURCE_EXTERNAL && standby)
+            Log.i(TAG, "save-or-arm ($source): $action")
+            when (action) {
                 ReplayTriggerAction.NONE -> return@launch
                 ReplayTriggerAction.ARM -> {
                     replay.setEnabled(true)

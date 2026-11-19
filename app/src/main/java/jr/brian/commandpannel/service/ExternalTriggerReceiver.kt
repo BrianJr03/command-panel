@@ -16,6 +16,7 @@ class ExternalTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != "${context.packageName}$ACTION_SUFFIX") return
         if (!AssistantService.isRunning) {
+            Log.i(TAG, "service not running")
             OverlayToast(context.applicationContext).show(context.getString(R.string.msg_trigger_not_running))
             return
         }
@@ -23,7 +24,8 @@ class ExternalTriggerReceiver : BroadcastReceiver() {
             context.startService(
                 Intent(context, AssistantService::class.java).setAction(AssistantService.ACTION_REPLAY_SAVE_OR_ARM)
             )
-        }.onFailure { Log.w(TAG, "couldn't reach the service", it) }
+        }.onSuccess { Log.i(TAG, "forwarded to the service") }
+            .onFailure { Log.w(TAG, "couldn't reach the service", it) }
     }
 
     private companion object {
