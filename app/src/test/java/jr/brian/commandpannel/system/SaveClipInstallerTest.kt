@@ -18,10 +18,10 @@ class SaveClipInstallerTest {
         val asset = SaveClipInstaller.parseAsset(
             release(
                 "command-panel-0.7.1.apk" to "https://github.com/x/command-panel-0.7.1.apk",
-                "tcp-save-clip.apk" to "https://github.com/x/tcp-save-clip.apk",
+                "tcp-sc.apk" to "https://github.com/x/tcp-sc.apk",
             ),
         )
-        assertEquals("https://github.com/x/tcp-save-clip.apk", asset?.url)
+        assertEquals("https://github.com/x/tcp-sc.apk", asset?.url)
         assertEquals(20126L, asset?.size)
     }
 
@@ -33,6 +33,6 @@ class SaveClipInstallerTest {
 
     @Test
     fun `only https downloads are used`() {
-        assertNull(SaveClipInstaller.parseAsset(release("tcp-save-clip.apk" to "http://github.com/x/tcp-save-clip.apk")))
+        assertNull(SaveClipInstaller.parseAsset(release("tcp-sc.apk" to "http://github.com/x/tcp-sc.apk")))
     }
 }

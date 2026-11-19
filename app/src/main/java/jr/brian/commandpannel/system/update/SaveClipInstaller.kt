@@ -15,7 +15,7 @@ sealed interface SaveClipStatus {
     data class NoPermission(val version: String) : SaveClipStatus
 }
 
-/** The `tcp-save-clip.apk` asset of a release. */
+/** The `tcp-sc.apk` asset of a release. */
 data class SaveClipAsset(val url: String, val size: Long)
 
 /**
@@ -25,10 +25,10 @@ data class SaveClipAsset(val url: String, val size: Long)
  */
 object SaveClipInstaller {
     const val PACKAGE = "jr.brian.tcp.saveclip"
-    const val ASSET_NAME = "tcp-save-clip.apk"
+    const val ASSET_NAME = "tcp-sc.apk"
     private const val TAGS = "https://api.github.com/repos/BrianJr03/command-panel/releases/tags"
     private const val MAX_APK_BYTES = 10L * 1024 * 1024
-    private const val STAGED = "/data/local/tmp/tcp-save-clip.apk"
+    private const val STAGED = "/data/local/tmp/tcp-sc.apk"
 
     fun status(context: Context): SaveClipStatus {
         val pm = context.packageManager

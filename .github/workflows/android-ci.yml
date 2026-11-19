@@ -66,5 +66,5 @@ jobs:
       - name: Upload TCP Save Clip debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: tcp-save-clip-debug
+          name: tcp-sc-debug
           path: trigger/build/outputs/apk/debug/trigger-debug.apk

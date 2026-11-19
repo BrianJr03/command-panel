@@ -129,7 +129,7 @@ jobs:
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
           echo "Renamed APK to: ${APK_NAME}"
           # TCP Save Clip (Back Button Hero trigger): same key, fixed name so release links stay stable.
-          mv trigger/build/outputs/apk/release/trigger-release.apk trigger/build/outputs/apk/release/tcp-save-clip.apk
+          mv trigger/build/outputs/apk/release/trigger-release.apk trigger/build/outputs/apk/release/tcp-sc.apk
 
       # --- Manual release flow (workflow_dispatch) ---
 
@@ -143,7 +143,7 @@ jobs:
           body_path: app/src/main/res/raw/patch_notes.md
           files: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-save-clip.apk
+            trigger/build/outputs/apk/release/tcp-sc.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -154,7 +154,7 @@ jobs:
           tag_name: ${{ inputs.release_tag }}
           files: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-save-clip.apk
+            trigger/build/outputs/apk/release/tcp-sc.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -167,7 +167,7 @@ jobs:
           name: command-panel-${{ steps.version.outputs.version_name }}
           path: |
             app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
-            trigger/build/outputs/apk/release/tcp-save-clip.apk
+            trigger/build/outputs/apk/release/tcp-sc.apk
           retention-days: 90
 
       - name: Cleanup keystore
