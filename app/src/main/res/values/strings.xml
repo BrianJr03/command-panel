@@ -195,6 +195,8 @@
     <string name="settings_replay_game_audio_desc">Record what you hear, while it keeps playing. Some apps block recording, so their clips are silent.</string>
     <string name="settings_replay_mic">Microphone</string>
     <string name="settings_replay_mic_desc">Mix your voice into clips. Android shows the mic indicator while the buffer is on.</string>
+    <string name="settings_replay_sound_no_helper">The root helper isn\'t running, so clips will have no sound. The Replay Buffer also needs it to record the screen. Run the checks in Diagnostics to start it again.</string>
+    <string name="settings_replay_sound_video_only">Sound couldn\'t start, so clips will have no sound. Turn the Replay Buffer off and on again to retry.</string>
     <string name="settings_replay_options">Clip options</string>
     <string name="settings_save_clip_title">TCP SC</string>
     <string name="settings_save_clip_desc">TCP SC (TCP Save Clip) is a small app that saves a clip when another app opens it. In Back Button Hero, choose Launch app → TCP SC → bottom screen, so your game keeps focus.</string>

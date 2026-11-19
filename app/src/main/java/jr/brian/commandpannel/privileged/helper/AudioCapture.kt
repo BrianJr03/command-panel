@@ -8,6 +8,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import jr.brian.commandpannel.privileged.PcmJitterBuffer
 import jr.brian.commandpannel.privileged.PcmMixer
 import java.io.FileOutputStream
 import kotlin.concurrent.thread
@@ -19,7 +20,8 @@ import kotlin.concurrent.thread
  * `--audio-source=playback --audio-dup`. The mic is a plain `AudioRecord`. Both are 48 kHz 16-bit stereo.
  *
  * [start] runs one capture session: it reads 20 ms frames from each source, mixes them and writes little-endian PCM
- * to the app's pipe until [stop] or the app closes its end.
+ * to the app's pipe until [stop] or the app closes its end. With both sources, the loopback sets the pace and the mic
+ * goes through a [PcmJitterBuffer] so the two clocks can't drift apart.
  */
 internal object AudioCapture {
     private const val TAG = "AudioCapture"
@@ -27,6 +29,10 @@ internal object AudioCapture {
     const val CHANNELS = 2
     /** Samples (both channels) in one 20 ms frame. */
     private const val FRAME_SAMPLES = SAMPLE_RATE / 50 * CHANNELS
+    /** Mic audio buffered before it's mixed in (40 ms), which absorbs bursty mic delivery. */
+    private const val MIC_TARGET_SAMPLES = FRAME_SAMPLES * 2
+    /** Most mic audio kept (100 ms); past this the oldest is dropped, so mic latency can't keep growing. */
+    private const val MIC_MAX_SAMPLES = FRAME_SAMPLES * 5
 
     @Volatile private var session: Thread? = null
     @Volatile private var running = false
@@ -86,14 +92,19 @@ internal object AudioCapture {
         val a = ShortArray(FRAME_SAMPLES)
         val b = ShortArray(FRAME_SAMPLES)
         val bytes = ByteArray(FRAME_SAMPLES * 2)
+        // With both sources, the mic (on its own hardware clock) is drained without blocking into a jitter buffer and
+        // taken one frame per loopback frame, so clock drift can't grow into mic latency or stall the loopback.
+        val micBuffer = if (loop != null && mic != null) PcmJitterBuffer(MIC_TARGET_SAMPLES, MIC_MAX_SAMPLES) else null
+        val micScratch = ShortArray(if (micBuffer != null) FRAME_SAMPLES * 4 else 0)
         try {
             FileOutputStream(out.fileDescriptor).use { stream ->
                 while (running) {
                     // The loopback paces the loop when game audio is on (it delivers silence when nothing plays).
                     val primary = loop?.record ?: mic!!
                     if (!readFull(primary, a)) break
-                    if (loop != null && mic != null) {
-                        if (!readFull(mic, b)) break
+                    if (micBuffer != null && mic != null) {
+                        if (!drainMic(mic, micScratch, micBuffer)) break
+                        micBuffer.take(b, FRAME_SAMPLES)
                         PcmMixer.mixInto(a, b, FRAME_SAMPLES)
                     }
                     PcmMixer.toBytes(a, FRAME_SAMPLES, bytes)
@@ -104,11 +115,23 @@ internal object AudioCapture {
             // The app closed its end (disarm) or the pipe broke; either way the session is over.
             Log.i(TAG, "audio stream ended: ${t.javaClass.simpleName}")
         } finally {
+            micBuffer?.let { Log.i(TAG, "mic alignment: ${it.overflows} catch-ups, ${it.underflows} gaps") }
             loop?.release()
             mic?.let { runCatching { it.stop() }; runCatching { it.release() } }
             runCatching { out.close() }
             running = false
         }
+    }
+
+    /** Moves everything the mic has ready into [into] without blocking. False if the mic failed. */
+    private fun drainMic(mic: AudioRecord, scratch: ShortArray, into: PcmJitterBuffer): Boolean {
+        while (running) {
+            val r = mic.read(scratch, 0, scratch.size, AudioRecord.READ_NON_BLOCKING)
+            if (r < 0) return false
+            if (r > 0) into.offer(scratch, r)
+            if (r < scratch.size) return true
+        }
+        return true
     }
 
     private fun readFull(record: AudioRecord, buf: ShortArray): Boolean {

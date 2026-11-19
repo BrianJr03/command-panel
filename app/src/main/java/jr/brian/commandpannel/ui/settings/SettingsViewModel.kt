@@ -148,6 +148,10 @@ data class SettingsState(
     val replayDoublePress: Boolean = false,
     val replayGameAudio: Boolean = true,
     val replayMic: Boolean = false,
+    /** The root helper (which records the screen and sound) isn't connected or connecting. */
+    val replayHelperDown: Boolean = false,
+    /** The armed capture asked for sound but couldn't start it, so clips are video only. */
+    val replaySoundVideoOnly: Boolean = false,
     /** Custom clips folder relative to internal storage, or `null` for the default (TCP Clips). */
     val replayClipsDir: String? = null,
     val appPickerOpen: Boolean = false,
@@ -788,6 +792,19 @@ class SettingsViewModel @Inject constructor(
         })
         // The other build took over (or let go of) the stock replacement; the service turns this one's switch off.
         sibling.observe { refreshSibling() }
+        // The service shares this process, so the helper's state and the armed capture's sound status are live here.
+        viewModelScope.launch {
+            jr.brian.commandpannel.privileged.RootHelper.state.collect { s ->
+                val down = s == jr.brian.commandpannel.privileged.RootHelper.State.DISCONNECTED ||
+                    s == jr.brian.commandpannel.privileged.RootHelper.State.UNAVAILABLE
+                _state.value = _state.value.copy(replayHelperDown = down)
+            }
+        }
+        viewModelScope.launch {
+            jr.brian.commandpannel.privileged.ReplaySoundStatus.videoOnly.collect { videoOnly ->
+                _state.value = _state.value.copy(replaySoundVideoOnly = videoOnly)
+            }
+        }
     }
 
     override fun onCleared() {

@@ -46,6 +46,14 @@ class ReplayCaptureEngine(
     /** Audio encoder output format while audio is being captured; `null` for a video-only capture. */
     val audioFormat: MediaFormat? get() = audio?.format
 
+    /**
+     * Right after arming, waits (up to [timeoutMs], blocking) for the first audio packet, so an early clip still gets
+     * its audio track. Returns at once for a video-only capture or once audio is flowing.
+     */
+    fun awaitAudio(timeoutMs: Long) {
+        audio?.awaitFirstPacket(timeoutMs)
+    }
+
     /** What the running capture records (names the saved clip). */
     @Volatile
     var target: ReplayTarget = ReplayTarget.DEFAULT
@@ -97,6 +105,7 @@ class ReplayCaptureEngine(
                 val enc = ReplayAudioEncoder(privileged, ring!!)
                 if (enc.start(sound.game, sound.mic)) audio = enc else Log.w(TAG, "audio capture unavailable; video only")
             }
+            ReplaySoundStatus.update(videoOnly = sound.any && audio == null)
             this.target = target
             running = true
             drainThread = thread(name = "replay-drain") { drainLoop() }
@@ -165,6 +174,7 @@ class ReplayCaptureEngine(
         running = false
         audio?.stop()
         audio = null
+        ReplaySoundStatus.update(videoOnly = false)
         runCatching { drainThread?.join(500) }
         drainThread = null
         privileged.stopDisplayMirror()
@@ -196,6 +206,33 @@ class ReplayCaptureEngine(
     }.getOrElse {
         Log.w(TAG, "layer stack lookup failed for display ${display.displayId}", it)
         display.displayId
+    }
+}
+
+/**
+ * Process-wide: whether the armed capture asked for sound but is recording video only (the helper couldn't open game
+ * audio or the mic). The companion shows a note while it is set.
+ */
+object ReplaySoundStatus {
+    private val _videoOnly = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val videoOnly: kotlinx.coroutines.flow.StateFlow<Boolean> = _videoOnly
+
+    internal fun update(videoOnly: Boolean) {
+        _videoOnly.value = videoOnly
+    }
+
+    /** Why clips would come out silent, for the Replay Buffer settings; `null` when there's nothing to say. */
+    enum class Note { NO_HELPER, VIDEO_ONLY }
+
+    /**
+     * The note to show. [soundOn]: game audio or the mic is turned on. [helperDown]: the root helper isn't connected
+     * (and isn't mid-connect). [armed] / [videoOnly]: the running capture asked for sound but couldn't start it.
+     */
+    fun note(soundOn: Boolean, helperDown: Boolean, armed: Boolean, videoOnly: Boolean): Note? = when {
+        !soundOn -> null
+        helperDown -> Note.NO_HELPER
+        armed && videoOnly -> Note.VIDEO_ONLY
+        else -> null
     }
 }
 

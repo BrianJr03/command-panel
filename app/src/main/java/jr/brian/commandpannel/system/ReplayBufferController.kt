@@ -89,10 +89,12 @@ class ReplayBufferController(
     /** How long a clip saved now would be: what's buffered, up to the save window, and at least 1 s. */
     fun clipSeconds(): Int = bufferedSeconds().coerceIn(1, windowSeconds())
 
-    /** Saves the buffered clip. Returns the saved path, or `error:<code>`. */
+    /** Saves the buffered clip. Blocking; call off the main thread. Returns the saved path, or `error:<code>`. */
     fun save(): String {
         if (!engine.isRunning) return "error:${ScreenRecorderEngine.REPLAY_ERR_NOT_ARMED}"
         val format = engine.videoFormat ?: return "error:${ScreenRecorderEngine.REPLAY_ERR_START_FAILED}"
+        // A save right after arming would otherwise beat the first audio packet and come out video only.
+        engine.awaitAudio(AUDIO_READY_TIMEOUT_MS)
         when (val slice = engine.slice()) {
             null, is ReplayRingBuffer.Slice.Failure -> {
                 val code = (slice as? ReplayRingBuffer.Slice.Failure)?.error?.let {
@@ -127,5 +129,8 @@ class ReplayBufferController(
     companion object {
         const val PREF_GAME_AUDIO = "replay_game_audio"
         const val PREF_MIC = "replay_mic"
+
+        /** Longest a save waits for audio to start flowing after arming. [save] runs off the main thread. */
+        const val AUDIO_READY_TIMEOUT_MS = 500L
     }
 }

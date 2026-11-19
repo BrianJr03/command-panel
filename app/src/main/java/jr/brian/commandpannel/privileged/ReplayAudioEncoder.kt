@@ -6,6 +6,8 @@ import android.media.MediaFormat
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.InputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
@@ -31,6 +33,17 @@ class ReplayAudioEncoder(private val privileged: PrivilegedAccess, private val r
     @Volatile
     var format: MediaFormat? = null
         private set
+
+    /** Released once the first AAC packet is in the ring (or the encoder stops), for [awaitFirstPacket]. */
+    private val firstPacket = CountDownLatch(1)
+
+    /**
+     * Waits up to [timeoutMs] for the first encoded packet. Capture, the AAC encoder's priming and its output format
+     * all take a moment after arming, so a clip saved right away would otherwise have no audio track. True if audio
+     * is in the ring.
+     */
+    fun awaitFirstPacket(timeoutMs: Long): Boolean =
+        firstPacket.await(timeoutMs, TimeUnit.MILLISECONDS) && running && format != null
 
     /** Starts capture of the requested sources; false if the helper couldn't open any of them. */
     fun start(game: Boolean, mic: Boolean): Boolean {
@@ -66,6 +79,7 @@ class ReplayAudioEncoder(private val privileged: PrivilegedAccess, private val r
 
     fun stop() {
         running = false
+        firstPacket.countDown()
         privileged.stopAudioCapture()
         // Closing our end unblocks a pending read and ends the helper's writes.
         runCatching { input?.close() }
@@ -107,6 +121,7 @@ class ReplayAudioEncoder(private val privileged: PrivilegedAccess, private val r
                     val isConfig = info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
                     if (out != null && info.size > 0 && !isConfig) {
                         ring.append(false, out, info.offset, info.size, info.presentationTimeUs, info.flags, false)
+                        firstPacket.countDown()
                     }
                     enc.releaseOutputBuffer(index, false)
                 }

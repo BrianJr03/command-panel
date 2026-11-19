@@ -602,6 +602,20 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
             stringResource(R.string.settings_replay_mic_desc),
             state.replayMic, vm::setReplayMic,
         )
+        val soundNote = jr.brian.commandpannel.privileged.ReplaySoundStatus.note(
+            soundOn = state.replayGameAudio || state.replayMic,
+            helperDown = state.replayHelperDown,
+            armed = state.replayEnabled,
+            videoOnly = state.replaySoundVideoOnly,
+        )
+        soundNote?.let { note ->
+            val text = when (note) {
+                jr.brian.commandpannel.privileged.ReplaySoundStatus.Note.NO_HELPER -> R.string.settings_replay_sound_no_helper
+                jr.brian.commandpannel.privileged.ReplaySoundStatus.Note.VIDEO_ONLY -> R.string.settings_replay_sound_video_only
+            }
+            Spacer(Modifier.height(8.dp))
+            InfoLine(stringResource(text), p.danger)
+        }
     }
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_capture))
