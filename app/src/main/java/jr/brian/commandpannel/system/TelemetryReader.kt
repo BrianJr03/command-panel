@@ -1,5 +1,7 @@
 package jr.brian.commandpannel.system
 
+import kotlin.math.abs
+
 /**
  * Pure parsing/formatting for the hardware telemetry the stock Settings tab shows, split out so it is unit-tested
  * without a device. Raw unit → display rules come straight from the teardown (NOTES.md §6).
@@ -33,8 +35,20 @@ object TelemetryReader {
         return ((i / 1_000_000.0) * (v / 1_000_000.0)).toFloat()
     }
 
-    /** Power ring fraction over the stock bidirectional −20..25 W scale. */
-    fun powerFraction(watts: Float): Float = ((watts - (-20f)) / (25f - (-20f))).coerceIn(0f, 1f)
+    /** Top of the power ring's scale in watts (the stock charge ceiling; heavy draw on battery stays below it). */
+    const val POWER_SCALE_MAX_W = 25f
+
+    /** Net power below this magnitude counts as idle, so sensor noise around 0 W doesn't flip the charging label. */
+    const val POWER_CHARGING_MIN_W = 0.1f
+
+    /**
+     * Power ring fraction: the magnitude of [watts] over 0..[POWER_SCALE_MAX_W], so the ring grows with the number
+     * shown whether the battery is charging or draining. The direction is shown by [isCharging], not the ring.
+     */
+    fun powerFraction(watts: Float): Float = (abs(watts) / POWER_SCALE_MAX_W).coerceIn(0f, 1f)
+
+    /** Positive net battery power means the battery is charging (it reads negative on battery). */
+    fun isCharging(watts: Float): Boolean = watts > POWER_CHARGING_MIN_W
 
     /** Frame counter out of `service call SurfaceFlinger 1013` output, e.g. "Result: Parcel(00024f0e …)". */
     fun parseSurfaceFlingerFrames(output: String): Long? {

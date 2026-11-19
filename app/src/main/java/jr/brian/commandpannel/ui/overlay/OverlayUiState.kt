@@ -39,8 +39,10 @@ data class OverlayUiState(
     val cpuFraction: Float = 0.58f,
     val gpuMhz: Int = 401,
     val gpuFraction: Float = 0.70f,
-    val powerW: Float = -4.0f,
-    val powerFraction: Float = 0.30f,
+    /** Net battery power magnitude in watts; [powerCharging] says whether it flows in (charging) or out. */
+    val powerW: Float = 4.0f,
+    val powerFraction: Float = 0.16f,  // 4 W of the 0..25 W scale
+    val powerCharging: Boolean = false,
     val ramGb: Float = 7.0f,
     val ramFraction: Float = 0.62f,
 

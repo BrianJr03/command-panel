@@ -41,6 +41,8 @@
     <string name="gauge_cpu">CPU</string>
     <string name="gauge_gpu">GPU</string>
     <string name="gauge_pwr">PWR</string>
+    <!-- Power gauge title while the battery is charging (the gauge then shows charge power, not draw). -->
+    <string name="gauge_chg">CHG</string>
     <string name="gauge_ram">RAM</string>
 
     <!-- Overlay: arrange mode -->

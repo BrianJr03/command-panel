@@ -1,7 +1,9 @@
 package jr.brian.commandpannel.system
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TelemetryReaderTest {
@@ -23,7 +25,28 @@ class TelemetryReaderTest {
         // -1.485 A * 3.9 V ≈ -5.79 W
         val w = TelemetryReader.powerWatts("-1485022", "3900000")!!
         assertEquals(-5.79f, w, 0.1f)
-        assertEquals(0.5f, TelemetryReader.powerFraction(2.5f), 0.02f) // ~midpoint of -20..25
+    }
+
+    @Test
+    fun powerFractionIsTheMagnitudeOverZeroToTwentyFive() {
+        assertEquals(0f, TelemetryReader.powerFraction(0f), 0.001f)          // idle: empty ring, not ~44%
+        assertEquals(8f / 25f, TelemetryReader.powerFraction(8f), 0.001f)    // 8 W charging
+        assertEquals(8f / 25f, TelemetryReader.powerFraction(-8f), 0.001f)   // 8 W draw fills the same, not less
+        assertEquals(1f, TelemetryReader.powerFraction(25f), 0.001f)
+        assertEquals(1f, TelemetryReader.powerFraction(-40f), 0.001f)        // clamped
+    }
+
+    @Test
+    fun powerFractionGrowsWithDrawOnBattery() {
+        assertTrue(TelemetryReader.powerFraction(-8f) > TelemetryReader.powerFraction(-4f))
+    }
+
+    @Test
+    fun chargingIsPositivePowerAboveTheNoiseFloor() {
+        assertTrue(TelemetryReader.isCharging(5f))
+        assertFalse(TelemetryReader.isCharging(-5.79f))
+        assertFalse(TelemetryReader.isCharging(0f))
+        assertFalse(TelemetryReader.isCharging(0.05f)) // noise around idle
     }
 
     @Test

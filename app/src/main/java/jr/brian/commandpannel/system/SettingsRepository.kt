@@ -99,7 +99,7 @@ class SettingsRepository(
                         tempC = t.tempC, fanPercent = t.fanPercent,
                         cpuGhz = t.cpuGhz, cpuFraction = t.cpuFraction,
                         gpuMhz = t.gpuMhz, gpuFraction = t.gpuFraction,
-                        powerW = t.powerW, powerFraction = t.powerFraction,
+                        powerW = t.powerW, powerFraction = t.powerFraction, powerCharging = t.powerCharging,
                         ramGb = t.ramGb, ramFraction = t.ramFraction,
                         fps = t.fps,
                     )

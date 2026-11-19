@@ -146,7 +146,9 @@ internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mo
 internal fun RingsCard(state: OverlayUiState, modifier: Modifier) {
     val cpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.cpuFraction, RingColors.Cpu, stringResource(R.string.gauge_cpu), "%.2f".format(state.cpuGhz), stringResource(R.string.unit_ghz), m) }
     val gpu: @Composable (Modifier) -> Unit = { m -> RingGauge(state.gpuFraction, RingColors.Gpu, stringResource(R.string.gauge_gpu), "${state.gpuMhz}", stringResource(R.string.unit_mhz), m) }
-    val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, stringResource(R.string.gauge_pwr), "%.2f".format(state.powerW), stringResource(R.string.unit_watts), m) }
+    // The ring and the number both show the power magnitude; the title says which way it flows (charging or draw).
+    val pwrTitle = stringResource(if (state.powerCharging) R.string.gauge_chg else R.string.gauge_pwr)
+    val pwr: @Composable (Modifier) -> Unit = { m -> RingGauge(state.powerFraction, RingColors.Pwr, pwrTitle, "%.2f".format(state.powerW), stringResource(R.string.unit_watts), m) }
     val ram: @Composable (Modifier) -> Unit = { m -> RingGauge(state.ramFraction, RingColors.Ram, stringResource(R.string.gauge_ram), "%.2f".format(state.ramGb), stringResource(R.string.unit_gb), m) }
     TccCard(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {

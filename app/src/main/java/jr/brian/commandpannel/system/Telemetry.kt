@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.abs
 
 /** Live hardware readings for the Settings tab. */
 data class Telemetry(
@@ -22,8 +23,10 @@ data class Telemetry(
     val cpuFraction: Float = 0f,
     val gpuMhz: Int = 0,
     val gpuFraction: Float = 0f,
+    /** Magnitude of the net battery power in watts (always >= 0); [powerCharging] gives the direction. */
     val powerW: Float = 0f,
-    val powerFraction: Float = 0.5f,
+    val powerFraction: Float = 0f,
+    val powerCharging: Boolean = false,
     val ramGb: Float = 0f,
     val ramFraction: Float = 0f,
     val fps: Int = 0,
@@ -106,7 +109,8 @@ class TelemetryMonitor(
             fanPercent = fan,
             cpuGhz = cpuGhz, cpuFraction = cpuFrac,
             gpuMhz = gpuMhz, gpuFraction = gpuFrac,
-            powerW = watts, powerFraction = TelemetryReader.powerFraction(watts),
+            powerW = abs(watts), powerFraction = TelemetryReader.powerFraction(watts),
+            powerCharging = TelemetryReader.isCharging(watts),
             ramGb = ramGb, ramFraction = ramFrac,
             fps = fps,
         )
