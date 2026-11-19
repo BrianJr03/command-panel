@@ -107,20 +107,20 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/keystore.jks
 
-      - name: Build signed release APK
+      - name: Build signed release APKs
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew assembleRelease \
+          ./gradlew :app:assembleRelease :trigger:assembleRelease \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/keystore.jks \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$KEY_PASSWORD \
             --stacktrace
 
-      - name: Rename APK
+      - name: Rename APKs
         id: rename
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
@@ -128,6 +128,8 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${APK_NAME}"
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
           echo "Renamed APK to: ${APK_NAME}"
+          # TCP Save Clip (Back Button Hero trigger): same key, fixed name so release links stay stable.
+          mv trigger/build/outputs/apk/release/trigger-release.apk trigger/build/outputs/apk/release/tcp-save-clip.apk
 
       # --- Manual release flow (workflow_dispatch) ---
 
@@ -139,7 +141,9 @@ jobs:
           name: ${{ inputs.release_name || inputs.release_tag }}
           prerelease: ${{ inputs.prerelease }}
           body_path: app/src/main/res/raw/patch_notes.md
-          files: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+          files: |
+            app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+            trigger/build/outputs/apk/release/tcp-save-clip.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -148,7 +152,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+          files: |
+            app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+            trigger/build/outputs/apk/release/tcp-save-clip.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -159,7 +165,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: command-panel-${{ steps.version.outputs.version_name }}
-          path: app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+          path: |
+            app/build/outputs/apk/release/${{ steps.rename.outputs.apk_name }}
+            trigger/build/outputs/apk/release/tcp-save-clip.apk
           retention-days: 90
 
       - name: Cleanup keystore
