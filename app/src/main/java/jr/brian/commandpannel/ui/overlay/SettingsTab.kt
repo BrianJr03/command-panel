@@ -85,6 +85,17 @@ internal fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modi
                 style = displayStyle,
                 modifier = Modifier.align(Alignment.TopStart),
             )
+            // No per-game reading: the number counts every frame on both screens (overlay included), so say so.
+            if (state.fpsCompositor) {
+                Text(
+                    stringResource(R.string.overlay_fps_compositor),
+                    color = colors.tertiary,
+                    fontSize = if (big) 16.sp else 11.sp,
+                    maxLines = 1,
+                    style = displayStyle,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
+            }
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.Bottom) {
                 Text("${state.fps}", color = colors.primary, fontSize = numberSp, fontWeight = FontWeight.Bold, maxLines = 1, style = displayStyle)
                 Text(stringResource(R.string.overlay_fps_suffix), color = colors.primary, fontSize = fpsSp, modifier = Modifier.padding(bottom = if (big) 14.dp else 10.dp))

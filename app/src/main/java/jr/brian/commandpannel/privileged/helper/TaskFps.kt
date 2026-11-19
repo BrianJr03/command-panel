@@ -13,8 +13,10 @@ import jr.brian.commandpannel.privileged.ClearTasksPolicy
  * counts the frames presented by the layers inside the task's subtree and reports roughly every 500 ms, so the
  * overlay and other apps never inflate the number the way the global composite counter (`SurfaceFlinger 1013`) does.
  *
- * The app polls [sample]; each call re-resolves the top standard root task on the display and moves the
- * registration when it changes, so no task-stack listener is needed.
+ * The app polls [sample]; each call re-resolves the game task and moves the registration when it changes, so no
+ * task-stack listener is needed. The game may be on either screen (the Thor's top is display 0, the bottom is 4), so
+ * the task is found on whichever display it is on: the focused root task first (the one taking gamepad input), then
+ * the top standard task on the preferred display, then on every other display.
  */
 object TaskFps {
     private const val TAG = "TaskFps"
@@ -23,6 +25,7 @@ object TaskFps {
     const val KEY_TASK_ID = "taskId"
     const val KEY_PACKAGE = "pkg"
     const val KEY_AGE_MS = "ageMs"
+    const val KEY_DISPLAY_ID = "displayId"
 
     private val windowManager: Any? by lazy {
         runCatching {
@@ -49,20 +52,26 @@ object TaskFps {
         }
     }
 
-    /** Latest FPS of the top standard task on [displayId]; `fps` is -1 when there is none or registration failed. */
+    /** A resolved game task: its id, top package and the display it is on. */
+    private data class GameTask(val taskId: Int, val pkg: String?, val displayId: Int)
+
+    /**
+     * Latest FPS of the game task (see the class doc for how it is found, starting from [preferredDisplayId]);
+     * `fps` is -1 when there is none or registration failed.
+     */
     @Synchronized
-    fun sample(displayId: Int): Bundle {
-        val task = resolveGameTask(displayId)
+    fun sample(preferredDisplayId: Int): Bundle {
+        val task = resolveGameTask(preferredDisplayId)
         if (task == null) {
             stop()
-            return result(-1f, -1, null, -1L)
+            return result(-1f, null, -1L)
         }
-        if (task.first != registeredTaskId && (task.first == failedTaskId || !register(task.first))) {
-            return result(-1f, task.first, task.second, -1L)
+        if (task.taskId != registeredTaskId && (task.taskId == failedTaskId || !register(task))) {
+            return result(-1f, task, -1L)
         }
         val fps = lastFps
         val age = if (lastAtMs == 0L) -1L else SystemClock.elapsedRealtime() - lastAtMs
-        return result(fps, task.first, task.second, age)
+        return result(fps, task, age)
     }
 
     @Synchronized
@@ -79,24 +88,43 @@ object TaskFps {
         lastAtMs = 0L
     }
 
-    private fun register(taskId: Int): Boolean {
+    private fun register(task: GameTask): Boolean {
         stop()
         val wm = windowManager ?: return false
         return runCatching {
             wm.javaClass.getMethod("registerTaskFpsCallback", Int::class.javaPrimitiveType, ITaskFpsCallback::class.java)
-                .invoke(wm, taskId, callback)
-            registeredTaskId = taskId
-            Log.i(TAG, "registered for task $taskId")
+                .invoke(wm, task.taskId, callback)
+            registeredTaskId = task.taskId
+            Log.i(TAG, "registered for task ${task.taskId} (${task.pkg}) on display ${task.displayId}")
             true
         }.getOrElse {
-            Log.w(TAG, "registerTaskFpsCallback($taskId) failed", it)
-            failedTaskId = taskId
+            Log.w(TAG, "registerTaskFpsCallback(${task.taskId}) failed", it)
+            failedTaskId = task.taskId
             false
         }
     }
 
-    /** First visible standard root task on [displayId] (the list is ordered top-first), as (taskId, package). */
-    private fun resolveGameTask(displayId: Int): Pair<Int, String?>? {
+    private fun resolveGameTask(preferredDisplayId: Int): GameTask? {
+        focusedGameTask()?.let { return it }
+        topGameTaskOn(preferredDisplayId)?.let { return it }
+        for (id in displayIds()) {
+            if (id == preferredDisplayId) continue
+            topGameTaskOn(id)?.let { return it }
+        }
+        return null
+    }
+
+    /** The focused root task when it is a visible standard (app or game) task; null for home, recents, etc. */
+    private fun focusedGameTask(): GameTask? {
+        val atm = activityTaskManager ?: return null
+        val info = runCatching { atm.javaClass.getMethod("getFocusedRootTaskInfo").invoke(atm) }
+            .onFailure { Log.w(TAG, "getFocusedRootTaskInfo failed", it) }
+            .getOrNull() ?: return null
+        return gameTaskOf(info, displayId = null)
+    }
+
+    /** First visible standard root task on [displayId] (the list is ordered top-first). */
+    private fun topGameTaskOn(displayId: Int): GameTask? {
         val atm = activityTaskManager ?: return null
         val infos = runCatching {
             atm.javaClass.getMethod("getAllRootTaskInfosOnDisplay", Int::class.javaPrimitiveType)
@@ -106,15 +134,30 @@ object TaskFps {
             null
         } ?: return null
         for (info in infos) {
-            info ?: continue
-            if (!isVisible(info) || activityType(info) != ClearTasksPolicy.ACTIVITY_TYPE_STANDARD) continue
-            val taskId = runCatching { info.javaClass.getField("taskId").getInt(info) }.getOrNull() ?: continue
-            val pkg = runCatching {
-                (info.javaClass.getField("topActivity").get(info) as? ComponentName)?.packageName
-            }.getOrNull()
-            return taskId to pkg
+            gameTaskOf(info ?: continue, displayId)?.let { return it }
         }
         return null
+    }
+
+    private fun gameTaskOf(info: Any, displayId: Int?): GameTask? {
+        if (!isVisible(info) || activityType(info) != ClearTasksPolicy.ACTIVITY_TYPE_STANDARD) return null
+        val taskId = runCatching { info.javaClass.getField("taskId").getInt(info) }.getOrNull() ?: return null
+        val pkg = runCatching {
+            (info.javaClass.getField("topActivity").get(info) as? ComponentName)?.packageName
+        }.getOrNull()
+        val display = displayId
+            ?: runCatching { info.javaClass.getField("displayId").getInt(info) }.getOrDefault(-1)
+        return GameTask(taskId, pkg, display)
+    }
+
+    /** Every logical display id, via the hidden `DisplayManagerGlobal`; just the default display if that fails. */
+    private fun displayIds(): IntArray = runCatching {
+        val cls = Class.forName("android.hardware.display.DisplayManagerGlobal")
+        val g = cls.getMethod("getInstance").invoke(null)
+        cls.getMethod("getDisplayIds").invoke(g) as IntArray
+    }.getOrElse {
+        Log.w(TAG, "getDisplayIds failed", it)
+        intArrayOf(0)
     }
 
     private fun isVisible(info: Any): Boolean =
@@ -127,10 +170,11 @@ object TaskFps {
             .recoverCatching { info.javaClass.getField("topActivityType").getInt(info) }
             .getOrDefault(ClearTasksPolicy.ACTIVITY_TYPE_UNDEFINED)
 
-    private fun result(fps: Float, taskId: Int, pkg: String?, ageMs: Long) = Bundle().apply {
+    private fun result(fps: Float, task: GameTask?, ageMs: Long) = Bundle().apply {
         putFloat(KEY_FPS, fps)
-        putInt(KEY_TASK_ID, taskId)
-        putString(KEY_PACKAGE, pkg)
+        putInt(KEY_TASK_ID, task?.taskId ?: -1)
+        putString(KEY_PACKAGE, task?.pkg)
+        putInt(KEY_DISPLAY_ID, task?.displayId ?: -1)
         putLong(KEY_AGE_MS, ageMs)
     }
 }

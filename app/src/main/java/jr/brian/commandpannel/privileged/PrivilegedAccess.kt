@@ -19,7 +19,7 @@ import javax.inject.Singleton
 class PrivilegedAccess @Inject constructor() {
 
     /** One per-task FPS reading from the helper; [fps] is -1 when no standard task is on the display. */
-    data class TaskFpsSample(val fps: Float, val taskId: Int, val packageName: String?, val ageMs: Long)
+    data class TaskFpsSample(val fps: Float, val taskId: Int, val packageName: String?, val displayId: Int, val ageMs: Long)
 
     data class InitResult(
         val hiddenApi: Boolean,
@@ -88,18 +88,22 @@ class PrivilegedAccess @Inject constructor() {
         RootHelper.binder?.let { runCatching { it.stopAudioCapture() } }
     }
 
-    /** FPS of the game task on [displayId] (helper only); null when the helper is down or the call fails. */
-    fun taskFps(displayId: Int): TaskFpsSample? =
+    /**
+     * FPS of the game task (helper only), looked for on [preferredDisplayId] after the focused task and before the
+     * other displays; null when the helper is down or the call fails.
+     */
+    fun taskFps(preferredDisplayId: Int): TaskFpsSample? =
         RootHelper.binder?.let { h ->
             runCatching {
-                val b = h.taskFps(displayId)
+                val b = h.taskFps(preferredDisplayId)
                 TaskFpsSample(
                     fps = b.getFloat(TaskFps.KEY_FPS, -1f),
                     taskId = b.getInt(TaskFps.KEY_TASK_ID, -1),
                     packageName = b.getString(TaskFps.KEY_PACKAGE),
+                    displayId = b.getInt(TaskFps.KEY_DISPLAY_ID, -1),
                     ageMs = b.getLong(TaskFps.KEY_AGE_MS, -1L),
                 )
-            }.getOrNull()
+            }.onFailure { Log.w("PrivilegedAccess", "taskFps failed", it) }.getOrNull()
         }
 
     fun stopTaskFps() {

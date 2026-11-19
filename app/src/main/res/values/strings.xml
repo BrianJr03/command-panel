@@ -36,6 +36,8 @@
     <!-- Overlay: Settings tab -->
     <string name="overlay_refresh_hz">%1$dHz</string>
     <string name="overlay_fps_suffix"> FPS</string>
+    <!-- Shown by the FPS counter when it counts every frame on both screens because no per-game reading is available. -->
+    <string name="overlay_fps_compositor">compositor FPS</string>
     <string name="overlay_temp">TEMP</string>
     <string name="overlay_fan">FAN</string>
     <string name="gauge_cpu">CPU</string>

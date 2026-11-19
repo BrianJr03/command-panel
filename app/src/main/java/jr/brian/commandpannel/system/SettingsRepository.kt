@@ -101,7 +101,7 @@ class SettingsRepository(
                         gpuMhz = t.gpuMhz, gpuFraction = t.gpuFraction,
                         powerW = t.powerW, powerFraction = t.powerFraction, powerCharging = t.powerCharging,
                         ramGb = t.ramGb, ramFraction = t.ramFraction,
-                        fps = t.fps,
+                        fps = t.fps, fpsCompositor = t.fpsCompositor,
                     )
                 }
             }

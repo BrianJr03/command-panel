@@ -56,29 +56,46 @@ class TelemetryReaderTest {
     }
 
     @Test
-    fun fpsIsCeiledAndCapped() {
+    fun fpsIsRoundedAndCapped() {
         assertEquals(60, TelemetryReader.fps(deltaFrames = 100, deltaMs = 1000, cap = 60)) // 100fps capped to 60
-        assertEquals(46, TelemetryReader.fps(deltaFrames = 68, deltaMs = 1500, cap = 120)) // ceil(45.3)
+        assertEquals(45, TelemetryReader.fps(deltaFrames = 68, deltaMs = 1500, cap = 120)) // 45.3 rounds down, not up
+        assertEquals(30, TelemetryReader.fps(deltaFrames = 45, deltaMs = 1510, cap = 120)) // 29.8: a 30 fps game stays 30
+        assertEquals(0, TelemetryReader.fps(deltaFrames = 10, deltaMs = 0, cap = 120))
+    }
+
+    @Test
+    fun frameDeltaHandlesTheCounterWrapping() {
+        assertEquals(45L, TelemetryReader.frameDelta(100L, 145L))
+        assertEquals(20L, TelemetryReader.frameDelta(0xFFFFFFF6L, 10L)) // 32-bit wrap
+        assertNull(TelemetryReader.frameDelta(null, 10L))
     }
 
     @Test
     fun chooseFpsPrefersAFreshTaskSample() {
-        assertEquals(30, TelemetryReader.chooseFps(taskFps = 29.6f, taskAgeMs = 400, globalFps = 120, cap = 120))
-        assertEquals(60, TelemetryReader.chooseFps(taskFps = 60.2f, taskAgeMs = 0, globalFps = 120, cap = 120))
-        assertEquals(0, TelemetryReader.chooseFps(taskFps = 0f, taskAgeMs = 400, globalFps = 120, cap = 120)) // paused game
+        val r = TelemetryReader.chooseFps(taskFps = 29.6f, taskAgeMs = 400, globalFps = 120, cap = 120)
+        assertEquals(30, r.fps)
+        assertFalse(r.compositor)
+        assertEquals(60, TelemetryReader.chooseFps(taskFps = 60.2f, taskAgeMs = 0, globalFps = 120, cap = 120).fps)
+        assertEquals(0, TelemetryReader.chooseFps(taskFps = 0f, taskAgeMs = 400, globalFps = 120, cap = 120).fps) // paused game
     }
 
     @Test
-    fun chooseFpsFallsBackToGlobal() {
-        assertEquals(90, TelemetryReader.chooseFps(taskFps = null, taskAgeMs = null, globalFps = 90, cap = 120)) // helper down
-        assertEquals(90, TelemetryReader.chooseFps(taskFps = -1f, taskAgeMs = -1, globalFps = 90, cap = 120)) // no game
-        assertEquals(90, TelemetryReader.chooseFps(taskFps = 30f, taskAgeMs = 5_000, globalFps = 90, cap = 120)) // stale
-        assertEquals(90, TelemetryReader.chooseFps(taskFps = 30f, taskAgeMs = -1, globalFps = 90, cap = 120)) // no report yet
+    fun chooseFpsFallsBackToGlobalAndFlagsIt() {
+        val cases = listOf(
+            TelemetryReader.chooseFps(taskFps = null, taskAgeMs = null, globalFps = 90, cap = 120), // helper down
+            TelemetryReader.chooseFps(taskFps = -1f, taskAgeMs = -1, globalFps = 90, cap = 120), // no game
+            TelemetryReader.chooseFps(taskFps = 30f, taskAgeMs = 5_000, globalFps = 90, cap = 120), // stale
+            TelemetryReader.chooseFps(taskFps = 30f, taskAgeMs = -1, globalFps = 90, cap = 120), // no report yet
+        )
+        cases.forEach {
+            assertEquals(90, it.fps)
+            assertTrue(it.compositor)
+        }
     }
 
     @Test
     fun chooseFpsIsCapped() {
-        assertEquals(60, TelemetryReader.chooseFps(taskFps = 75f, taskAgeMs = 100, globalFps = 0, cap = 60))
-        assertEquals(60, TelemetryReader.chooseFps(taskFps = null, taskAgeMs = null, globalFps = 120, cap = 60))
+        assertEquals(60, TelemetryReader.chooseFps(taskFps = 75f, taskAgeMs = 100, globalFps = 0, cap = 60).fps)
+        assertEquals(60, TelemetryReader.chooseFps(taskFps = null, taskAgeMs = null, globalFps = 120, cap = 60).fps)
     }
 }

@@ -43,8 +43,10 @@ interface IRootHelper {
     void stopDisplayMirror();
 
     /**
-     * Per-task FPS of the top visible standard task on [displayId] via IWindowManager.registerTaskFpsCallback (v4).
-     * Keys: "fps" (float, -1 if none), "taskId" (int), "pkg" (String), "ageMs" (long, -1 before the first report).
+     * Per-task FPS of the game task via IWindowManager.registerTaskFpsCallback (v4). The task is the focused root
+     * task if it is a visible standard one, else the top one on [displayId], else the top one on any other display.
+     * Keys: "fps" (float, -1 if none), "taskId" (int), "pkg" (String), "displayId" (int), "ageMs" (long, -1 before
+     * the first report).
      */
     Bundle taskFps(int displayId);
 

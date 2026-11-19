@@ -167,7 +167,7 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
         return uid == 0 || uid == appUid
     }
 
-    override fun taskFps(displayId: Int): Bundle = TaskFps.sample(displayId)
+    override fun taskFps(displayId: Int): Bundle = TaskFps.sample(preferredDisplayId = displayId)
 
     override fun stopTaskFps() = TaskFps.stop()
 

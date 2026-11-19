@@ -61,23 +61,36 @@ object TelemetryReader {
         return if (hex.length == 8) hex.toLongOrNull(16) else null
     }
 
-    /** FPS from two frame-counter samples; capped at the panel's refresh rate. */
+    /**
+     * Frames between two reads of the 32-bit SurfaceFlinger counter (both read as unsigned), allowing for one
+     * wrap-around; null when either sample is missing.
+     */
+    fun frameDelta(prev: Long?, now: Long?): Long? {
+        if (prev == null || now == null) return null
+        val d = now - prev
+        return if (d >= 0) d else d + (1L shl 32)
+    }
+
+    /** FPS from two frame-counter samples, rounded to the nearest frame; capped at the panel's refresh rate. */
     fun fps(deltaFrames: Long, deltaMs: Long, cap: Int): Int {
         if (deltaMs <= 0 || deltaFrames < 0) return 0
-        val raw = Math.ceil(deltaFrames * 1000.0 / deltaMs).toInt()
+        val raw = Math.round(deltaFrames * 1000.0 / deltaMs).toInt()
         return raw.coerceIn(0, cap)
     }
 
     /** A per-task reading older than this means the callback stopped (task gone, helper restarted). */
     const val TASK_FPS_MAX_AGE_MS = 2_000L
 
+    /** An FPS value and where it came from: the game task's own frames, or every frame the compositor showed. */
+    data class FpsReading(val fps: Int, val compositor: Boolean)
+
     /**
-     * Per-task FPS when the sample is fresh, else the global composite FPS; capped at the panel's refresh rate.
-     * The task value is already an average, so it is rounded rather than ceiled.
+     * Per-task FPS when the sample is fresh, else the global composite FPS (flagged [FpsReading.compositor] so the
+     * panel can say so); capped at the panel's refresh rate. The task value is already an average, so it is rounded.
      */
-    fun chooseFps(taskFps: Float?, taskAgeMs: Long?, globalFps: Int, cap: Int): Int {
+    fun chooseFps(taskFps: Float?, taskAgeMs: Long?, globalFps: Int, cap: Int): FpsReading {
         val fresh = taskFps != null && taskFps >= 0f && taskAgeMs != null && taskAgeMs in 0..TASK_FPS_MAX_AGE_MS
         val fps = if (fresh) Math.round(taskFps!!) else globalFps
-        return fps.coerceIn(0, cap)
+        return FpsReading(fps.coerceIn(0, cap), compositor = !fresh)
     }
 }

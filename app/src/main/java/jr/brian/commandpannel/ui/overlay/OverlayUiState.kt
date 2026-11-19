@@ -32,6 +32,8 @@ data class OverlayUiState(
 
     val is120Hz: Boolean = false,
     val fps: Int = 49,
+    /** The FPS is the compositor's count of all frames on both screens (no per-game reading); the panel labels it. */
+    val fpsCompositor: Boolean = false,
 
     val tempC: Int = 60,
     val fanPercent: Int = 24,

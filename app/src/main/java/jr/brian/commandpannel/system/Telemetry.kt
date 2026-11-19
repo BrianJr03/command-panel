@@ -30,15 +30,22 @@ data class Telemetry(
     val ramGb: Float = 0f,
     val ramFraction: Float = 0f,
     val fps: Int = 0,
+    /** True when [fps] is the compositor's count of every frame on both screens, not the game's own frames. */
+    val fpsCompositor: Boolean = TelemetryMonitor.NEW_FPS_SOURCES,
 )
 
 /**
  * Polls the stock telemetry sources every [intervalMs] while started: sysfs nodes read directly (the probe showed
  * the app's own uid can read them), the fan via [FanProvider], RAM via [ActivityManager], and FPS from
- * SurfaceFlinger's global composite counter (transaction 1013, which the app's uid is refused but root allows) via
- * `service call` through the root shell, as stock does. With [NEW_FPS_SOURCES] on, FPS instead comes from the game
- * task on the top display through the root helper's task FPS callback (frames that task actually presented),
- * falling back to the global counter read over the helper binder when no game is up.
+ * the game task through the root helper's task FPS callback (frames that task actually presented, on whichever
+ * display it is on). When that has no fresh reading (no game up, helper down, the callback unsupported), FPS falls
+ * back to SurfaceFlinger's global composite counter (transaction 1013, which the app's uid is refused but root
+ * allows), read over the helper binder or, without the helper, `service call` through the root shell as stock does.
+ * That counter includes both screens and the overlay's own animations, so the reading is flagged
+ * [Telemetry.fpsCompositor] and the panel labels it.
+ *
+ * The per-task source and that label are behind [NEW_FPS_SOURCES] until they've had more QA (#4). With it off, FPS
+ * is the global counter alone, unlabeled, as before.
  */
 class TelemetryMonitor(
     private val context: Context,
@@ -47,13 +54,6 @@ class TelemetryMonitor(
     private val intervalMs: Long = 1500L,
 ) {
     companion object {
-        /**
-         * Off: FPS is the stock method only (`service call SurfaceFlinger 1013` through the root shell). On: the
-         * per-task game FPS from the root helper, with the global counter read over the helper binder as fallback.
-         * Kept off until the new sources are verified on device.
-         */
-        const val NEW_FPS_SOURCES = false
-
         private const val TEMP = "/sys/devices/virtual/thermal/thermal_zone48/temp"
         private const val CPU_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq"
         private const val CPU_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq"
@@ -61,6 +61,9 @@ class TelemetryMonitor(
         private const val GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"
         private const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
         private const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
+
+        /** Per-game FPS from the task callback, with the "compositor FPS" label on fallback. Off pending QA (#4). */
+        const val NEW_FPS_SOURCES = false
     }
 
     private val _state = MutableStateFlow(Telemetry())
@@ -112,30 +115,38 @@ class TelemetryMonitor(
             powerW = abs(watts), powerFraction = TelemetryReader.powerFraction(watts),
             powerCharging = TelemetryReader.isCharging(watts),
             ramGb = ramGb, ramFraction = ramFrac,
-            fps = fps,
+            fps = fps.fps, fpsCompositor = fps.compositor,
         )
     }
 
-    private fun sampleFps(): Int {
+    private fun sampleFps(): TelemetryReader.FpsReading {
         val cap = refreshRateCap()
         // The global counter is sampled every time so its delta is ready the moment the task source drops out.
         val globalFps = sampleGlobalFps(cap)
-        if (!NEW_FPS_SOURCES) return globalFps
+        if (!NEW_FPS_SOURCES) return TelemetryReader.FpsReading(globalFps, compositor = false)
+        // The game is usually on the top screen; the helper also checks the focused task and the bottom screen.
         val task = privileged.taskFps(Display.DEFAULT_DISPLAY)
         return TelemetryReader.chooseFps(task?.fps, task?.ageMs, globalFps, cap)
     }
 
     private fun sampleGlobalFps(cap: Int): Int {
+        // Timestamp each read at the midpoint of the call itself, so binder or fork latency doesn't skew the interval.
         // The helper's direct binder transaction is sub-millisecond; the shell fallback forks `sh` + `service`.
-        val frames = (if (NEW_FPS_SOURCES) privileged.surfaceFlingerFrameCount() else null)
-            ?: privileged.shell("service call SurfaceFlinger 1013")?.let(TelemetryReader::parseSurfaceFlingerFrames)
+        val (frames, now) = timed { privileged.surfaceFlingerFrameCount() }
+            ?: timed { privileged.shell("service call SurfaceFlinger 1013")?.let(TelemetryReader::parseSurfaceFlingerFrames) }
             ?: return _state.value.fps
-        val now = System.nanoTime() / 1_000_000L
-        val prev = lastFrames
-        val prevTime = lastFrameTime
+        val delta = TelemetryReader.frameDelta(lastFrames, frames)
+        val dt = now - lastFrameTime
         lastFrames = frames
         lastFrameTime = now
-        if (prev == null) return _state.value.fps
-        return TelemetryReader.fps(frames - prev, now - prevTime, cap)
+        return if (delta == null) _state.value.fps else TelemetryReader.fps(delta, dt, cap)
+    }
+
+    /** Runs [read] and pairs a non-null result with the midpoint of the call in milliseconds (monotonic clock). */
+    private inline fun timed(read: () -> Long?): Pair<Long, Long>? {
+        val t0 = System.nanoTime()
+        val v = read() ?: return null
+        val t1 = System.nanoTime()
+        return v to (t0 + t1) / 2 / 1_000_000L
     }
 }
