@@ -14,6 +14,7 @@ import android.content.ComponentName
 import jr.brian.commandpannel.service.AssistantService
 import jr.brian.commandpannel.system.Prefs
 import jr.brian.commandpannel.system.QuickLaunch
+import jr.brian.commandpannel.system.QuickLaunchAfter
 import jr.brian.commandpannel.system.QuickLaunchApp
 import jr.brian.commandpannel.system.QuickLaunchDisplay
 import jr.brian.commandpannel.system.SystemSettings
@@ -89,6 +90,7 @@ data class SettingsState(
     val orderedEnabledTiles: List<String> = emptyList(),
     val quickLaunchLabel: String? = null,
     val quickLaunchDisplay: QuickLaunchDisplay = QuickLaunchDisplay.TOP,
+    val quickLaunchAfter: QuickLaunchAfter = QuickLaunchAfter.CLOSE,
     /** Show the Quick Launch app's icon and name on its nav button instead of the stock glyph and "Launch". */
     val quickLaunchShowApp: Boolean = true,
     val quickLaunchComponent: ComponentName? = null,
@@ -198,6 +200,7 @@ class SettingsViewModel @Inject constructor(
             .enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null)),
         quickLaunchLabel = QuickLaunch.savedLabel(getApplication()),
         quickLaunchDisplay = QuickLaunch.savedDisplay(getApplication()),
+        quickLaunchAfter = QuickLaunch.savedAfter(getApplication()),
         quickLaunchShowApp = prefs.getBoolean("quick_launch_show_app", true),
         quickLaunchComponent = QuickLaunch.savedComponent(getApplication()),
         navOrder = jr.brian.commandpannel.system.NavBarButton.ordered(prefs.getString("nav_bar_order", null)).map { it.key },
@@ -663,6 +666,11 @@ class SettingsViewModel @Inject constructor(
     fun setQuickLaunchDisplay(display: QuickLaunchDisplay) {
         QuickLaunch.savedComponent(app)?.let { QuickLaunch.save(app, it, display) }
         _state.value = _state.value.copy(quickLaunchDisplay = display)
+    }
+
+    fun setQuickLaunchAfter(after: QuickLaunchAfter) {
+        QuickLaunch.saveAfter(app, after)
+        _state.value = _state.value.copy(quickLaunchAfter = after)
     }
 
     fun clearQuickLaunch() {

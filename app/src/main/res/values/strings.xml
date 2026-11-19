@@ -228,6 +228,12 @@
     <string name="settings_choose_app">Choose app</string>
     <string name="settings_clear">Clear</string>
     <string name="settings_open_on">Open on:</string>
+    <string name="settings_after_launch">After launching:</string>
+    <string name="settings_after_launch_close">Close the panel</string>
+    <string name="settings_after_launch_keep_open">Keep the panel open</string>
+    <string name="settings_after_launch_reopen">Reopen when the app closes</string>
+    <string name="settings_after_launch_keep_open_note">The panel can only stay open when the app opens on the upper screen. On the lower screen it closes so the app isn\'t hidden.</string>
+    <string name="settings_after_launch_reopen_note">The panel comes back when you leave the app with Home or Back. It stops waiting if the screen turns off, you open the panel yourself, or after 30 minutes.</string>
     <string name="settings_choose_an_app">Choose an app</string>
     <string name="settings_back">Back</string>
     <string name="settings_loading">Loading…</string>

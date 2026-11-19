@@ -759,6 +759,17 @@ private fun QuickLaunchCard(state: SettingsState, vm: SettingsViewModel) {
             jr.brian.commandpannel.system.QuickLaunchDisplay.entries.forEach { d ->
                 RadioRow(stringResource(d.labelRes), state.quickLaunchDisplay == d) { vm.setQuickLaunchDisplay(d) }
             }
+            Spacer(Modifier.height(10.dp))
+            CardDesc(stringResource(R.string.settings_after_launch))
+            jr.brian.commandpannel.system.QuickLaunchAfter.entries.forEach { a ->
+                RadioRow(stringResource(a.labelRes), state.quickLaunchAfter == a) { vm.setQuickLaunchAfter(a) }
+            }
+            val after = state.quickLaunchAfter
+            if (after.effectiveFor(state.quickLaunchDisplay) != after) {
+                CardDesc(stringResource(R.string.settings_after_launch_keep_open_note))
+            } else if (after == jr.brian.commandpannel.system.QuickLaunchAfter.REOPEN) {
+                CardDesc(stringResource(R.string.settings_after_launch_reopen_note))
+            }
         }
     }
 }

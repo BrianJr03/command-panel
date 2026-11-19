@@ -23,7 +23,7 @@ object SettingsBackup {
     private val EXPORTED = setOf(
         "replace_stock_assistant", "battery_estimate", "hide_net_speed", "clear_tasks_keep_on_screen",
         "suppress_bottom_tip", "rgb_accent_sync", "qs_enabled_tiles", "qs_hide_labels",
-        "quick_launch_component", "quick_launch_display",
+        "quick_launch_component", "quick_launch_display", "quick_launch_after",
         "overlay_look", CustomLookStore.KEY, ThemeSources.KEY, "companion_follow_look", "nav_bar_order", "quick_launch_show_app",
         "rail_order",
     )

@@ -638,9 +638,14 @@ class SettingsRepository(
         _uiState.update { it.copy(suppressBottomTip = suppress) }
     }
 
+    /**
+     * Set by the service: what the panel does once Quick Launch opened the app (close, stay, or close and reopen
+     * when the app closes; #9). Closes it by default, like Task and the stock panel's own launches.
+     */
+    var onQuickLaunched: () -> Unit = { onHideOverlay() }
+
     override fun quickLaunch() {
-        // Out of the way once the app is opening, like Task and the stock panel's own launches.
-        if (QuickLaunch.launch(context)) onHideOverlay()
+        if (QuickLaunch.launch(context)) onQuickLaunched()
     }
 
     override fun openRecents() {

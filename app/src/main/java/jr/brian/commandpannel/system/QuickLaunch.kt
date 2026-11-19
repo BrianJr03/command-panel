@@ -22,12 +22,37 @@ enum class QuickLaunchDisplay(val displayId: Int, @StringRes val labelRes: Int) 
 }
 
 /**
+ * What happens to the panel once Quick Launch has opened the app (#9). [key] is the stored pref value.
+ * [KEEP_OPEN] only works when the app opens on the other screen than the panel; see [effectiveFor].
+ */
+enum class QuickLaunchAfter(val key: String, @StringRes val labelRes: Int) {
+    CLOSE("close", R.string.settings_after_launch_close),
+    KEEP_OPEN("keep_open", R.string.settings_after_launch_keep_open),
+    REOPEN("reopen", R.string.settings_after_launch_reopen);
+
+    /**
+     * The behavior that really applies for an app opening on [display]. The panel sits on the lower screen, so an app
+     * opening there would sit under it: keeping the panel open falls back to closing it.
+     */
+    fun effectiveFor(display: QuickLaunchDisplay): QuickLaunchAfter =
+        if (this == KEEP_OPEN && display.displayId == PANEL_DISPLAY_ID) CLOSE else this
+
+    companion object {
+        /** The Thor display the panel is shown on (the lower screen). */
+        const val PANEL_DISPLAY_ID = 4
+
+        fun fromKey(key: String?): QuickLaunchAfter = entries.firstOrNull { it.key == key } ?: CLOSE
+    }
+}
+
+/**
  * Quick Launch (fork feature): persists a chosen launcher app + target display and launches it on that display via
  * `ActivityOptions.setLaunchDisplayId`.
  */
 object QuickLaunch {
     private const val KEY_COMPONENT = "quick_launch_component"
     private const val KEY_DISPLAY = "quick_launch_display"
+    const val KEY_AFTER = "quick_launch_after"
 
     /** All launcher activities except this app, sorted by label. Does package-manager I/O — call off the main thread. */
     fun listApps(context: Context): List<QuickLaunchApp> {
@@ -62,6 +87,12 @@ object QuickLaunch {
             .putString(KEY_COMPONENT, component.flattenToString())
             .putInt(KEY_DISPLAY, display.displayId)
             .apply()
+    }
+
+    fun savedAfter(context: Context): QuickLaunchAfter = QuickLaunchAfter.fromKey(prefs(context).getString(KEY_AFTER, null))
+
+    fun saveAfter(context: Context, after: QuickLaunchAfter) {
+        prefs(context).edit().putString(KEY_AFTER, after.key).apply()
     }
 
     fun clear(context: Context) {

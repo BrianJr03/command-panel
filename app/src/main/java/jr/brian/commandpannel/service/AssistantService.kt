@@ -23,6 +23,8 @@ import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.BdsaDetector
 import jr.brian.commandpannel.system.Prefs
+import jr.brian.commandpannel.system.QuickLaunch
+import jr.brian.commandpannel.system.QuickLaunchAfter
 import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.system.StockCoexistence
@@ -61,6 +63,7 @@ class AssistantService : Service() {
     private lateinit var tapWaker: ExternalDisplayTapWaker
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
     private lateinit var bdsa: BdsaDetector
+    private lateinit var quickLaunchReturn: QuickLaunchReturnWatcher
     private val handler = Handler(Looper.getMainLooper())
     /** Double-press feedback; our own window, since system toasts are dropped while the app has no window showing. */
     private val toast by lazy { jr.brian.commandpannel.overlay.OverlayToast(applicationContext) }
@@ -80,7 +83,10 @@ class AssistantService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_SCREEN_OFF -> coexistence.onScreenOff()
+                Intent.ACTION_SCREEN_OFF -> {
+                    quickLaunchReturn.cancel()
+                    coexistence.onScreenOff()
+                }
                 Intent.ACTION_SCREEN_ON -> {
                     coexistence.onScreenOn()
                     recheckStandby(force = false)
@@ -162,6 +168,18 @@ class AssistantService : Service() {
             },
             onVisibilityChanged = { repository.onOverlayVisibilityChanged(it) },
         )
+        quickLaunchReturn = QuickLaunchReturnWatcher(
+            context = applicationContext,
+            scope = scope,
+            shell = { privileged.shell(it) },
+            isDeviceAwake = {
+                getSystemService(android.os.PowerManager::class.java).isInteractive && !keyguard.isKeyguardLocked
+            },
+            isPanelShowing = { overlay.isShowing },
+            canReopen = { !standby && !screenMode.isBottomBlanked() },
+            reopen = { overlay.show() },
+        )
+        repository.onQuickLaunched = ::onQuickLaunched
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
             isBottomBlanked = { screenMode.isBottomBlanked() },
@@ -231,6 +249,7 @@ class AssistantService : Service() {
         coexistence.onStop()
         if (hardwareRunning) tapWaker.stop()
         runCatching { replay.disarm() }
+        quickLaunchReturn.cancel()
         repository.stop()
         if (hardwareRunning) screenMode.stop()
         overlay.destroy()
@@ -282,6 +301,25 @@ class AssistantService : Service() {
      */
     private fun stockReplaced(): Boolean = !standby && coexistence.enabled.value
 
+    /**
+     * Quick Launch just opened the app: close the panel, keep it, or close it and watch for the app to close (#9).
+     * A new launch always replaces an earlier watch.
+     */
+    private fun onQuickLaunched() {
+        quickLaunchReturn.cancel()
+        val display = QuickLaunch.savedDisplay(applicationContext)
+        when (QuickLaunch.savedAfter(applicationContext).effectiveFor(display)) {
+            QuickLaunchAfter.CLOSE -> overlay.hide()
+            QuickLaunchAfter.KEEP_OPEN -> Unit
+            QuickLaunchAfter.REOPEN -> {
+                overlay.hide()
+                QuickLaunch.savedComponent(applicationContext)?.let {
+                    quickLaunchReturn.watch(it.packageName, display.displayId)
+                }
+            }
+        }
+    }
+
     /** Re-checks for Better Dual Screen Assistant ([force] skips the detector's short cache) and applies the result. */
     private fun recheckStandby(force: Boolean) {
         scope.launch {
@@ -316,6 +354,7 @@ class AssistantService : Service() {
         coexistence.standby = active
         Log.i(TAG, "standby=$active")
         if (active) {
+            quickLaunchReturn.cancel()
             overlay.hide()
             if (hardwareRunning) {
                 screenMode.stop()
