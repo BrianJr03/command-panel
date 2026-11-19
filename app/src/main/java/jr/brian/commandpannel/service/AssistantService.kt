@@ -239,7 +239,8 @@ class AssistantService : Service() {
                 ReplayTriggerAction.NONE -> return@launch
                 ReplayTriggerAction.ARM -> {
                     replay.setEnabled(true)
-                    toast.show(getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed))
+                    val armed = if (source == SOURCE_EXTERNAL) R.string.msg_replay_trigger_armed else R.string.msg_replay_double_armed
+                    toast.show(getString(if (replay.isArmed) armed else R.string.msg_replay_double_arm_failed))
                     return@launch
                 }
                 ReplayTriggerAction.SAVE -> Unit
