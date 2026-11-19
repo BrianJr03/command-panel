@@ -308,7 +308,7 @@ class SettingsRepository(
         val fan = settings.getInt(Keys.FAN_MODE, 1)
         val style = settings.getInt(Keys.CONTROLLER_STYLE, 1)
         val theme = settings.getInt(Keys.THEME_MODE, 4)
-        val light = settings.getString(Keys.JOYSTICK_LIGHT).orEmpty().split(",").any { it.trim() == "1" }
+        val light = SystemSettings.StickLight.isOn(settings.getString(Keys.JOYSTICK_LIGHT))
         return enabledTileKeys().mapNotNull { key ->
             val id = QuickSettingTileId.fromKey(key) ?: return@mapNotNull null
             // Focus Lock is hidden outside dual mode, like stock.
@@ -336,6 +336,7 @@ class SettingsRepository(
                 QuickSettingTileId.SCREENSHOT -> str(R.string.tile_name_screenshot) to false
                 QuickSettingTileId.CLEAR_ALL_TASKS -> str(R.string.tile_clear_all_tasks) to false
                 QuickSettingTileId.REPLAY_BUFFER -> str(R.string.tile_replay_buffer) to prefs.getBoolean("replay_enabled", false)
+                QuickSettingTileId.STICK_LED -> str(R.string.text_joystick_lights) to light
             }
             QuickTile(key, id.icon, title, active)
         }
@@ -505,6 +506,7 @@ class SettingsRepository(
             "charging_sep" -> toggleIntKey(Keys.CHARGING_SEPARATION, default = 0)
             "force_landscape" -> toggleIntKey(Keys.FORCE_LANDSCAPE, default = 0)
             "ambient_led" -> toggleAmbientLight()
+            "stick_led" -> toggleStickLight()
             "clear_memory" -> cleanMemory()
             "wifi" -> privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
             "bluetooth" -> privileged.shell("svc bluetooth ${if (bluetoothConnected()) "disable" else "enable"}")
@@ -568,9 +570,31 @@ class SettingsRepository(
     override fun setThemeMode(value: Int) = settings.putInt(Keys.THEME_MODE, value)
 
     override fun toggleAmbientLight() {
-        val show = privileged.shell("getprop sys.light.curr.is.show")?.trim()
-        val isOn = show == "1" || show == "true"
+        val isOn = ambientLightShown() == true
         privileged.shell("am broadcast -a com.ro.external.request.light.adj.action --ez isShow ${!isOn}")
+    }
+
+    /** The vendor daemon's ambient-light switch (`sys.light.curr.is.show`), or `null` if it can't be read. */
+    private fun ambientLightShown(): Boolean? = when (privileged.shell("getprop sys.light.curr.is.show")?.trim()) {
+        "1", "true" -> true
+        "0", "false" -> false
+        else -> null
+    }
+
+    /**
+     * Stick LED tile (fork feature): both sticks on or off through `joystick_light_enabled`, which the vendor settings'
+     * "Joystick Lights" switch uses. In case the LED daemon doesn't act on a write from outside, the SN3112 nodes are
+     * then written directly: black for off; the saved color for on, unless Ambient LED is switched off.
+     */
+    private fun toggleStickLight() {
+        val on = !SystemSettings.StickLight.isOn(settings.getString(Keys.JOYSTICK_LIGHT))
+        settings.putString(Keys.JOYSTICK_LIGHT, SystemSettings.StickLight.valueFor(on))
+        scope?.launch(Dispatchers.IO) {
+            delay(STICK_LED_FALLBACK_DELAY_MS) // let the daemon apply the key first
+            if (!on || ambientLightShown() != false) {
+                jr.brian.commandpannel.privileged.ThorRgbController.setSticksLit(context, on)
+            }
+        }
     }
 
     override fun cleanMemory() {
@@ -681,3 +705,6 @@ class SettingsRepository(
     private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController
         .accentOverride(context, prefs.getBoolean("rgb_accent_sync", false))
 }
+
+/** How long the Stick LED tile waits for the LED daemon before writing the nodes itself. */
+private const val STICK_LED_FALLBACK_DELAY_MS = 400L

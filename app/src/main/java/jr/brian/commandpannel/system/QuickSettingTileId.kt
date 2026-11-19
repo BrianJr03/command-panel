@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
@@ -56,7 +57,8 @@ enum class QuickSettingTileId(
     TRIGGER_MODE("trigger_mode", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Tune), TileInteraction.DIALOG),
     SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG),
     CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION),
-    REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE);
+    REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE),
+    STICK_LED("stick_led", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.SportsEsports), TileInteraction.TOGGLE);
 
     /** Display name for the companion app's enable/disable list. */
     @get:StringRes
@@ -83,6 +85,7 @@ enum class QuickSettingTileId(
         SCREENSHOT -> R.string.tile_name_screenshot
         CLEAR_ALL_TASKS -> R.string.tile_name_clear_all_tasks
         REPLAY_BUFFER -> R.string.tile_name_replay_buffer
+        STICK_LED -> R.string.text_joystick_lights
     }
 
     companion object {

@@ -35,6 +35,25 @@ object ThorRgbController {
         VendorRootShell.exec(dualCommand(snapshot.leftArgb, snapshot.rightArgb, b), wait = false)
     }
 
+    /**
+     * Writes the stick LEDs straight to the nodes: the saved picker color and brightness when [lit], black otherwise.
+     * The Stick LED tile's fallback for when the vendor daemon doesn't act on `joystick_light_enabled`. Returns
+     * `false` (and writes nothing) off the Thor, or when lighting with no saved color.
+     */
+    fun setSticksLit(context: Context, lit: Boolean): Boolean {
+        if (!isAynThor) return false
+        val snapshot = sticksSnapshot(readSystemSnapshot(context), lit) ?: return false
+        applySnapshot(snapshot)
+        return true
+    }
+
+    /** What [setSticksLit] writes: [saved] when lit (`null` if it has no color), else the same brightness in black. */
+    internal fun sticksSnapshot(saved: Snapshot, lit: Boolean): Snapshot? = when {
+        !lit -> saved.copy(leftArgb = 0, rightArgb = 0)
+        saved.leftArgb and 0xFFFFFF == 0 && saved.rightArgb and 0xFFFFFF == 0 -> null
+        else -> saved
+    }
+
     fun readSystemSnapshot(context: Context): Snapshot {
         val cr = context.contentResolver
         val rawColor = runCatching { Settings.System.getString(cr, PICKER_COLOR_KEY) }.getOrNull()

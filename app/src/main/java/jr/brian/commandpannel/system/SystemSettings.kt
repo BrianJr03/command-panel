@@ -32,6 +32,11 @@ class SystemSettings(
         privileged.shell("settings put system $key $value")
     }
 
+    /** Single-quoted for the shell; callers pass plain values such as `"1,1"` (no single quotes). */
+    fun putString(key: String, value: String) {
+        privileged.shell("settings put system $key '$value'")
+    }
+
     fun uriFor(key: String) = Settings.System.getUriFor(key)
 
     object Keys {
@@ -55,5 +60,17 @@ class SystemSettings(
         const val MIN_REFRESH = "min_refresh_rate"
         const val PEAK_REFRESH = "peak_refresh_rate"
         const val SCREEN_BRIGHTNESS = "screen_brightness"        // 0..255 (top display)
+    }
+
+    /** The `joystick_light_enabled` value format: `"left,right"`, each `1` (on) or `0` (off). */
+    object StickLight {
+        /** On when either stick's LED is on, like the stock tile. */
+        fun isOn(raw: String?): Boolean = raw.orEmpty().split(",").any {
+            val v = it.trim()
+            v == "1" || v.equals("true", ignoreCase = true)
+        }
+
+        /** Both sticks on or off together. */
+        fun valueFor(on: Boolean): String = if (on) "1,1" else "0,0"
     }
 }
