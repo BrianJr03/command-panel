@@ -1093,7 +1093,10 @@ class SettingsViewModel @Inject constructor(
 
     /** Re-reads whether TCP Save Clip is installed and paired (companion resume, package changes). */
     fun refreshSaveClip() {
-        _state.value = _state.value.copy(saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(app))
+        val status = jr.brian.commandpannel.system.update.SaveClipInstaller.status(app)
+        // A message about the previous state ("doesn't include…") is stale once it changes, unless an install is running.
+        val message = _state.value.saveClipMessage.takeIf { _state.value.saveClip == status || _state.value.saveClipBusy }
+        _state.value = _state.value.copy(saveClip = status, saveClipMessage = message)
     }
 
     /**
@@ -1103,6 +1106,11 @@ class SettingsViewModel @Inject constructor(
      */
     fun installSaveClip() {
         if (_state.value.saveClipBusy) return
+        // Already installed and paired: pressing the card just says so.
+        if (_state.value.saveClip is jr.brian.commandpannel.system.update.SaveClipStatus.Ready) {
+            android.widget.Toast.makeText(app, R.string.msg_save_clip_already_installed, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         val replace = _state.value.saveClip is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission
         _state.value = _state.value.copy(saveClipBusy = true, saveClipMessage = null)
         viewModelScope.launch {

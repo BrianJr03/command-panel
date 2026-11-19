@@ -646,14 +646,15 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
 
 /**
  * TCP SC (TCP Save Clip), the trigger app Back Button Hero launches to save a clip: whether it's installed and paired
- * with this build. While it needs installing (or reinstalling), the whole card is the button: A or a tap fetches the
- * one from this version's release. Debug builds pair only with a locally built trigger (signature permission), so
- * they get a note instead.
+ * with this build. The whole card is the button: A or a tap fetches the one from this version's release when it needs
+ * installing (or reinstalling), and says it's already installed otherwise. Debug builds pair only with a locally built
+ * trigger (signature permission), so they get a note instead.
  */
 @Composable
 private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
     val status = state.saveClip
     val installable = !BuildConfig.DEBUG && status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready
+    val pressable = !BuildConfig.DEBUG
     val content: @Composable () -> Unit = {
         CardTitle(stringResource(R.string.settings_save_clip_title))
         CardDesc(stringResource(R.string.settings_save_clip_desc))
@@ -690,8 +691,8 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
         }
         state.saveClipMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
-    if (installable) {
-        // installSaveClip ignores presses while an install is running.
+    if (pressable) {
+        // installSaveClip ignores presses while an install is running, and only toasts when it's already installed.
         FocusCard(
             onActivate = vm::installSaveClip,
             modifier = Modifier.tourTarget(TourSpot.SAVE_CLIP).noRippleClickable(onClick = vm::installSaveClip),

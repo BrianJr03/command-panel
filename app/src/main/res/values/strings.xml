@@ -565,6 +565,7 @@
     <string name="msg_replay_double_arm_failed">Couldn\'t start the replay buffer</string>
     <string name="msg_trigger_not_running">Command Panel isn\'t running</string>
     <string name="msg_save_clip_installed">TCP SC is installed and ready.</string>
+    <string name="msg_save_clip_already_installed">TCP SC is already installed</string>
     <string name="msg_save_clip_not_in_release">Release v%1$s doesn\'t include TCP SC.</string>
     <string name="msg_save_clip_failed">Couldn\'t install TCP SC (%1$s)</string>
     <string name="msg_save_clip_allow_installs">Allow Command Panel to install apps in the screen that just opened, then press Install again.</string>
