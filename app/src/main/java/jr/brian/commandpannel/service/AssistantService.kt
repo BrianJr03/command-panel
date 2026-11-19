@@ -26,6 +26,7 @@ import jr.brian.commandpannel.system.Prefs
 import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.system.StockCoexistence
+import jr.brian.commandpannel.system.VolumeKeyChain
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.privileged.RootHelper
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +105,12 @@ class AssistantService : Service() {
                         if (down) coexistence.ensureSuppressed()
                         machine.onEvent(down, long)
                     }
+                }
+                VolumeKeyChain.ACTION -> {
+                    val keyType = intent.getStringExtra(VolumeKeyChain.EXTRA_KEY_TYPE)
+                    val owns = stockReplaced()
+                    Log.d(TAG, "volume key $keyType stockReplaced=$owns")
+                    if (owns) repository.onVolumeKey(keyType)
                 }
                 ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
                 ACTION_HIDE_OVERLAY -> overlay.hide()
@@ -266,6 +273,15 @@ class AssistantService : Service() {
         }
     }
 
+    /**
+     * Whether Command Panel stands in for the stock assistant, so it chains the volume keys to the bottom level (#7).
+     * Stock does that in a receiver its `TccServices` registers, and "Replace stock assistant" keeps that service from
+     * running: the process is frozen, and from the teardown its app binds the service only once at startup, which
+     * fails while the suppress has it disabled, so it should stay down in the brief unfreeze windows too. With the option off, stock is running and chains them
+     * itself; on standby the other replacement owns stock. Either way, acting too would move the level two steps.
+     */
+    private fun stockReplaced(): Boolean = !standby && coexistence.enabled.value
+
     /** Re-checks for Better Dual Screen Assistant ([force] skips the detector's short cache) and applies the result. */
     private fun recheckStandby(force: Boolean) {
         scope.launch {
@@ -333,6 +349,7 @@ class AssistantService : Service() {
     private fun registerAynReceiver() {
         val filter = IntentFilter().apply {
             addAction(ACTION_TCC_BUTTON)
+            addAction(VolumeKeyChain.ACTION)
             addAction(ACTION_SHOW_OVERLAY)
             addAction(ACTION_HIDE_OVERLAY)
             addAction(ACTION_TOGGLE_OVERLAY)

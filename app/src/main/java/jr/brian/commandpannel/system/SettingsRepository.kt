@@ -89,6 +89,7 @@ class SettingsRepository(
     private var bottomWritesInFlight = 0
     private val bottomFlush = Runnable { bottomThrottle.flush(now())?.let(::writeBottomLevel) }
     private val bottomCatchUp = Runnable { refreshBottomVolume() }
+    private val volumeKeys = VolumeKeyChain()
 
     // Top volume (#5): music volume changes (keys, other apps) reach the open panel through VOLUME_CHANGED_ACTION.
     private val topGuard = VolumeEchoGuard(ECHO_HOLD_MS)
@@ -462,6 +463,29 @@ class SettingsRepository(
     }
 
     /**
+     * A hardware volume key ([keyType] from `action.volume.key.event`) while Command Panel stands in for the stock
+     * assistant (#7): past the music volume's max or min, the key moves the bottom level one step, as stock does.
+     * A drag in progress wins over the key.
+     */
+    fun onVolumeKey(keyType: String?) {
+        val t = now()
+        val bottom = if (bottomWritesInFlight > 0) bottomThrottle.lastWritten else null
+        val level = volumeKeys.onKey(
+            keyType, t,
+            music = audio.getStreamVolume(AudioManager.STREAM_MUSIC),
+            musicMin = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC),
+            musicMax = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+            // A write still on its way counts, so quick presses don't read a stale setting and lose steps.
+            bottom = bottom ?: settings.getInt(Keys.SECONDARY_VOLUME, 7).coerceIn(0, BOTTOM_VOLUME_MAX),
+        ) ?: return
+        if (bottomGuard.dragging) return
+        bottomThrottle.sync(level)
+        bottomGuard.onRelease(t)
+        writeBottomLevel(level)
+        _uiState.update { it.copy(bottomVolume = level / BOTTOM_VOLUME_MAX.toFloat()) }
+    }
+
+    /**
      * The overlay was hidden, possibly in the middle of a drag whose release never arrives: commit what the slider
      * shows so the guard doesn't keep ignoring the setting.
      */
@@ -641,10 +665,6 @@ class SettingsRepository(
         settings.putInt(key, if (cur == 0) 1 else 0)
     }
 
-    /**
-     * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED color becomes the
-     * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
-     */
     private companion object {
         const val BOTTOM_WRITE_INTERVAL_MS = 100L
         /** How long a slider keeps ignoring change notifications after its release or last write. */
@@ -654,6 +674,10 @@ class SettingsRepository(
         const val EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE"
     }
 
+    /**
+     * When the "Sync overlay accent to stick LED" fork toggle is on, the Thor's ambient-LED color becomes the
+     * overlay accent (inverted from the original theme→LED sync). Returns the opaque ARGB accent, or null when off.
+     */
     private fun readAccentOverride(): Int? = jr.brian.commandpannel.privileged.ThorRgbController
         .accentOverride(context, prefs.getBoolean("rgb_accent_sync", false))
 }
