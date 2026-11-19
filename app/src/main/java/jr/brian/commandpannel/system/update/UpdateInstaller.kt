@@ -1,7 +1,10 @@
 package jr.brian.commandpannel.system.update
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -66,6 +69,8 @@ object UpdateInstaller {
      * this process, so the work runs as a detached root command. Returns false when the root shell isn't available.
      */
     fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): Boolean {
+        // Debug device checks: the same no-root override as ThorKBM's, so updates go through Android's installer.
+        if (ThorKbmInstaller.DebugOverrides.read(context).noRoot) return false
         val pkg = context.packageName
         val activity = "$pkg/jr.brian.commandpannel.MainActivity"
         val staged = privileged.shell(
@@ -89,11 +94,36 @@ object UpdateInstaller {
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** Hands [apk] to Android's package installer (the user confirms the install). */
+    /**
+     * Hands [apk] to Android's package installer (the user confirms the install). Aimed at the system installer
+     * itself, so other apps that open APKs (file managers, APK stores) never get a say through the "Open with"
+     * chooser. Falls back to the plain intent only when no system installer resolves.
+     */
     fun systemInstallerIntent(context: Context, apk: File): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
-        return Intent(Intent.ACTION_VIEW)
+        val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val handlers = context.packageManager.queryIntentActivities(
+            intent,
+            PackageManager.ResolveInfoFlags.of((PackageManager.MATCH_SYSTEM_ONLY or PackageManager.MATCH_DEFAULT_ONLY).toLong()),
+        ).mapNotNull { it.activityInfo }.map { a ->
+            InstallerCandidate(a.packageName, a.name, system = a.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0)
+        }
+        pickInstaller(handlers)?.let { intent.component = ComponentName(it.packageName, it.activityName) }
+        return intent
+    }
+
+    /** An activity that opens APKs: its package, class, and whether it's part of the system image. */
+    internal data class InstallerCandidate(val packageName: String, val activityName: String, val system: Boolean)
+
+    /**
+     * The installer to hand APKs to: a system app only, preferring Android's package installer (AOSP's
+     * `com.android.packageinstaller` or Google's `com.google.android.packageinstaller`). Null when no system app
+     * handles APKs.
+     */
+    internal fun pickInstaller(candidates: List<InstallerCandidate>): InstallerCandidate? {
+        val system = candidates.filter { it.system }
+        return system.firstOrNull { it.packageName.endsWith(".packageinstaller") } ?: system.firstOrNull()
     }
 }

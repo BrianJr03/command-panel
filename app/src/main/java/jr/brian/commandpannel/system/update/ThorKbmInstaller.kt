@@ -71,7 +71,8 @@ object ThorKbmInstaller {
     /**
      * Debug builds only, for device checks: `files/thorkbm_debug.properties` in the app's own storage (written with
      * `run-as`). `release_tag=v2.2` installs that release instead of the latest; `no_root=true` skips the root shell,
-     * so Install goes through Android's installer. Release builds never read it.
+     * so Install (and a Command Panel update, see [UpdateInstaller.installWithRoot]) goes through Android's
+     * installer. Release builds never read it.
      */
     internal data class DebugOverrides(val releaseTag: String? = null, val noRoot: Boolean = false) {
         companion object {
