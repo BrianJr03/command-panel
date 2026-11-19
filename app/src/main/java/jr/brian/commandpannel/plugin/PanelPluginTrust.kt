@@ -66,6 +66,13 @@ object PanelPluginTrust {
         return current.map { sha256Hex(it.toByteArray()) }
     }
 
+    /**
+     * Whether a plugin is listed: signed only with allowlisted keys ([trusted]), or, in a debug Command Panel build
+     * ([debugBuild]) only, a debuggable app ([debuggable]), so a debug plugin build gets a real tile for testing.
+     */
+    fun isListed(trusted: Boolean, debuggable: Boolean, debugBuild: Boolean): Boolean =
+        trusted || (debugBuild && debuggable)
+
     /** True when installed [packageName] is signed only with allowlisted keys. */
     fun isTrustedPackage(pm: PackageManager, packageName: String, allowed: Set<String> = ALLOWED_CERTS): Boolean {
         val info = runCatching { pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()

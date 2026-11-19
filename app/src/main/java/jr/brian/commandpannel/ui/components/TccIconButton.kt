@@ -48,7 +48,7 @@ fun TccIconButton(
     showLabel: Boolean = true,
     pressAnimation: Boolean = false,
     onClick: (() -> Unit)? = null,
-) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, showLabel, pressAnimation, onClick)
+) = TccIconButton(TileIcon.Stock(iconBase), label, circleSize, modifier, active, labelSize, iconInset, variant, index, showLabel, pressAnimation, onClick = onClick)
 
 @Composable
 fun TccIconButton(
@@ -65,6 +65,8 @@ fun TccIconButton(
     showLabel: Boolean = true,
     /** Shrink the button while it's pressed ([pressScale]). */
     pressAnimation: Boolean = false,
+    /** What screen readers say for the icon; [label] when null. */
+    contentDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = LocalTccColors.current
@@ -115,12 +117,12 @@ fun TccIconButton(
             Box(modifier = iconContainer, contentAlignment = Alignment.Center) {
                 Image(
                     painter = icon.painter(),
-                    contentDescription = label,
-                    // App launcher icons keep their own colors.
-                    colorFilter = if (icon is TileIcon.App) null else stockIconColorFilter(iconTint),
+                    contentDescription = contentDescription ?: label,
+                    // App launcher and plugin icons keep their own colors.
+                    colorFilter = if (icon.fullColor) null else stockIconColorFilter(iconTint),
                     // A launcher icon carries its own transparent margin, so in the nav bar it is scaled up at draw time
                     // to read as large as the glyph icons; the box (and so the label's position) stays the same.
-                    modifier = if (isNav && icon is TileIcon.App) {
+                    modifier = if (isNav && icon.fullColor) {
                         imageModifier.graphicsLayer { scaleX = NAV_APP_ICON_SCALE; scaleY = NAV_APP_ICON_SCALE }
                     } else imageModifier,
                 )

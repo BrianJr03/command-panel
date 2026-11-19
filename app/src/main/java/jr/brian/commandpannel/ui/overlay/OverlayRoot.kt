@@ -99,6 +99,10 @@ fun OverlayRoot(
                     onLaunch = { if (!onboarding) actions.quickLaunch() },
                     onSettings = { selectTab(OverlayTab.SETTINGS) },
                     onApp = { actions.launchCompanion() },
+                    plugins = if (onboarding) emptyList() else state.panelPlugins,
+                    onPlugin = { actions.openPanelPlugin(it) },
+                    // In Arrange mode the bar is dragged, never scrolled.
+                    scrollEnabled = !arrange.isArranging,
                 )
             }
         }

@@ -70,13 +70,27 @@ class OverlayHost(
     var isShowing = false
         private set
 
+    /** True while the show animation runs: the panel is on screen but not fully drawn yet. */
+    private var fadingIn = false
+    private val pendingVisible = PendingVisible()
+
     fun toggle() = if (isShowing) hide() else show()
 
+    /**
+     * Shows the panel. [onVisible] runs once it is fully drawn: at the end of the fade-in, or right away if it already
+     * is. It also runs if the panel can't show, or is hidden or destroyed first, so a caller never waits forever (a
+     * Panel plugin handing back the bottom screen, #19, removes its UI only then).
+     */
     @SuppressLint("ClickableViewAccessibility")
-    fun show() = onMain {
-        if (isShowing) return@onMain
+    fun show(onVisible: (() -> Unit)? = null) = onMain {
+        if (isShowing) {
+            onVisible?.let { pendingVisible.add(visibleNow = !fadingIn, callback = it) }
+            return@onMain
+        }
+        onVisible?.let { pendingVisible.add(visibleNow = false, callback = it) }
         val display = topology.bottomDisplay ?: run {
             Log.w(TAG, "no bottom display; cannot show overlay")
+            pendingVisible.flush()
             return@onMain
         }
         val displayContext = context.createDisplayContext(display)
@@ -108,6 +122,7 @@ class OverlayHost(
         } catch (t: Throwable) {
             Log.e(TAG, "addView failed", t)
             owner.onDestroy()
+            pendingVisible.flush()
             return@onMain
         }
         composeView = view
@@ -118,9 +133,15 @@ class OverlayHost(
         wm.addCrossWindowBlurEnabledListener(main::post, blurEnabledListener)
         applyBlur()
         owner.onResume()
+        fadingIn = true
         view.animate()
             .alpha(1f).translationY(0f)
             .setDuration(ANIM_MS).setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                // Not run if a hide cancels the animation; hide flushes instead.
+                fadingIn = false
+                pendingVisible.flush()
+            }
             .start()
     }
 
@@ -128,7 +149,10 @@ class OverlayHost(
         val view = composeView ?: return@onMain
         val owner = lifecycleOwner
         isShowing = false
+        fadingIn = false
         onVisibilityChanged(false)
+        // Hidden before it finished fading in: nobody should keep waiting for it.
+        pendingVisible.flush()
         releaseBlur(view)
         view.animate()
             .alpha(0f).translationY(view.height * SLIDE_FRACTION)
@@ -147,6 +171,8 @@ class OverlayHost(
 
     fun destroy() = onMain {
         if (isShowing) onVisibilityChanged(false)
+        fadingIn = false
+        pendingVisible.flush()
         composeView?.let { view ->
             releaseBlur(view)
             runCatching {

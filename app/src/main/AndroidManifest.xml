@@ -41,6 +41,10 @@
         <!-- ThorKBM: the Keyboard section installs and opens it. -->
         <package android:name="jr.brian.thorkbm" />
         <package android:name="jr.brian.thorkbm.debug" />
+        <!-- Panel plugins (PanelPluginRegistry); also covered by QUERY_ALL_PACKAGES, listed so the lookup is explicit. -->
+        <intent>
+            <action android:name="jr.brian.commandpanel.plugin.action.PANEL_PLUGIN" />
+        </intent>
     </queries>
 
     <application

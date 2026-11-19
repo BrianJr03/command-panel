@@ -48,6 +48,9 @@ interface OverlayActions {
     /** Finishes or skips the first-run onboarding; either way it doesn't start on its own again. */
     fun endOnboarding()
 
+    /** Opens the Panel plugin [key] in the panel's place (its nav button). The service handles it; a no-op elsewhere. */
+    fun openPanelPlugin(key: String) {}
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}

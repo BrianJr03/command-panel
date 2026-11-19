@@ -15,11 +15,16 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import jr.brian.commandpannel.BuildConfig
 import jr.brian.commandpannel.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import jr.brian.commandpannel.overlay.ExternalDisplayTapWaker
 import jr.brian.commandpannel.overlay.OverlayHost
+import jr.brian.commandpannel.plugin.PanelPluginRegistry
+import jr.brian.commandpannel.plugin.PanelPluginSession
+import jr.brian.commandpannel.plugin.PanelPluginSwap.EndReason
+import jr.brian.commandpannel.system.DisplayTopology
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.BdsaDetector
 import jr.brian.commandpannel.system.Prefs
@@ -29,7 +34,9 @@ import jr.brian.commandpannel.system.ScreenModeController
 import jr.brian.commandpannel.system.SettingsRepository
 import jr.brian.commandpannel.system.StockCoexistence
 import jr.brian.commandpannel.system.VolumeKeyChain
+import jr.brian.commandpannel.ui.overlay.OverlayActions
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
+import jr.brian.commandpannel.ui.overlay.PanelPluginButton
 import jr.brian.commandpannel.privileged.RootHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +71,9 @@ class AssistantService : Service() {
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
     private lateinit var bdsa: BdsaDetector
     private lateinit var quickLaunchReturn: QuickLaunchReturnWatcher
+    /** Installed Panel plugins (their nav buttons) and the session that hands them the bottom screen (#19). */
+    private lateinit var plugins: PanelPluginRegistry
+    private lateinit var pluginSession: PanelPluginSession
     private val handler = Handler(Looper.getMainLooper())
     /** Double-press feedback; our own window, since system toasts are dropped while the app has no window showing. */
     private val toast by lazy { jr.brian.commandpannel.overlay.OverlayToast(applicationContext) }
@@ -85,6 +95,8 @@ class AssistantService : Service() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     quickLaunchReturn.cancel()
+                    // The lid closed (or the screen went off): the panel is what's there when it opens.
+                    pluginSession.end(EndReason.SCREEN_OFF)
                     coexistence.onScreenOff()
                 }
                 Intent.ACTION_SCREEN_ON -> {
@@ -123,11 +135,14 @@ class AssistantService : Service() {
                     Log.d(TAG, "volume key $keyType stockReplaced=$owns")
                     if (owns) repository.onVolumeKey(keyType)
                 }
-                ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
+                ACTION_SHOW_OVERLAY -> showPanel(auto = intent.getBooleanExtra(EXTRA_AUTO, false))
                 ACTION_HIDE_OVERLAY -> overlay.hide()
-                ACTION_TOGGLE_OVERLAY -> overlay.toggle()
+                ACTION_TOGGLE_OVERLAY -> togglePanel(EndReason.PANEL_REQUESTED)
                 ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                 ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
+                // Registered only in debug builds; checked again so a release build never acts on them.
+                ACTION_DEBUG_PLUGIN_START -> if (BuildConfig.DEBUG) debugStartPlugin(intent)
+                ACTION_DEBUG_PLUGIN_END -> if (BuildConfig.DEBUG) pluginSession.end(EndReason.DEBUG)
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
@@ -152,7 +167,11 @@ class AssistantService : Service() {
         repository = SettingsRepository(applicationContext, privileged)
         screenMode = ScreenModeController(
             applicationContext, privileged,
-            onHideOverlay = { overlay.hide() },
+            onHideOverlay = {
+                // A screen mode blanked a panel; Command Panel owns the bottom screen's power, so the plugin goes too.
+                pluginSession.end(EndReason.BOTTOM_BLANKED)
+                overlay.hide()
+            },
             onBrightnessRestored = { repository.refresh() },
         )
         repository.onHideOverlay = { overlay.hide() }
@@ -160,15 +179,27 @@ class AssistantService : Service() {
         tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)
         replay = jr.brian.commandpannel.system.ReplayBufferController(applicationContext, privileged)
         bdsa = BdsaDetector(applicationContext, privileged)
+        plugins = PanelPluginRegistry(applicationContext, scope)
+        pluginSession = PanelPluginSession(
+            applicationContext,
+            bottomDisplayId = { DisplayTopology(applicationContext).bottomDisplay?.displayId },
+            showPanel = { onVisible -> overlay.show(onVisible) },
+            hidePanel = { overlay.hide() },
+        )
+        val overlayActions = object : OverlayActions by repository {
+            override fun openPanelPlugin(key: String) = startPanelPlugin(key)
+        }
         overlay = OverlayHost(
             this,
             content = { _ ->
                 val state by repository.uiState.collectAsState()
+                val installed by plugins.plugins.collectAsState()
                 // Theme Studio's unsaved draft, shown live while it's open.
                 val draft by jr.brian.commandpannel.ui.theme.StudioDraft.look.collectAsState()
+                val shown = draft?.let { state.copy(look = it.baseLook, customLook = it) } ?: state
                 OverlayRoot(
-                    state = draft?.let { state.copy(look = it.baseLook, customLook = it) } ?: state,
-                    actions = repository,
+                    state = shown.copy(panelPlugins = installed.map { PanelPluginButton(it.component, it.label) }),
+                    actions = overlayActions,
                 )
             },
             onVisibilityChanged = { repository.onOverlayVisibilityChanged(it) },
@@ -180,16 +211,22 @@ class AssistantService : Service() {
             isDeviceAwake = {
                 getSystemService(android.os.PowerManager::class.java).isInteractive && !keyguard.isKeyguardLocked
             },
-            isPanelShowing = { overlay.isShowing },
-            canReopen = { !standby && !screenMode.isBottomBlanked() },
+            // A plugin on the bottom screen counts as the panel being up: the user is busy there, so stop watching.
+            isPanelShowing = { overlay.isShowing || pluginSession.busy },
+            canReopen = { !standby && !screenMode.isBottomBlanked() && !pluginSession.busy },
             reopen = { overlay.show() },
         )
         repository.onQuickLaunched = ::onQuickLaunched
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
             isBottomBlanked = { screenMode.isBottomBlanked() },
-            onToggleOverlay = { overlay.toggle() },
-            onHideOverlay = { overlay.hide() },
+            // During a plugin session the AYN press ends it and brings the panel back, instead of toggling.
+            onToggleOverlay = { togglePanel(EndReason.AYN_PRESS) },
+            // Long press: the plugin hides first, then the panel hides and the bottom screen blanks as usual.
+            onHideOverlay = {
+                pluginSession.end(EndReason.AYN_LONG_PRESS)
+                overlay.hide()
+            },
             onBlankBottom = { repository.selectMode(1) },
             onWakeBottom = { repository.selectMode(0) },
             doublePressEnabled = { Prefs.of(applicationContext).getBoolean(PREF_DOUBLE_PRESS_REPLAY, false) },
@@ -213,6 +250,9 @@ class AssistantService : Service() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         })
+        // A plugin left showing by a service that died mid-session is told to hide; then list what's installed.
+        pluginSession.clearStale()
+        plugins.refresh()
         scope.launch {
             privileged.initialize(applicationContext)
             repository.start(scope)
@@ -233,9 +273,9 @@ class AssistantService : Service() {
         when (intent?.action) {
             // The companion's automatic preview on launch is skipped on standby, so it doesn't cover the other app's
             // overlay; an explicit show (preview button) still works.
-            ACTION_SHOW_OVERLAY -> if (!(standby && intent.getBooleanExtra(EXTRA_AUTO, false))) overlay.show()
+            ACTION_SHOW_OVERLAY -> showPanel(auto = intent.getBooleanExtra(EXTRA_AUTO, false))
             ACTION_HIDE_OVERLAY -> overlay.hide()
-            ACTION_TOGGLE_OVERLAY -> overlay.toggle()
+            ACTION_TOGGLE_OVERLAY -> togglePanel(EndReason.PANEL_REQUESTED)
             ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
             ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
             // Only reachable through ExternalTriggerReceiver (the service isn't exported); a no-op on standby.
@@ -255,6 +295,7 @@ class AssistantService : Service() {
         if (hardwareRunning) tapWaker.stop()
         runCatching { replay.disarm() }
         quickLaunchReturn.cancel()
+        pluginSession.destroy()
         repository.stop()
         if (hardwareRunning) screenMode.stop()
         overlay.destroy()
@@ -263,6 +304,66 @@ class AssistantService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /**
+     * Every request to show the panel goes through here, so the bottom screen has one owner (#19): showing the panel
+     * ends a plugin session first, which brings the panel back. The companion's automatic preview ([auto]) skips the
+     * show on standby, and leaves an active plugin alone.
+     */
+    private fun showPanel(auto: Boolean) {
+        if (auto && standby) return
+        if (pluginSession.keepsPluginOnShow(auto)) {
+            Log.i(TAG, "automatic show skipped: a plugin has the bottom screen")
+            return
+        }
+        pluginSession.end(EndReason.PANEL_REQUESTED)
+        overlay.show()
+    }
+
+    /** Toggles the panel, or, during a plugin session, ends it (which brings the panel back). */
+    private fun togglePanel(reason: EndReason) {
+        if (!pluginSession.end(reason)) overlay.toggle()
+    }
+
+    /** A plugin's nav button: hands it the bottom screen, unless Command Panel is on standby or the screen is blanked. */
+    private fun startPanelPlugin(key: String) {
+        if (standby || screenMode.isBottomBlanked()) {
+            Log.i(TAG, "plugin $key not started: standby=$standby blanked=${screenMode.isBottomBlanked()}")
+            return
+        }
+        val plugin = plugins.find(key) ?: run {
+            Log.w(TAG, "plugin $key isn't listed")
+            return
+        }
+        quickLaunchReturn.cancel()
+        pluginSession.start(plugin)
+    }
+
+    /**
+     * Debug builds only, for scripts: starts a plugin session as its nav button would. [EXTRA_PLUGIN_COMPONENT] picks
+     * the service (default: the first listed one); [EXTRA_ALLOW_UNTRUSTED] also accepts a plugin signed with a key
+     * that isn't allowlisted (a debug-signed test plugin). The version check still applies.
+     */
+    private fun debugStartPlugin(intent: Intent) {
+        val wanted = intent.getStringExtra(EXTRA_PLUGIN_COMPONENT)
+            ?.let { android.content.ComponentName.unflattenFromString(it)?.flattenToString() }
+        val allowUntrusted = intent.getBooleanExtra(EXTRA_ALLOW_UNTRUSTED, false)
+        scope.launch {
+            val found = withContext(Dispatchers.IO) { plugins.query(allowUntrusted) }
+            val plugin = if (wanted != null) found.firstOrNull { it.key == wanted } else found.firstOrNull()
+            Log.i(TAG, "debug plugin start: wanted=$wanted untrusted=$allowUntrusted found=${plugin?.key}")
+            if (plugin == null || standby || screenMode.isBottomBlanked()) return@launch
+            // A second start while a session is busy is a no-op: showing the panel first would put it over the plugin.
+            if (pluginSession.busy) {
+                Log.i(TAG, "debug plugin start ignored: a session is busy")
+                return@launch
+            }
+            quickLaunchReturn.cancel()
+            // The panel is normally up when a tile is picked; a script may start from anywhere.
+            overlay.show()
+            pluginSession.start(plugin)
+        }
+    }
 
     /**
      * AYN double press or an external trigger ([source]): arms the Replay Buffer if it's off, otherwise saves a clip.
@@ -360,6 +461,7 @@ class AssistantService : Service() {
         Log.i(TAG, "standby=$active")
         if (active) {
             quickLaunchReturn.cancel()
+            pluginSession.end(EndReason.STANDBY)
             overlay.hide()
             if (hardwareRunning) {
                 screenMode.stop()
@@ -377,6 +479,8 @@ class AssistantService : Service() {
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             val pkg = intent.data?.schemeSpecificPart
+            // Any install, update or removal can add or drop a Panel plugin.
+            plugins.refresh()
             if (pkg == coexistence.sibling.siblingPackage) {
                 // An owner that was uninstalled can't hand over; clear its record so neither build waits on it.
                 val removed = intent.action == Intent.ACTION_PACKAGE_REMOVED && !intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
@@ -402,6 +506,10 @@ class AssistantService : Service() {
             addAction(ACTION_REPLAY_SET_ENABLED)
             addAction(ACTION_REPLAY_SAVE)
             addAction(ACTION_REPLAY_REARM)
+            if (BuildConfig.DEBUG) {
+                addAction(ACTION_DEBUG_PLUGIN_START)
+                addAction(ACTION_DEBUG_PLUGIN_END)
+            }
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -459,6 +567,14 @@ class AssistantService : Service() {
         const val ACTION_RECHECK_COEXISTENCE = "jr.brian.commandpannel.action.RECHECK_COEXISTENCE"
         /** On [ACTION_SHOW_OVERLAY]: an automatic show (companion launch) that standby may skip. */
         const val EXTRA_AUTO = "auto"
+        /** Debug builds only: start a Panel plugin session, as its nav button would (scripts). */
+        const val ACTION_DEBUG_PLUGIN_START = "jr.brian.commandpannel.action.DEBUG_PLUGIN_START"
+        /** Debug builds only: end the Panel plugin session. */
+        const val ACTION_DEBUG_PLUGIN_END = "jr.brian.commandpannel.action.DEBUG_PLUGIN_END"
+        /** On [ACTION_DEBUG_PLUGIN_START]: the plugin service, as `package/class`; the first listed one when missing. */
+        const val EXTRA_PLUGIN_COMPONENT = "component"
+        /** On [ACTION_DEBUG_PLUGIN_START]: also accept a plugin whose signing key isn't allowlisted. */
+        const val EXTRA_ALLOW_UNTRUSTED = "allow_untrusted"
 
         /** True between [onCreate] and [onDestroy], so [ExternalTriggerReceiver] never starts the service itself. */
         @Volatile var isRunning = false

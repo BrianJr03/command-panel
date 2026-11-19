@@ -24,6 +24,7 @@
     <!-- Overlay: nav bar -->
     <string name="nav_launch">Launch</string>
     <string name="nav_app">App</string>
+    <string name="nav_plugin_open">Open %1$s on the bottom screen</string>
 
     <!-- Overlay: Mode tab -->
     <string name="mode_dual_screen_display">Dual-screen\ndisplay</string>

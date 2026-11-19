@@ -55,6 +55,8 @@ data class OverlayUiState(
     val quickLaunchApp: android.content.ComponentName? = null,
     /** Nav bar button order (companion Nav Bar section). */
     val navOrder: List<jr.brian.commandpannel.system.NavBarButton> = jr.brian.commandpannel.system.NavBarButton.entries,
+    /** Installed Panel plugins, one nav button each (empty hides them). Filled by the service, not the repository. */
+    val panelPlugins: List<PanelPluginButton> = emptyList(),
     val tiles: List<QuickTile> = QuickTile.STOCK_DEFAULTS,
     val tilePage: Int = 0,
     val layout: jr.brian.commandpannel.system.OverlayLayout = jr.brian.commandpannel.system.OverlayLayout.DEFAULT,

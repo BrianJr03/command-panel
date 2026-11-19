@@ -43,6 +43,10 @@ certificate digest on CP's allowlist. In version 1 the allowlist has one entry: 
 signed with any other key (including a debug key) isn't listed. To be added, send the SHA-256 digest of your release
 certificate (`apksigner verify --print-certs your.apk`).
 
+**Debug CP builds only** also list a plugin whose app is debuggable (`ApplicationInfo.FLAG_DEBUGGABLE`, which a debug
+build of the plugin has), whatever its key, so a debug plugin build gets a real tile for testing. Release CP builds
+list allowlisted keys only.
+
 The plugin checks the caller too: on every message, `Message.sendingUid` must belong to one of
 `COMMAND_PANEL_PACKAGES` (`PackageManager.getPackagesForUid`), signed with `COMMAND_PANEL_CERT_SHA256`. Ignore messages
 that fail the check. A debug plugin build may relax the certificate part to test against a debug CP.
@@ -84,6 +88,7 @@ Unknown reasons are treated like `CLOSED_BY_USER`.
 3. CP hides its panel only after `MSG_SHOWN`, so the bottom screen is never empty.
 4. The session ends in one of these ways. Each time, CP's panel comes back:
    - **The plugin closes** (its Hide key, say): it sends `MSG_CLOSED`. CP shows its panel, then sends `MSG_HIDE`.
+     With `CLOSED_OPENED_ELSEWHERE`, CP doesn't show its panel (see "Opened outside CP").
    - **The user presses the AYN button**: CP shows its panel, then sends `MSG_HIDE`.
    - **The lid closes and reopens**: on reopen CP shows its panel, then sends `MSG_HIDE`.
    - **The plugin never says it's shown**: no `MSG_SHOWN` within `SHOWN_TIMEOUT_MS` (3 s) of `MSG_SHOW`. CP keeps
@@ -110,8 +115,9 @@ launcher icon, a notification, another app) it behaves as a normal app and sends
 
 If the user opens the plugin's UI another way **during** a session (for example from its launcher icon on the top
 screen), the session is over: the plugin sends `MSG_CLOSED` with `CLOSED_OPENED_ELSEWHERE`, leaves plugin mode, and
-carries on as a normal app. CP then shows its panel and sends `MSG_HIDE`; the plugin ignores that `MSG_HIDE` for the
-UI it just opened elsewhere.
+carries on as a normal app. CP ends the session but **doesn't** show its panel, since the plugin's own UI may now be
+up on the bottom screen and the two would stack; the user's next AYN press shows the panel as usual. CP still sends
+`MSG_HIDE`; the plugin ignores it for the UI it just opened elsewhere.
 
 ## Checklist for a plugin
 

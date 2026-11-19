@@ -77,4 +77,18 @@ class PanelPluginTrustTest {
         assertEquals(listOf(1, 2, 101, 102), listOf(PanelPluginContract.MSG_SHOW, PanelPluginContract.MSG_HIDE, PanelPluginContract.MSG_SHOWN, PanelPluginContract.MSG_CLOSED))
         assertEquals(3_000L, PanelPluginContract.SHOWN_TIMEOUT_MS)
     }
+
+    @Test
+    fun `release builds list allowlisted plugins only`() {
+        assertTrue(PanelPluginTrust.isListed(trusted = true, debuggable = false, debugBuild = false))
+        assertFalse(PanelPluginTrust.isListed(trusted = false, debuggable = true, debugBuild = false))
+        assertFalse(PanelPluginTrust.isListed(trusted = false, debuggable = false, debugBuild = false))
+    }
+
+    @Test
+    fun `debug builds also list debuggable plugins`() {
+        assertTrue(PanelPluginTrust.isListed(trusted = false, debuggable = true, debugBuild = true))
+        assertTrue(PanelPluginTrust.isListed(trusted = true, debuggable = false, debugBuild = true))
+        assertFalse(PanelPluginTrust.isListed(trusted = false, debuggable = false, debugBuild = true))
+    }
 }
