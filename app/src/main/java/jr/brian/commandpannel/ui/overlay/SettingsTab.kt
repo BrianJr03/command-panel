@@ -107,32 +107,45 @@ internal fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modi
 @Composable
 internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
     val colors = LocalTccColors.current
-    val pages = state.tiles.chunked(8)
+    val pages = state.tiles.chunked(QuickTileSizing.PAGE_SIZE)
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
+    val labelSize = 10.sp
+    val density = androidx.compose.ui.platform.LocalDensity.current
     TccCard(modifier) {
         Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp)) {
-            androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f),
-            ) { pageIndex ->
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                // The circles grow with the card, from the old fixed size up to a cap; a label reserves two lines.
+                // Without names the tiles grow into the freed space.
+                val labelDp = if (state.hideTileLabels) 0f else with(density) { labelSize.toDp().value } * 2.4f + 3f
+                val circleSize = QuickTileSizing.circleDp(
+                    pageWidthDp = maxWidth.value,
+                    pageHeightDp = maxHeight.value,
+                    rows = QuickTileSizing.rows(state.tiles.size),
+                    labelDp = labelDp,
+                    hideLabels = state.hideTileLabels,
+                ).dp
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    items(pages.getOrElse(pageIndex) { emptyList() }, key = { it.id }) { tile ->
-                        TccIconButton(
-                            icon = tile.icon,
-                            label = tile.title,
-                            // Without names the tiles grow into the freed space.
-                            circleSize = if (state.hideTileLabels) 50.dp else 48.dp,
-                            active = tile.active,
-                            labelSize = 10.sp,
-                            showLabel = !state.hideTileLabels,
-                            pressAnimation = true,
-                            onClick = { onTile(tile.id) },
-                        )
+                ) { pageIndex ->
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(QuickTileSizing.COLUMNS),
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        items(pages.getOrElse(pageIndex) { emptyList() }, key = { it.id }) { tile ->
+                            TccIconButton(
+                                icon = tile.icon,
+                                label = tile.title,
+                                circleSize = circleSize,
+                                active = tile.active,
+                                labelSize = labelSize,
+                                showLabel = !state.hideTileLabels,
+                                pressAnimation = true,
+                                onClick = { onTile(tile.id) },
+                            )
+                        }
                     }
                 }
             }
