@@ -1,11 +1,15 @@
-## Command Panel v0.6.1
+## Command Panel v0.7.0
 
-A quick fix for opening your clips folder.
+Replay Buffer clips now have sound.
 
-### Fixes
-- **Open folder works.** It used to say no file manager could open the clips folder. It now opens the folder in the Files app.
+### New
+- **Game audio in clips.** Replay Buffer records what you hear, and it keeps playing on your speakers while it records. On by default. A few apps block recording, so their clips are silent.
+- **Microphone.** Turn it on to mix your voice into clips. Android shows the mic indicator while the buffer is on.
 
-See the [v0.6.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.6.0) for the previous release.
+### Changes
+- **Audio switches restart the buffer right away,** like the other capture settings.
+
+See the [v0.6.1 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.6.1) for the previous release.
 
 ---
 *Licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
