@@ -71,6 +71,29 @@ object ScreenModePlan {
     /** `screen_focus_lock` while [covered] is blanked: the other, visible screen, as the vendor's single-screen modes do. */
     fun focusLockWhileCovered(covered: Panel): Int = if (covered == Panel.BOTTOM) 1 else 2
 
+    /** What covers a blanked screen (#39). */
+    enum class Cover {
+        /** Nothing is blanked. */
+        NONE,
+        /**
+         * The app's black window only: no root helper. The status bar draws above it, and apps that hide overlay
+         * windows (Android Settings) hide it while they're in front.
+         */
+        APP,
+        /**
+         * The app's window (it eats the touches) plus the helper's black SurfaceFlinger layer above everything, status
+         * bar included, which nothing in WindowManager can hide.
+         */
+        APP_AND_LAYER,
+    }
+
+    /** Which cover [blank] gets: the helper's layer on top whenever the helper is connected. */
+    fun coverFor(blank: Int, helperConnected: Boolean): Cover = when {
+        blankedPanel(blank) == null -> Cover.NONE
+        helperConnected -> Cover.APP_AND_LAYER
+        else -> Cover.APP
+    }
+
     /** The AYN long press: wakes a blanked screen, else blanks the bottom one. */
     fun afterLongPress(blank: Int): Int = if (blank != NONE) NONE else BLANK_BOTTOM
 

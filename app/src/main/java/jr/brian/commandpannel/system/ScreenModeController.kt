@@ -34,6 +34,11 @@ import kotlinx.coroutines.launch
  * backlight isn't touched. `sys.temp.disabled.touch` isn't used any more: the cover already eats touches, and a cover
  * goes away with our process while a stuck prop would leave a screen without touch.
  *
+ * With the root helper, the helper also puts a black SurfaceFlinger layer over the blanked screen (#39): the window
+ * alone sits under the status bar, and apps that hide overlay windows (Android Settings) hide it. The layer takes no
+ * input, so the window still eats the touches. The layer goes with the helper's process, and it's taken down on
+ * every way back (dual, stop, standby) and drawn again after a helper restart or a wake.
+ *
  * The blank state lives in prefs, so a service restart re-covers the panel; sleep and wake leave the window alone. A
  * vendor mode of 1 or 2 (an older Command Panel, something else) is adopted as our state and put back to 0.
  * Brightness levels that older versions dropped and saved are restored once (#36: kept until the helper takes them).
@@ -77,8 +82,19 @@ class ScreenModeController(
         restoreLegacyBrightness()
         helperWatch?.cancel()
         helperWatch = CoroutineScope(Dispatchers.Main).launch {
-            privileged.helperState.collect { if (it == RootHelper.State.CONNECTED) restoreLegacyBrightness() }
+            privileged.helperState.collect {
+                if (it == RootHelper.State.CONNECTED) {
+                    restoreLegacyBrightness()
+                    // A helper that restarted lost its layers with its process: draw them again.
+                    syncLayers()
+                }
+            }
         }
+    }
+
+    /** The device woke (or the lid opened): put the helper's layer back if SurfaceFlinger dropped it. */
+    fun onScreenOn() {
+        if (running) syncLayers()
     }
 
     /**
@@ -91,8 +107,11 @@ class ScreenModeController(
         context.contentResolver.unregisterContentObserver(vendorObserver)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         main.removeCallbacks(notifyRestored)
+        main.removeCallbacks(showLayers)
         helperWatch?.cancel()
         helperWatch = null
+        // The helper's layers come down whether we hand over or are going away; [start] draws them again.
+        hideLayers()
         if (handOver && blank != ScreenModePlan.NONE) {
             prefs.edit().putInt(KEY_BLANK, ScreenModePlan.NONE).apply()
             apply(ScreenModePlan.NONE, force = true)
@@ -131,6 +150,9 @@ class ScreenModeController(
         saveFocusState(plan.saveFocus)
         when (plan.cover) {
             null -> {
+                // The layer goes first, so the app cover's slide out is what you see.
+                main.removeCallbacks(showLayers)
+                hideLayers()
                 removeCover(Panel.BOTTOM, animate = true)
                 removeCover(Panel.TOP, animate = true)
             }
@@ -142,6 +164,9 @@ class ScreenModeController(
                 }
                 removeCover(if (plan.cover == Panel.BOTTOM) Panel.TOP else Panel.BOTTOM, animate = false)
                 showCover(plan.cover, animate = !starting)
+                // The helper's layer goes on once the app cover has slid in.
+                main.removeCallbacks(showLayers)
+                main.postDelayed(showLayers, if (starting) 0L else SLIDE_MS)
             }
         }
         if (plan.restoreFocus) restoreFocusState()
@@ -201,6 +226,36 @@ class ScreenModeController(
             Log.i(TAG, "$panel brightness restored to $saved (saved by an older version)")
         }
         return applied
+    }
+
+    // ---- the helper's layer (#39) ----
+
+    private val showLayers = Runnable { syncLayers() }
+
+    /**
+     * Puts the helper's black layer on the blanked screen and takes it off the other one (see
+     * [ScreenModePlan.coverFor]). Without the helper there's nothing to do: the app cover alone is the fallback, and
+     * a helper that died took its layers with it.
+     */
+    private fun syncLayers() {
+        if (!privileged.isHelperConnected) return
+        val covered = ScreenModePlan.blankedPanel(blank)
+        val withLayer = ScreenModePlan.coverFor(blank, helperConnected = true) == ScreenModePlan.Cover.APP_AND_LAYER
+        for (panel in Panel.values()) {
+            val id = displayOf(panel)?.displayId ?: continue
+            if (withLayer && panel == covered) {
+                val ok = privileged.showBlankLayer(id)
+                Log.i(TAG, "$panel layer up: ${if (ok) "done" else "failed (app cover only)"}")
+            } else {
+                privileged.hideBlankLayer(id)
+            }
+        }
+    }
+
+    /** Takes the helper's layer off both screens. */
+    private fun hideLayers() {
+        if (!privileged.isHelperConnected) return
+        for (panel in Panel.values()) displayOf(panel)?.displayId?.let { privileged.hideBlankLayer(it) }
     }
 
     // ---- the cover ----

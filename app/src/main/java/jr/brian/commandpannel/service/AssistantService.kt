@@ -100,6 +100,8 @@ class AssistantService : Service() {
                     coexistence.onScreenOff()
                 }
                 Intent.ACTION_SCREEN_ON -> {
+                    // A blanked screen's helper layer is put back if SurfaceFlinger dropped it over the sleep.
+                    if (hardwareRunning) screenMode.onScreenOn()
                     coexistence.onScreenOn()
                     recheckStandby(force = false)
                 }

@@ -94,6 +94,27 @@ class ScreenModePlanTest {
         assertNull(ScreenModePlan.blankedPanel(0))
     }
 
+    // ---- which cover (#39) ----
+
+    @Test
+    fun `with the helper a blanked screen gets the layer above everything, on top of the app cover`() {
+        assertEquals(ScreenModePlan.Cover.APP_AND_LAYER, ScreenModePlan.coverFor(BLANK_BOTTOM, helperConnected = true))
+        assertEquals(ScreenModePlan.Cover.APP_AND_LAYER, ScreenModePlan.coverFor(BLANK_TOP, helperConnected = true))
+    }
+
+    @Test
+    fun `without the helper the app cover alone is the fallback`() {
+        assertEquals(ScreenModePlan.Cover.APP, ScreenModePlan.coverFor(BLANK_BOTTOM, helperConnected = false))
+        assertEquals(ScreenModePlan.Cover.APP, ScreenModePlan.coverFor(BLANK_TOP, helperConnected = false))
+    }
+
+    @Test
+    fun `nothing blanked means no cover at all, helper or not`() {
+        assertEquals(ScreenModePlan.Cover.NONE, ScreenModePlan.coverFor(NONE, helperConnected = true))
+        assertEquals(ScreenModePlan.Cover.NONE, ScreenModePlan.coverFor(NONE, helperConnected = false))
+        assertEquals(ScreenModePlan.Cover.NONE, ScreenModePlan.coverFor(7, helperConnected = true))
+    }
+
     // ---- levels saved by older versions (#36) ----
 
     @Test

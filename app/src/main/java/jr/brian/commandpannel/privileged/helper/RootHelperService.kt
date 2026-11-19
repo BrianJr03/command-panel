@@ -33,6 +33,9 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
         Log.i(tag, "client died; waiting ${HelperProtocol.GRACE_MS} ms for it to come back")
         main.post {
             clientToken = null
+            // The app's touch-eating cover went with it: don't keep a screen black with touches going through.
+            // A restarted app covers it again.
+            BlankLayer.hideAll()
             orphanedAtMs = SystemClock.elapsedRealtime()
             main.removeCallbacks(graceTick)
             main.post(graceTick)
@@ -57,6 +60,7 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
                     TaskFps.stop()
                     DisplayMirror.stop()
                     AudioCapture.stop()
+                    BlankLayer.hideAll()
                     exitProcess(0)
                 }
             }
@@ -122,8 +126,19 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
 
     override fun shutdown() {
         Log.i(tag, "shutdown requested")
+        BlankLayer.hideAll()
         exitProcess(0)
     }
+
+    override fun showBlankLayer(displayId: Int): Boolean {
+        if (!callerIsApp()) {
+            Log.w(tag, "showBlankLayer refused for uid ${android.os.Binder.getCallingUid()}")
+            return false
+        }
+        return BlankLayer.show(displayId)
+    }
+
+    override fun hideBlankLayer(displayId: Int): Boolean = callerIsApp() && BlankLayer.hide(displayId)
 
     override fun removeTask(taskId: Int): Boolean = runCatching {
         val atm = Class.forName("android.app.ActivityTaskManager")

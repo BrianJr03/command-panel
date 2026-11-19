@@ -15,8 +15,11 @@
 #   - focus lock points at the visible screen;
 #   - a tap on the covered screen changes nothing (the focused app there stays the same);
 #   - a press brings it back: cover gone, vendor mode 0, focus lock restored, frame not black.
-# Then: a service restart while covered (the cover comes back), and a sleep/wake (KEYCODE_SLEEP / KEYCODE_WAKEUP,
-# never the power key) while covered (it stays).
+# Then (#39) the helper's black layer: with Android Settings in front on the top screen (it hides every overlay
+# window), "only bottom screen" still makes the top black, status bar strip included; a helper restart draws the layer
+# again; a wake keeps it; a press brings Settings back. Then a service restart while covered (the cover comes back),
+# and a sleep/wake (KEYCODE_SLEEP / KEYCODE_WAKEUP, never the power key) while covered (it stays). After a wake the
+# lock screen may be up: the script never tries to get past it (it skips the press and goes back to dual).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -61,6 +64,16 @@ button() { sh_dev "sendevent $AYN_DEV 1 $AYN_CODE 1; sendevent $AYN_DEV 0 0 0; s
 long_press() { button 1; }
 press() { button 0.1; }
 select_mode() { sh_dev am broadcast -a "$ACTION_SELECT_MODE" -p "$PKG" --ei mode "$1" >/dev/null; }
+helper_stop() { sh_dev am broadcast -a jr.brian.commandpannel.action.DEBUG_HELPER_STOP -p "$PKG" >/dev/null; }
+helper_start() { sh_dev am broadcast -a jr.brian.commandpannel.action.DEBUG_HELPER_START -p "$PKG" >/dev/null; }
+# The helper publishes "<package>.root_helper" in ServiceManager while it runs (HelperProtocol.serviceName).
+helper_up() { sh_dev service list | grep -qF "$PKG.root_helper"; }
+keyguard_up() { sh_dev dumpsys window | grep -m1 isKeyguardShowing | grep -q true; }
+# The top screen's status bar strip and the whole frame of a top screencap, as "strip|frame" mean RGB.
+top_means() {
+  local w; w="$(sh_dev wm size -d "$TOP_ID" | grep -oE '[0-9]+x[0-9]+' | tail -1 | cut -dx -f1)"
+  echo "$(mean_rgb "$1" "${w:-1920}:$STATUS_BAR_PX:0:0")|$(mean_rgb "$1")"
+}
 
 TOP_ID=0; BOTTOM_ID=""; TOP_PHYSICAL=""; BOTTOM_PHYSICAL=""
 display_of() { if [ "$1" = top ]; then echo "$TOP_ID"; else echo "$BOTTOM_ID"; fi; }
@@ -110,7 +123,7 @@ case_check() {
     bar="$(mean_rgb "$OUT_DIR/$name-covered.png" "${w:-1920}:$STATUS_BAR_PX:0:0")"
     rest="$(mean_rgb "$OUT_DIR/$name-covered.png" "${w:-1920}:ih-$STATUS_BAR_PX:0:$STATUS_BAR_PX")"
     echo "  status bar strip mean RGB: $bar; below it: $rest"
-    if is_black "$bar"; then pass "status bar covered too"; else skip "status bar shows through the cover (mean $bar): reported, not hidden"; fi
+    check "status bar covered too (#39, mean RGB $bar)" is_black "$bar"
     check "top frame below the status bar is black (mean RGB $rest)" is_black "$rest"
   fi
   local app_before; app_before="$(focused_on "$(display_of "$screen")")"
@@ -161,6 +174,59 @@ case_check "long-press" bottom long 1 1
 case_check "only-top" bottom 1 1 1
 case_check "only-bottom" top 2 2 2
 
+step "Only bottom screen with Android Settings in front (#39)"
+# Settings hides every non-system overlay window while it's in front, so only the helper's layer can cover it.
+check "root helper up" wait_for 20 helper_up
+sh_dev am start -W -a android.settings.SETTINGS --display "$TOP_ID" >/dev/null
+sleep 2
+shot top settings-open
+IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-open.png")"
+check "Settings open with its status bar showing (strip mean RGB $bar)" not_black "$bar"
+select_mode 2
+check "cover up on the top screen" wait_for 5 "cover_on top"
+sleep 1
+shot top settings-covered
+IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-covered.png")"
+check "status bar strip black over Settings (mean RGB $bar)" is_black "$bar"
+check "whole top frame black over Settings (mean RGB $frame)" is_black "$frame"
+echo "  screenshots: $OUT_DIR/settings-open.png, $OUT_DIR/settings-covered.png"
+
+# A helper restart while covered: its layer goes with its process, and comes back with the helper.
+helper_stop
+check "helper stopped" wait_for 10 "! helper_up"
+sleep 1
+shot top settings-helper-down
+IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-helper-down.png")"
+echo "  helper down: Settings hides the app cover, so the frame shows (mean RGB $frame): the documented fallback"
+check "blank state kept while the helper is down" test "$(blank_state)" = 2
+helper_start
+check "helper back" wait_for 20 helper_up
+sleep 2
+shot top settings-helper-back
+IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-helper-back.png")"
+check "layer drawn again after the helper restart (frame mean RGB $frame)" is_black "$frame"
+
+# A wake while covered: the layer is put back if SurfaceFlinger dropped it.
+sh_dev input keyevent KEYCODE_SLEEP >/dev/null
+sleep 3
+sh_dev input keyevent KEYCODE_WAKEUP >/dev/null
+sleep 3
+if keyguard_up; then
+  skip "lock screen up after the wake: not getting past it (unlock by hand); cleanup goes back to dual"
+else
+  shot top settings-wake
+  IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-wake.png")"
+  check "top still black over Settings after the wake (strip $bar, frame $frame)" is_black "$frame"
+  press
+  check "a press brings it back" wait_for 5 cover_gone
+  sleep 1
+  shot top settings-back
+  IFS='|' read -r bar frame <<< "$(top_means "$OUT_DIR/settings-back.png")"
+  check "Settings and its status bar show again (strip $bar, frame $frame)" not_black "$frame"
+fi
+[ "$(blank_state)" = 0 ] || { select_mode 0; sleep 2; }
+sh_dev input -d "$TOP_ID" keyevent KEYCODE_HOME >/dev/null
+
 step "Service restart while covered"
 long_press
 check "cover up" wait_for 5 "cover_on bottom"
@@ -183,8 +249,13 @@ check "cover still up after the wake" cover_on bottom
 shot bottom wake-covered
 rgb="$(mean_rgb "$OUT_DIR/wake-covered.png")"
 check "bottom frame black after the wake (mean RGB $rgb)" is_black "$rgb"
-press
-check "a press brings it back" wait_for 5 cover_gone
+if keyguard_up; then
+  # The button machine ignores a short press on the lock screen (by design); cleanup goes back to dual.
+  skip "lock screen up after the wake: press not tried (unlock by hand)"
+else
+  press
+  check "a press brings it back" wait_for 5 cover_gone
+fi
 
 echo
 echo "$passes passed, $fails failed, $skips skipped"

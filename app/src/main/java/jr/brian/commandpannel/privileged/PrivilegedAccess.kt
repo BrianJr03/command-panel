@@ -59,6 +59,17 @@ class PrivilegedAccess @Inject constructor() {
     fun getDisplayBrightness(displayId: Int): Float? =
         RootHelper.binder?.let { runCatching { it.getDisplayBrightness(displayId) }.getOrNull() }
 
+    /**
+     * Covers a display with the helper's black SurfaceFlinger layer, above the status bar and every app (helper
+     * only). False when the helper is down or the layer couldn't be added.
+     */
+    fun showBlankLayer(displayId: Int): Boolean =
+        RootHelper.binder?.let { runCatching { it.showBlankLayer(displayId) }.getOrDefault(false) } ?: false
+
+    /** Removes that layer. False when the helper is down (its layers went with it) or removing it failed. */
+    fun hideBlankLayer(displayId: Int): Boolean =
+        RootHelper.binder?.let { runCatching { it.hideBlankLayer(displayId) }.getOrDefault(false) } ?: false
+
     /** Removes a recent task by id (helper only). Returns true if removed. */
     fun removeTask(taskId: Int): Boolean =
         RootHelper.binder?.let { runCatching { it.removeTask(taskId) }.getOrDefault(false) } ?: false

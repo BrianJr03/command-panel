@@ -76,4 +76,14 @@ interface IRootHelper {
 
     /** Stops startAudioCapture and closes its stream (v7). */
     void stopAudioCapture();
+
+    /**
+     * Covers display [displayId] with an opaque black SurfaceFlinger layer above everything WindowManager draws,
+     * status bar included (v9). Not a window, so apps that hide overlays can't hide it. True once it's up. The layer
+     * goes away with the helper process.
+     */
+    boolean showBlankLayer(int displayId);
+
+    /** Removes the layer showBlankLayer added (v9). True once it's gone. */
+    boolean hideBlankLayer(int displayId);
 }
