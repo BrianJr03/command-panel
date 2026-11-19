@@ -27,6 +27,11 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Held by TCP Save Clip (signed with the same key) so it can ask ExternalTriggerReceiver for a replay save. -->
+    <permission
+        android:name="${applicationId}.permission.TRIGGER"
+        android:protectionLevel="signature" />
+
     <!-- Load the stock assistant's drawables at runtime (StockResources) instead of bundling AYN's icon art. -->
     <queries>
         <package android:name="com.odin.dualscreen.assistant" />
@@ -88,6 +93,15 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".service.ExternalTriggerReceiver"
+            android:exported="true"
+            android:permission="${applicationId}.permission.TRIGGER">
+            <intent-filter>
+                <action android:name="${applicationId}.action.SAVE_OR_ARM_REPLAY" />
             </intent-filter>
         </receiver>
     </application>

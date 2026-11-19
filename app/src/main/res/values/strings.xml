@@ -545,6 +545,7 @@
     <string name="msg_replay_double_saving_both">BOTH | Saving %1$d sec clip…</string>
     <string name="msg_replay_double_armed">Replay buffer on. Double-press again to save a clip.</string>
     <string name="msg_replay_double_arm_failed">Couldn\'t start the replay buffer</string>
+    <string name="msg_trigger_not_running">Command Panel isn\'t running</string>
     <string name="msg_save_failed">Save failed (%1$s)</string>
     <string name="msg_saved_to">Saved to %1$s</string>
     <string name="msg_export_failed">Export failed</string>
