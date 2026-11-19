@@ -129,6 +129,7 @@ class AssistantService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
         screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
@@ -157,7 +158,7 @@ class AssistantService : Service() {
             onBlankBottom = { repository.selectMode(1) },
             onWakeBottom = { repository.selectMode(0) },
             doublePressEnabled = { Prefs.of(applicationContext).getBoolean(PREF_DOUBLE_PRESS_REPLAY, false) },
-            onDoublePress = ::onAynDoublePress,
+            onDoublePress = { saveOrArmReplay(SOURCE_DOUBLE_PRESS) },
             schedule = { ms, block ->
                 val r = Runnable(block)
                 handler.postDelayed(r, ms)
@@ -202,11 +203,14 @@ class AssistantService : Service() {
             ACTION_TOGGLE_OVERLAY -> overlay.toggle()
             ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
             ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
+            // Only reachable through ExternalTriggerReceiver (the service isn't exported); a no-op on standby.
+            ACTION_REPLAY_SAVE_OR_ARM -> saveOrArmReplay(SOURCE_EXTERNAL)
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        isRunning = false
         handler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(aynReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
@@ -224,13 +228,21 @@ class AssistantService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /** AYN double press: arms the Replay Buffer if it's off, otherwise saves a clip. Either way, a toast says so. */
-    private fun onAynDoublePress() {
+    /**
+     * AYN double press or an external trigger ([source]): arms the Replay Buffer if it's off, otherwise saves a clip.
+     * Either way, a toast says so. Only the external trigger checks standby here; the button handler already keeps
+     * double presses from reaching the machine on standby.
+     */
+    private fun saveOrArmReplay(source: String) {
         scope.launch(Dispatchers.IO) {
-            if (!replay.isArmed) {
-                replay.setEnabled(true)
-                toast.show(getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed))
-                return@launch
+            when (replayTriggerAction(replay.isArmed, standby = source == SOURCE_EXTERNAL && standby)) {
+                ReplayTriggerAction.NONE -> return@launch
+                ReplayTriggerAction.ARM -> {
+                    replay.setEnabled(true)
+                    toast.show(getString(if (replay.isArmed) R.string.msg_replay_double_armed else R.string.msg_replay_double_arm_failed))
+                    return@launch
+                }
+                ReplayTriggerAction.SAVE -> Unit
             }
             // Say it right away; a second toast follows only if the save fails.
             val saving = when (replay.armedTarget) {
@@ -240,7 +252,7 @@ class AssistantService : Service() {
             }
             toast.show(getString(saving, replay.clipSeconds()))
             val result = replay.save()
-            Log.i(TAG, "replay save (double press): $result")
+            Log.i(TAG, "replay save ($source): $result")
             sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
             if (result.startsWith("error:")) toast.show(getString(R.string.msg_save_failed, result.removePrefix("error:")))
         }
@@ -370,12 +382,20 @@ class AssistantService : Service() {
         const val ACTION_REPLAY_REARM = "jr.brian.commandpannel.action.REPLAY_REARM"
         const val ACTION_REPLAY_REARMED = "jr.brian.commandpannel.action.REPLAY_REARMED"
         const val EXTRA_REPLAY_ARMED = "replay_armed"
+        /** Arm the Replay Buffer if it's off, otherwise save a clip; sent by [ExternalTriggerReceiver]. */
+        const val ACTION_REPLAY_SAVE_OR_ARM = "jr.brian.commandpannel.action.REPLAY_SAVE_OR_ARM"
+        const val SOURCE_DOUBLE_PRESS = "double_press"
+        const val SOURCE_EXTERNAL = "external"
         const val EXTRA_ENABLE = "enable"
         const val PREF_DOUBLE_PRESS_REPLAY = "ayn_double_press_replay"
         /** Re-run Better Dual Screen Assistant detection now (sent by the companion after it changes BDSA). */
         const val ACTION_RECHECK_COEXISTENCE = "jr.brian.commandpannel.action.RECHECK_COEXISTENCE"
         /** On [ACTION_SHOW_OVERLAY]: an automatic show (companion launch) that standby may skip. */
         const val EXTRA_AUTO = "auto"
+
+        /** True between [onCreate] and [onDestroy], so [ExternalTriggerReceiver] never starts the service itself. */
+        @Volatile var isRunning = false
+            private set
 
         fun start(context: Context) {
             val intent = Intent(context, AssistantService::class.java)
