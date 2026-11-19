@@ -17,6 +17,7 @@ Volume keys reach the bottom screen, Quick Launch can bring the panel back, a Jo
 - **Sound in early clips.** A clip saved right after turning on the Replay Buffer now has sound, and the mic stays in sync with game audio over long sessions.
 - **No-sound note.** The Replay Buffer section tells you when clips will have no sound.
 - **Steadier FPS counter.** The reading is rounded instead of rounded up.
+- **Settings sections scroll back to the top.** Going up the section list in settings now reaches the very top again.
 
 See the [v0.8.1 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.8.1) for the previous release.
 
