@@ -646,60 +646,78 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
 
 /**
  * TCP SC (TCP Save Clip), the trigger app Back Button Hero launches to save a clip: whether it's installed and paired
- * with this build. The whole card is the button: A or a tap fetches the one from this version's release when it needs
- * installing (or reinstalling), and says it's already installed otherwise. Debug builds pair only with a locally built
- * trigger (signature permission), so they get a note instead.
+ * with this build. Install / Reinstall fetches the one from this version's release; once it's ready, its status pill
+ * says it's already installed when pressed. Debug builds pair only with a locally built trigger (signature
+ * permission), so they get a note instead.
  */
 @Composable
 private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
     val status = state.saveClip
-    val installable = !BuildConfig.DEBUG && status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready
-    val pressable = !BuildConfig.DEBUG
-    val content: @Composable () -> Unit = {
+    Card(Modifier.tourTarget(TourSpot.SAVE_CLIP)) {
         CardTitle(stringResource(R.string.settings_save_clip_title))
         CardDesc(stringResource(R.string.settings_save_clip_desc))
         Spacer(Modifier.height(10.dp))
-        val (line, tone) = when (status) {
-            is jr.brian.commandpannel.system.update.SaveClipStatus.Ready ->
-                stringResource(R.string.settings_save_clip_ready, status.version) to p.accent
-            is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission ->
-                stringResource(R.string.settings_save_clip_no_permission) to p.textPrimary
-            jr.brian.commandpannel.system.update.SaveClipStatus.Missing ->
-                stringResource(R.string.settings_save_clip_missing) to p.textSecondary
+        when {
+            status is jr.brian.commandpannel.system.update.SaveClipStatus.Ready && !BuildConfig.DEBUG ->
+                // installSaveClip only toasts that it's already installed.
+                SaveClipAction(stringResource(R.string.settings_save_clip_ready, status.version), filled = false, onClick = vm::installSaveClip)
+            status is jr.brian.commandpannel.system.update.SaveClipStatus.Ready ->
+                Text(stringResource(R.string.settings_save_clip_ready, status.version), color = p.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+            else -> Text(
+                stringResource(
+                    if (status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission) R.string.settings_save_clip_no_permission
+                    else R.string.settings_save_clip_missing,
+                ),
+                color = if (status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission) p.textPrimary else p.textSecondary,
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+            )
         }
-        Text(line, color = tone, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
         if (BuildConfig.DEBUG) {
             Spacer(Modifier.height(6.dp))
             InfoLine(stringResource(R.string.settings_save_clip_debug_note))
-        } else if (installable) {
+        } else if (status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready) {
             Spacer(Modifier.height(10.dp))
-            // A label, not a second focus stop: the card itself installs.
-            Box(Modifier.clip(controlShape(12.dp)).background(p.accent).padding(horizontal = 20.dp, vertical = 11.dp)) {
-                Text(
-                    lookLabel(
-                        stringResource(
-                            when {
-                                state.saveClipBusy -> R.string.settings_save_clip_installing
-                                status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission -> R.string.settings_save_clip_reinstall
-                                else -> R.string.settings_save_clip_install
-                            },
-                        ),
-                    ),
-                    color = p.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
-                )
-            }
+            // Stays pressable while busy (a disabled control drops gamepad focus); installSaveClip ignores repeats.
+            SaveClipAction(
+                stringResource(
+                    when {
+                        state.saveClipBusy -> R.string.settings_save_clip_installing
+                        status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission -> R.string.settings_save_clip_reinstall
+                        else -> R.string.settings_save_clip_install
+                    },
+                ),
+                filled = true,
+                onClick = vm::installSaveClip,
+            )
         }
         state.saveClipMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
-    if (pressable) {
-        // installSaveClip ignores presses while an install is running, and only toasts when it's already installed.
-        FocusCard(
-            onActivate = vm::installSaveClip,
-            modifier = Modifier.tourTarget(TourSpot.SAVE_CLIP).noRippleClickable(onClick = vm::installSaveClip),
-            content = content,
-        )
-    } else {
-        Card(Modifier.tourTarget(TourSpot.SAVE_CLIP), content = content)
+}
+
+/**
+ * The TCP SC card's controls: the Install button ([filled]) and the "Installed" status pill. Focus is unmistakable on
+ * any look: a solid accent fill, a bright outline and a bigger scale.
+ */
+@Composable
+private fun SaveClipAction(text: String, filled: Boolean, onClick: () -> Unit) {
+    val f = focusState()
+    val shape = controlShape(12.dp)
+    val scale by focusScale(f.value, 1.08f, "saveClipScale")
+    val bg by focusColor(
+        when { f.value -> p.accentFocused; filled -> p.accent; else -> p.accentSoft },
+        "saveClipBg",
+    )
+    val fg = if (f.value || filled) p.onAccent else p.accent
+    Box(
+        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape).background(bg)
+            .border(if (f.value) 2.5.dp else 1.5.dp, if (f.value) p.textPrimary else p.accent, shape)
+            .focusControl(f, onClick)
+            .noRippleClickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(lookLabel(text), color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
     }
 }
 
