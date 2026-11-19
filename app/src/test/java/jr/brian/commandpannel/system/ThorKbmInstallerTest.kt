@@ -108,6 +108,20 @@ class ThorKbmInstallerTest {
     }
 
     @Test
+    fun `debug overrides read a release tag and the no-root switch`() {
+        val o = ThorKbmInstaller.DebugOverrides.parse("# device check\nrelease_tag = v2.2\nno_root=true\n")
+        assertEquals("2.2", o.releaseTag)
+        assertTrue(o.noRoot)
+    }
+
+    @Test
+    fun `debug overrides ignore odd tags and default to off`() {
+        assertEquals(ThorKbmInstaller.DebugOverrides(), ThorKbmInstaller.DebugOverrides.parse(""))
+        assertNull(ThorKbmInstaller.DebugOverrides.parse("release_tag=v2.2/../x").releaseTag)
+        assertFalse(ThorKbmInstaller.DebugOverrides.parse("no_root=yes").noRoot)
+    }
+
+    @Test
     fun `asset name follows ThorKBM's release naming`() {
         assertEquals("ThorKBM-v2.2.1.apk", ThorKbmInstaller.assetName("2.2.1"))
     }

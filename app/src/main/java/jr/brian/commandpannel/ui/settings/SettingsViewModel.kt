@@ -1211,9 +1211,9 @@ class SettingsViewModel @Inject constructor(
             var handOff: java.io.File? = null
             val failure = withContext(Dispatchers.IO) {
                 runCatching {
-                    val release = installer.latest() ?: return@runCatching app.getString(R.string.msg_thorkbm_no_release)
+                    val release = installer.latest(app) ?: return@runCatching app.getString(R.string.msg_thorkbm_no_release)
                     val apk = installer.download(app, release)
-                    val out = installer.installWithRoot(privileged, apk)
+                    val out = installer.installWithRoot(app, privileged, apk)
                     when {
                         out == null -> { handOff = apk; null }
                         out.lines().any { it.trim() == "Success" } -> null

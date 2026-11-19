@@ -57,8 +57,44 @@ object ThorKbmInstaller {
         return ThorKbmStatus(version(PACKAGE), version(DEBUG_PACKAGE))
     }
 
-    /** The latest release, or null when it has no `ThorKBM-v<version>.apk`. Counts against [GitHubRateGuard]. */
-    fun latest(): ThorKbmRelease? = parseRelease(JSONObject(Http.getText(LATEST, 512 * 1024, "application/vnd.github+json")))
+    /**
+     * The latest release (or, on a debug build, the [DebugOverrides.releaseTag] one), or null when it has no
+     * `ThorKBM-v<version>.apk`. Counts against [GitHubRateGuard].
+     */
+    fun latest(context: Context): ThorKbmRelease? {
+        val url = DebugOverrides.read(context).releaseTag?.let { "$TAGS/v$it" } ?: LATEST
+        return parseRelease(JSONObject(Http.getText(url, 512 * 1024, "application/vnd.github+json")))
+    }
+
+    private const val TAGS = "https://api.github.com/repos/BrianJr03/Thor-Ergo-Android/releases/tags"
+
+    /**
+     * Debug builds only, for device checks: `files/thorkbm_debug.properties` in the app's own storage (written with
+     * `run-as`). `release_tag=v2.2` installs that release instead of the latest; `no_root=true` skips the root shell,
+     * so Install goes through Android's installer. Release builds never read it.
+     */
+    internal data class DebugOverrides(val releaseTag: String? = null, val noRoot: Boolean = false) {
+        companion object {
+            const val FILE = "thorkbm_debug.properties"
+
+            fun read(context: Context): DebugOverrides {
+                if (!jr.brian.commandpannel.BuildConfig.DEBUG) return DebugOverrides()
+                val text = runCatching { File(context.filesDir, FILE).readText() }.getOrNull() ?: return DebugOverrides()
+                return parse(text)
+            }
+
+            /** `key=value` lines; an unknown key or a tag that isn't a plain version is ignored. */
+            fun parse(text: String): DebugOverrides {
+                val map = text.lines().mapNotNull { line ->
+                    line.substringBefore('#').split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim() }
+                }.toMap()
+                return DebugOverrides(
+                    releaseTag = map["release_tag"]?.removePrefix("v")?.takeIf { VERSION.matches(it) },
+                    noRoot = map["no_root"] == "true",
+                )
+            }
+        }
+    }
 
     internal fun parseRelease(release: JSONObject): ThorKbmRelease? {
         val version = release.optString("tag_name").removePrefix("v").takeIf { VERSION.matches(it) } ?: return null
@@ -103,7 +139,8 @@ object ThorKbmInstaller {
      * root installs is the APK that was checked. Never replaces an installed ThorKBM. Returns the installer's output,
      * or null when the root shell isn't available.
      */
-    fun installWithRoot(privileged: PrivilegedAccess, apk: File): String? {
+    fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): String? {
+        if (DebugOverrides.read(context).noRoot) return null
         val sha = sha256(apk)
         val staged = privileged.shell(
             "cp '${apk.absolutePath}' $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,

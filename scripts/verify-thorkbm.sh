@@ -11,15 +11,21 @@
 #                      settings on the device: only with the PM's OK. Without it, an installed ThorKBM gets the
 #                      Open checks only.
 #   --no-build         Installs the debug APK already built instead of building it.
+#   --no-root          Installs through Android's installer instead of the root shell, as on a Thor without root:
+#                      writes the debug build's `no_root=true` override (removed again on exit), allows "Install
+#                      unknown apps" for the debug build when asked, and taps through Android's installer. Checks
+#                      each card message, and that the APK handed over is ThorKBM signed with its release key.
+#                      Stops if Play Protect shows up.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-stage="all"; uninstall_first=false; build=true
+stage="all"; uninstall_first=false; build=true; no_root=false
 for arg in "$@"; do
   case "$arg" in
     static|device|all) stage="$arg" ;;
     --uninstall-first) uninstall_first=true ;;
     --no-build) build=false ;;
+    --no-root) no_root=true ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -97,6 +103,87 @@ open_keyboard_section() {
   tap_text "Keyboard" && sleep 1 && ui_has "ThorKBM"
 }
 
+# The debug build's ThorKBM overrides file (ThorKbmInstaller.DebugOverrides), in its own storage.
+OVERRIDES="files/thorkbm_debug.properties"
+set_no_root() {
+  local tmp; tmp="$(mktemp)"; echo "no_root=true" > "$tmp"
+  adb push "$tmp" /data/local/tmp/thorkbm_debug.properties >/dev/null 2>&1; rm -f "$tmp"
+  sh_dev run-as "$PKG" cp /data/local/tmp/thorkbm_debug.properties "$OVERRIDES"
+  sh_dev rm -f /data/local/tmp/thorkbm_debug.properties
+  [ "$(sh_dev run-as "$PKG" cat "$OVERRIDES")" = "no_root=true" ]
+}
+clear_overrides() { $no_root && sh_dev run-as "$PKG" rm -f "$OVERRIDES" >/dev/null; }
+trap clear_overrides EXIT
+
+play_protect() { dump_ui; grep -qiE 'Play Protect|Unsafe app blocked|Scan app' "$OUT_DIR/ui.xml"; }
+stop_on_play_protect() {
+  if play_protect; then
+    shot play-protect
+    fail "Play Protect showed up; stopping here so a person can look"
+    echo; echo "$passes passed, $fails failed, $skips skipped"; exit 1
+  fi
+}
+card_message_is() { open_keyboard_section >/dev/null; grep -qF "text=\"$1\"" "$OUT_DIR/ui.xml"; }
+# Card messages (strings.xml msg_thorkbm_*), with `'` as Android shows it.
+MSG_ALLOW="Allow Command Panel to install apps in the screen that just opened, then press Install again."
+MSG_FINISH="Finish installing ThorKBM in Android's installer."
+# The APK the debug build handed to Android's installer (its updates cache), pulled for a signer check.
+handed_apk_ok() {
+  local apk="$OUT_DIR/thorkbm-handed.apk"
+  adb exec-out run-as "$PKG" cat cache/updates/thorkbm.apk > "$apk" 2>/dev/null
+  # Badging is read whole first: with pipefail, grep -q closing the pipe early would fail the check.
+  local badging; badging="$("$BUILD_TOOLS/aapt2" dump badging "$apk" 2>/dev/null)"
+  [ -s "$apk" ] && [ "$(cert_digest "$apk")" = "$KBM_CERT" ] && echo "$badging" | grep -q "^package: name='$KBM' "
+}
+
+# Android's installer labels its buttons in capitals on this firmware.
+tap_install() { tap_text "INSTALL" || tap_text "Install"; }
+
+# Install through Android's installer: allow "Install unknown apps" if asked, then confirm the install.
+install_without_root() {
+  check "debug build's no_root override written" set_no_root
+  check "pressed Install" tap_text "Install"
+  if wait_for 30 "top_focus | grep -q ManageAppExternalSources"; then
+    shot no-root-allow-installs
+    pass "Install opened \"Install unknown apps\" for the debug build"
+    check "allowed installs from the debug build" tap_text "Allow from this source"
+    sleep 1
+    check "debug build may now install apps" sh -c "adb shell appops get $PKG REQUEST_INSTALL_PACKAGES | grep -q allow"
+    sh_dev input -d 0 keyevent KEYCODE_BACK >/dev/null; sleep 2
+    check "card says: $MSG_ALLOW" card_message_is "$MSG_ALLOW"
+    shot no-root-card-allow-message
+    check "pressed Install again" tap_text "Install"
+  else
+    skip "\"Install unknown apps\" wasn't asked (already allowed for the debug build)"
+  fi
+  if ! wait_for 60 "top_focus | grep -qiE 'packageinstaller|ResolverActivity'"; then
+    fail "Android's installer didn't open"; return
+  fi
+  if top_focus | grep -q ResolverActivity; then
+    # Other apps on the device also open APKs, so Android asks which one; a direct handoff would skip this.
+    shot no-root-chooser
+    fail "Android asked which app opens the APK instead of going straight to its installer"
+    if ui_has "Open with Package installer" && tap_text "Just once" && wait_for 10 "top_focus | grep -qi packageinstaller"; then
+      echo "  picked Package installer, just once"
+    else
+      return
+    fi
+  fi
+  pass "Android's installer opened"
+  stop_on_play_protect
+  shot no-root-installer
+  # uiautomator only sees the installer's window, so the card's "$MSG_FINISH" behind it is checked by eye.
+  echo "  check by eye: the card behind the installer says \"$MSG_FINISH\" ($OUT_DIR/no-root-installer.png)"
+  check "the APK handed over is ThorKBM, signed with its release key" handed_apk_ok
+  check "confirmed in Android's installer" tap_install
+  if wait_for 60 "installed $KBM"; then pass "$KBM installed"; else stop_on_play_protect; fail "$KBM not installed after 60 s"; return; fi
+  sleep 2
+  stop_on_play_protect
+  shot no-root-installer-done
+  tap_text "DONE" || tap_text "Done"
+  sleep 1
+}
+
 device_checks() {
   step "Device"
   if ! adb get-state >/dev/null 2>&1; then fail "no device connected"; return; fi
@@ -131,8 +218,14 @@ device_checks() {
       sh -c "grep -q 'text=\"Install\"' '$OUT_DIR/ui.xml' && grep -q 'text=\"Open\"' '$OUT_DIR/ui.xml'"
 
     step "Install"
-    check "pressed Install" tap_text "Install"
-    if wait_for 90 "installed $KBM"; then
+    if $no_root; then
+      install_without_root
+    else
+      check "pressed Install" tap_text "Install"
+    fi
+    if $no_root; then
+      :
+    elif wait_for 90 "installed $KBM"; then
       pass "$KBM installed"
     else
       local focus; focus="$(top_focus)"
@@ -149,8 +242,8 @@ device_checks() {
       adb pull "$(sh_dev pm path "$KBM" | grep -m1 base.apk | sed 's/^package://')" "$apk" >/dev/null 2>&1
       check "installed APK is signed with ThorKBM's release key" test "$(cert_digest "$apk")" = "$KBM_CERT"
       [ -n "$latest" ] && check "installed version is the latest release ($latest)" test "$(version_of "$KBM")" = "$latest"
-      echo "  installer of record: $(sh_dev dumpsys package "$KBM" | grep -m1 -o 'installerPackageName=[^ ]*' || echo none)"
-      check "no staged copy left behind" sh -c "! adb shell ls /data/local/tmp/thorkbm.apk >/dev/null 2>&1"
+      echo "  installer fields: $(sh_dev dumpsys package "$KBM" | grep -oE '(installerPackageName|installInitiatingPackageName|installOriginatingPackageName|updateOwnerPackageName)=[^ ]*' | tr '\n' ' ')"
+      $no_root || check "no staged copy left behind" sh -c "! adb shell ls /data/local/tmp/thorkbm.apk >/dev/null 2>&1"
       $had_debug && check "debug build still installed" installed "$KBM.debug"
     fi
   fi
