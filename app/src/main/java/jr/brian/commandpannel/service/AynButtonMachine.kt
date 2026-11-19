@@ -7,7 +7,9 @@ package jr.brian.commandpannel.service
  *
  * Broadcast `action.tcc.button.key.event` carries `key_action_down` and `key_isLongPress`:
  *  - down, not long  -> no-op (never toggle on key-down, or the following key-up closes it again)
- *  - down, long      -> consume the press, hide the overlay, blank the bottom screen
+ *  - down, long      -> consume the press, hide the overlay, blank the bottom screen. If the bottom screen is already
+ *                       blanked by us, wake it instead (still consumed), so a firmware that only ever sends
+ *                       "down+long" can still get the screen back (#14). A repeat within the same hold is ignored.
  *  - up              -> if a long press was consumed, reset and stop; else ignored on the keyguard; else if the
  *                       bottom screen is blanked, wake it; else toggle the overlay (debounced)
  *
@@ -30,17 +32,33 @@ class AynButtonMachine(
     /** Runs the block after the delay; returns a function that cancels it. */
     private val schedule: (delayMs: Long, block: () -> Unit) -> (() -> Unit) = { _, block -> block(); {} },
     private val doublePressWindowMs: Long = 300L,
+    /**
+     * A long-press down this soon after the previous one, with no key-up between, is the same hold repeating rather
+     * than a new press, so it's ignored and can't flip a screen it just blanked back on.
+     */
+    private val longPressRepeatMs: Long = 500L,
 ) {
     private var longPressConsumed = false
+    private var lastLongDownAt = 0L
     private var lastToggleAt = 0L
     private var cancelPending: (() -> Unit)? = null
 
     fun onEvent(down: Boolean, longPress: Boolean) {
         if (down) {
             if (longPress) {
+                val t = now()
+                // Same hold repeating (no key-up since the last long-press down): already handled, keep it consumed.
+                val repeat = longPressConsumed && t >= lastLongDownAt && t - lastLongDownAt < longPressRepeatMs
+                lastLongDownAt = t
                 longPressConsumed = true
+                if (repeat) return
                 cancelPending?.invoke()
                 cancelPending = null
+                if (isBottomBlanked()) {
+                    // Already blanked by us: wake instead of blanking again. Its key-up, if any, is swallowed.
+                    onWakeBottom()
+                    return
+                }
                 onHideOverlay()
                 onBlankBottom()
             }

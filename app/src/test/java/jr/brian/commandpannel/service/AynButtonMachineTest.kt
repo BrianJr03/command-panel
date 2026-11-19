@@ -26,8 +26,8 @@ class AynButtonMachineTest {
             isBottomBlanked = { blanked },
             onToggleOverlay = { toggles++ },
             onHideOverlay = { hides++ },
-            onBlankBottom = { blanks++ },
-            onWakeBottom = { wakes++ },
+            onBlankBottom = { blanks++; blanked = true },
+            onWakeBottom = { wakes++; blanked = false },
             now = { clock },
             debounceMs = debounceMs,
             doublePressEnabled = { doublePress },
@@ -162,5 +162,77 @@ class AynButtonMachineTest {
         r.clock = 2000; up(m)
         assertEquals(2, r.toggles)
         assertEquals(0, r.doubles)
+    }
+
+    // #14: a long press while the bottom is already blanked by us wakes it.
+
+    @Test
+    fun longPress_whileBlanked_wakesAndSwallowsTheKeyUp() {
+        val r = Recorder(); val m = r.machine()
+        r.clock = 1000; down(m, long = true); up(m)
+        assertEquals(1, r.blanks)
+        r.clock = 5000; down(m, long = true)
+        assertEquals(1, r.wakes)
+        assertEquals("no second blank", 1, r.blanks)
+        up(m)
+        assertEquals("release after the waking long press is swallowed", 0, r.toggles)
+        assertEquals(false, r.blanked)
+    }
+
+    @Test
+    fun longPress_repeatsWithinOneHold_neitherWakeNorReblank() {
+        val r = Recorder(); val m = r.machine()
+        r.clock = 1000; down(m, long = true)
+        r.clock = 1050; down(m, long = true)
+        r.clock = 1100; down(m, long = true)
+        r.clock = 1150; down(m, long = true) // keeps refreshing, so the whole hold counts as one press
+        r.clock = 1200; up(m)
+        assertEquals(1, r.blanks)
+        assertEquals(1, r.hides)
+        assertEquals(0, r.wakes)
+        assertEquals(0, r.toggles)
+        assertEquals(true, r.blanked)
+    }
+
+    @Test
+    fun firmwareThatOnlySendsDownLong_togglesBlankAndWake() {
+        val r = Recorder(); val m = r.machine()
+        r.clock = 1000; down(m, long = true)
+        assertEquals(true, r.blanked)
+        r.clock = 3000; down(m, long = true) // no key-up ever came
+        assertEquals(1, r.wakes)
+        assertEquals(false, r.blanked)
+        r.clock = 5000; down(m, long = true)
+        assertEquals(2, r.blanks)
+        assertEquals(true, r.blanked)
+    }
+
+    @Test
+    fun longPress_afterAReleasedLongPress_isNeverARepeat() {
+        val r = Recorder(); val m = r.machine()
+        r.clock = 1000; down(m, long = true); up(m)
+        r.clock = 1100; down(m, long = true) // quick but after a key-up: a new press
+        assertEquals(1, r.wakes)
+    }
+
+    @Test
+    fun longPress_whileBlanked_cancelsAPendingSinglePress() {
+        val r = Recorder().apply { doublePress = true; blanked = true }; val m = r.machine()
+        up(m)
+        down(m, long = true); up(m)
+        assertEquals(null, r.pending)
+        assertEquals(1, r.wakes)
+        assertEquals(0, r.doubles)
+        assertEquals(0, r.toggles)
+    }
+
+    @Test
+    fun shortPresses_unaffectedByLongPressTracking() {
+        val r = Recorder(); val m = r.machine()
+        r.clock = 1000; down(m, long = true); up(m)
+        r.clock = 3000; down(m); up(m) // wakes (blanked), as before
+        assertEquals(1, r.wakes)
+        r.clock = 5000; down(m); up(m)
+        assertEquals(1, r.toggles)
     }
 }

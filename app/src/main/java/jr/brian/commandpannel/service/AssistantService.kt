@@ -99,9 +99,14 @@ class AssistantService : Service() {
         override fun onReceive(ctx: Context, intent: Intent) {
             when (intent.action) {
                 ACTION_TCC_BUTTON -> {
-                    val down = intent.getBooleanExtra(EXTRA_KEY_DOWN, true)
-                    val long = intent.getBooleanExtra(EXTRA_KEY_LONG, true)
-                    Log.d(TAG, "AYN button down=$down long=$long standby=$standby")
+                    val extras = intent.extras
+                    // Read like BDSA: a missing key_action_down is a key-up, never a long press (#14).
+                    @Suppress("DEPRECATION")
+                    val event = AynButtonEvent.parse { key -> extras?.get(key) }
+                    val down = event.down
+                    val long = event.longPress
+                    val keys = extras?.keySet()?.sorted()?.joinToString(",").orEmpty()
+                    Log.d(TAG, "AYN button down=$down long=$long standby=$standby extras=[$keys]")
                     // On standby the other replacement answers the button; a cheap (cached) re-check picks up its
                     // being turned off.
                     if (standby) {
@@ -431,8 +436,6 @@ class AssistantService : Service() {
         private const val NOTIF_ID = 1
 
         const val ACTION_TCC_BUTTON = "action.tcc.button.key.event"
-        const val EXTRA_KEY_DOWN = "key_action_down"
-        const val EXTRA_KEY_LONG = "key_isLongPress"
 
         const val ACTION_SHOW_OVERLAY = "jr.brian.commandpannel.action.SHOW_OVERLAY"
         const val ACTION_HIDE_OVERLAY = "jr.brian.commandpannel.action.HIDE_OVERLAY"
