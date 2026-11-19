@@ -235,7 +235,8 @@ internal fun SettingsContent(
     ) {
     CompositionLocalProvider(LocalTourTargets provides if (touring || followingLook) tourTargets else null) {
     Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
-        NavRail(nav, state.railOrder, railRequesters, onReorder = vm::reorderRail) { nav = it }
+        // Like the pane: focus (and a section being moved) scrolls in with room for its focus ring and scale.
+        PaddedBringIntoView { NavRail(nav, state.railOrder, railRequesters, onReorder = vm::reorderRail) { nav = it } }
         PaddedBringIntoView {
         // Marks the pane's controls, so the one you leave is remembered for D-pad Right from the rail.
         CompositionLocalProvider(LocalInContentPane provides true) {
