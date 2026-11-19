@@ -1048,6 +1048,7 @@ private fun ThorKbmDetails(state: SettingsState, vm: SettingsViewModel, previewA
     val status = state.thorKbm
     CardTitle(stringResource(R.string.settings_thorkbm_title))
     CardDesc(stringResource(R.string.settings_thorkbm_desc))
+    InfoLine(stringResource(R.string.settings_thorkbm_plugin_note), tone = p.textTertiary)
     if (previewAbove) {
         Spacer(Modifier.height(10.dp))
         ThorKbmPreview()
@@ -1085,12 +1086,20 @@ private fun ThorKbmDetails(state: SettingsState, vm: SettingsViewModel, previewA
 /** ThorKBM on the bottom screen, shown whether or not it's installed. Not a focus target. */
 @Composable
 private fun ThorKbmPreview() {
-    Image(
-        painterResource(R.drawable.thorkbm_preview),
-        contentDescription = stringResource(R.string.settings_thorkbm_preview_desc),
-        modifier = Modifier.size(THORKBM_PREVIEW_WIDTH, THORKBM_PREVIEW_HEIGHT).clip(cardShape()),
-        contentScale = ContentScale.Fit,
-    )
+    // A black frame (the capture's own background) around the screenshot, so its keys and trackpad don't touch the
+    // rounded border.
+    Box(
+        Modifier.size(THORKBM_PREVIEW_WIDTH, THORKBM_PREVIEW_HEIGHT).clip(cardShape())
+            .background(THORKBM_PREVIEW_FRAME).padding(THORKBM_PREVIEW_MARGIN),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painterResource(R.drawable.thorkbm_preview),
+            contentDescription = stringResource(R.string.settings_thorkbm_preview_desc),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
 }
 
 /**
@@ -1100,6 +1109,9 @@ private fun ThorKbmPreview() {
 private val THORKBM_PREVIEW_HEIGHT = 200.dp
 private val THORKBM_PREVIEW_WIDTH = THORKBM_PREVIEW_HEIGHT * (1240f / 1080f)
 private val THORKBM_PREVIEW_GAP = 20.dp
+/** The frame between the screenshot and the preview's rounded border, in the capture's own black. */
+private val THORKBM_PREVIEW_MARGIN = 10.dp
+private val THORKBM_PREVIEW_FRAME = Color.Black
 private val THORKBM_MIN_DETAILS_WIDTH = 220.dp
 
 /**

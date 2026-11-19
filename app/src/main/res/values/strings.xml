@@ -220,6 +220,7 @@
     <string name="settings_save_clip_installing">Installing…</string>
     <string name="settings_save_clip_debug_note">This is a debug build: it only works with a TCP SC you build yourself, so installing from GitHub is off here.</string>
     <string name="settings_thorkbm_title">ThorKBM</string>
+    <string name="settings_thorkbm_plugin_note">Its own app, used as a panel plugin.</string>
     <string name="settings_thorkbm_desc">ThorKBM turns the bottom screen into a keyboard and trackpad for the top screen. Install it here once; after that it keeps itself up to date.</string>
     <string name="settings_thorkbm_installed">Installed (%1$s)</string>
     <string name="settings_thorkbm_debug_also">Debug build also installed (%1$s)</string>
