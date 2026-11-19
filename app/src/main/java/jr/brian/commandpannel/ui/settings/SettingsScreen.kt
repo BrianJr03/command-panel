@@ -470,7 +470,7 @@ private fun RailItem(
             }
             .focusControl(f) { if (grabbed) reorder.drop() else reorder.grab(key) }
             .noRippleClickable { onSelect(item) }
-            .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = 14.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(item.icon, null, tint = if (on || f.value || lifted) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
@@ -487,7 +487,8 @@ private fun RailItem(
             Icons.Rounded.DragHandle,
             contentDescription = stringResource(R.string.settings_rail_move, stringResource(item.category.titleRes)),
             tint = if (lifted || f.value) p.accent else p.textTertiary,
-            modifier = Modifier.size(36.dp)
+            // Small enough that a row is no taller than before the handle, so every section fits on the rail.
+            modifier = Modifier.size(30.dp)
                 .onGloballyPositioned { handleCoords[0] = it }
                 .pointerInput(key) {
                     detectDragGestures(
@@ -500,7 +501,7 @@ private fun RailItem(
                         onDragCancel = reorder::endDrag,
                     )
                 }
-                .padding(6.dp),
+                .padding(5.dp),
         )
     }
 }
