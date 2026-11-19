@@ -13,7 +13,12 @@ import android.os.Bundle
 class SaveClipActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        for (pkg in TARGETS) sendBroadcast(Intent("$pkg.action.SAVE_OR_ARM_REPLAY").setPackage(pkg))
+        // Include stopped packages so a force-stopped Command Panel still gets it and can say it isn't running.
+        for (pkg in TARGETS) {
+            sendBroadcast(
+                Intent("$pkg.action.SAVE_OR_ARM_REPLAY").setPackage(pkg).addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            )
+        }
         finish()
         if (Build.VERSION.SDK_INT >= 34) {
             overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
