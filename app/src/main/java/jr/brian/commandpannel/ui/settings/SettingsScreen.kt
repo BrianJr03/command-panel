@@ -72,6 +72,7 @@ import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.ViewAgenda
@@ -133,6 +134,7 @@ private enum class NavItem(val category: SettingsCategory, val icon: ImageVector
     THEMES(SettingsCategory.THEMES, Icons.Rounded.Brush, R.string.settings_cat_themes_desc),
     REPLAY(SettingsCategory.REPLAY, Icons.Rounded.Videocam, R.string.settings_cat_replay_desc),
     DIAGNOSTICS(SettingsCategory.DIAGNOSTICS, Icons.Rounded.MonitorHeart, R.string.settings_cat_diagnostics_desc),
+    EXPERIMENTAL(SettingsCategory.EXPERIMENTAL, Icons.Rounded.Science, R.string.settings_cat_experimental_desc),
 }
 
 @Composable
@@ -272,6 +274,7 @@ internal fun SettingsContent(
                 }
                 SettingsCategory.REPLAY -> ReplayBufferCard(state, vm)
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
+                SettingsCategory.EXPERIMENTAL -> Experimental(state, vm)
             }
         }
         }
@@ -1047,6 +1050,17 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.settings_rgb_accent_desc),
         state.rgbAccentSync, vm::setRgbAccentSync,
         Modifier.tourTarget(TourSpot.RGB_ACCENT),
+    )
+}
+
+// ---- Experimental ----
+
+@Composable
+private fun Experimental(state: SettingsState, vm: SettingsViewModel) {
+    SwitchCard(
+        stringResource(R.string.settings_task_fps),
+        stringResource(R.string.settings_task_fps_desc),
+        state.taskFps, vm::setTaskFps,
     )
 }
 

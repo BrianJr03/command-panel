@@ -99,7 +99,7 @@ import kotlin.math.roundToInt
 /** A region the tour can spotlight. [inPane] regions live in the scrolling content pane (the rest are on the rail). */
 internal enum class TourSpot(val inPane: Boolean = true) {
     RAIL(false),
-    RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_REPLAY(false), RAIL_DIAGNOSTICS(false),
+    RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_REPLAY(false), RAIL_DIAGNOSTICS(false), RAIL_EXPERIMENTAL(false),
     REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, SAVE_CLIP, PREVIEW,
     BUTTON_ORDER, QUICK_LAUNCH,
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
@@ -119,6 +119,7 @@ internal enum class TourSpot(val inPane: Boolean = true) {
             SettingsCategory.THEMES -> RAIL_THEMES
             SettingsCategory.REPLAY -> RAIL_REPLAY
             SettingsCategory.DIAGNOSTICS -> RAIL_DIAGNOSTICS
+            SettingsCategory.EXPERIMENTAL -> RAIL_EXPERIMENTAL
         }
     }
 }

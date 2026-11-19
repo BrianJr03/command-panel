@@ -142,12 +142,14 @@
     <string name="settings_cat_diagnostics">Diagnostics</string>
     <string name="settings_cat_themes">Themes</string>
     <string name="settings_cat_replay">Replay Buffer</string>
+    <string name="settings_cat_experimental">Experimental</string>
     <string name="settings_cat_general_desc">Core behavior and companion features</string>
     <string name="settings_cat_nav_bar_desc">Arrange the overlay nav bar and its Quick Launch button</string>
     <string name="settings_cat_quick_toggles_desc">Pick and order the overlay\'s quick tiles</string>
     <string name="settings_cat_appearance_desc">Theme and look of the bottom-screen overlay</string>
     <string name="settings_cat_diagnostics_desc">Check the privileged access layer</string>
     <string name="settings_cat_themes_desc">Mix, build and save your own overlay looks</string>
+    <string name="settings_cat_experimental_desc">Features still being tested</string>
     <string name="settings_cat_replay_desc">Save clips of what just happened, from the overlay, a double press or TCP SC</string>
     <string name="settings_rail_move">Move %1$s</string>
 
@@ -171,6 +173,8 @@
     <string name="sibling_take_over">Take over</string>
     <string name="sibling_open">Open %1$s</string>
     <string name="settings_battery_estimate">Battery Estimate</string>
+    <string name="settings_task_fps">In-game FPS</string>
+    <string name="settings_task_fps_desc">Count the frames the game itself draws, not everything both screens show. With no game reading, the counter says compositor FPS. Still being tested, so readings may be off.</string>
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>
     <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>

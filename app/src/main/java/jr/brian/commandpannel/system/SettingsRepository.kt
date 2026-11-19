@@ -56,7 +56,11 @@ class SettingsRepository(
     /** Set by the service so screenshot/launch actions can dismiss the overlay first. */
     var onHideOverlay: () -> Unit = {}
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val telemetry = TelemetryMonitor(context, privileged, refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 })
+    private val telemetry = TelemetryMonitor(
+        context, privileged,
+        refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 },
+        taskFpsEnabled = { prefs.getBoolean(TelemetryMonitor.PREF_TASK_FPS, false) },
+    )
     private val batteryEstimate = BatteryEstimateMonitor(context, settings, enabled = { prefs.getBoolean("battery_estimate", false) })
 
     private val _uiState = MutableStateFlow(OverlayUiState())

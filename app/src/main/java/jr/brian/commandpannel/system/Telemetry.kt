@@ -31,7 +31,7 @@ data class Telemetry(
     val ramFraction: Float = 0f,
     val fps: Int = 0,
     /** True when [fps] is the compositor's count of every frame on both screens, not the game's own frames. */
-    val fpsCompositor: Boolean = TelemetryMonitor.NEW_FPS_SOURCES,
+    val fpsCompositor: Boolean = false,
 )
 
 /**
@@ -44,13 +44,15 @@ data class Telemetry(
  * That counter includes both screens and the overlay's own animations, so the reading is flagged
  * [Telemetry.fpsCompositor] and the panel labels it.
  *
- * The per-task source and that label are behind [NEW_FPS_SOURCES] until they've had more QA (#4). With it off, FPS
- * is the global counter alone, unlabeled, as before.
+ * The per-task source and that label are opt-in from the companion's Experimental section until they've had more
+ * QA (#4): [taskFpsEnabled] reads the `experimental_task_fps` pref every sample. With it off, FPS is the global
+ * counter alone, unlabeled, as before.
  */
 class TelemetryMonitor(
     private val context: Context,
     private val privileged: PrivilegedAccess,
     private val refreshRateCap: () -> Int,
+    taskFpsEnabled: () -> Boolean,
     private val intervalMs: Long = 1500L,
 ) {
     companion object {
@@ -62,14 +64,15 @@ class TelemetryMonitor(
         private const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
         private const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
 
-        /** Per-game FPS from the task callback, with the "compositor FPS" label on fallback. Off pending QA (#4). */
-        const val NEW_FPS_SOURCES = false
+        /** Pref for per-game FPS from the task callback, with the "compositor FPS" label on fallback (#4). */
+        const val PREF_TASK_FPS = "experimental_task_fps"
     }
 
     private val _state = MutableStateFlow(Telemetry())
     val state: StateFlow<Telemetry> = _state.asStateFlow()
 
     private var job: Job? = null
+    private val taskFps = TaskFpsSwitch(taskFpsEnabled, stop = privileged::stopTaskFps)
     private var lastFrames: Long? = null
     private var lastFrameTime: Long = 0L
 
@@ -85,7 +88,7 @@ class TelemetryMonitor(
 
     fun stop() {
         job?.cancel(); job = null
-        if (NEW_FPS_SOURCES) privileged.stopTaskFps()
+        taskFps.release()
     }
 
     private fun read(path: String): String = runCatching { File(path).readText() }.getOrDefault("")
@@ -123,7 +126,7 @@ class TelemetryMonitor(
         val cap = refreshRateCap()
         // The global counter is sampled every time so its delta is ready the moment the task source drops out.
         val globalFps = sampleGlobalFps(cap)
-        if (!NEW_FPS_SOURCES) return TelemetryReader.FpsReading(globalFps, compositor = false)
+        if (!taskFps.sample()) return TelemetryReader.FpsReading(globalFps, compositor = false)
         // The game is usually on the top screen; the helper also checks the focused task and the bottom screen.
         val task = privileged.taskFps(Display.DEFAULT_DISPLAY)
         return TelemetryReader.chooseFps(task?.fps, task?.ageMs, globalFps, cap)
@@ -148,5 +151,27 @@ class TelemetryMonitor(
         val v = read() ?: return null
         val t1 = System.nanoTime()
         return v to (t0 + t1) / 2 / 1_000_000L
+    }
+}
+
+/**
+ * Tracks the per-game FPS switch across samples, so the root helper's task FPS callback is stopped once when the
+ * switch turns off (or the monitor stops while it was on), and never touched while it stays off.
+ */
+internal class TaskFpsSwitch(private val enabled: () -> Boolean, private val stop: () -> Unit) {
+    private var wasOn = false
+
+    /** Reads the switch for this sample: true to use the task source. Stops the callback on an on-to-off change. */
+    fun sample(): Boolean {
+        val on = enabled()
+        if (wasOn && !on) stop()
+        wasOn = on
+        return on
+    }
+
+    /** The monitor is stopping: stops the callback if the last sample used it. */
+    fun release() {
+        if (wasOn) stop()
+        wasOn = false
     }
 }

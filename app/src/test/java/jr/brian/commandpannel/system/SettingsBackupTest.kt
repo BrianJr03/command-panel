@@ -15,6 +15,7 @@ class SettingsBackupTest {
             "quick_launch_display" to 4,
             "overlay_look" to "AURORA_GLASS",
             "companion_follow_look" to true,
+            TelemetryMonitor.PREF_TASK_FPS to true,
             "ignored_key" to "should not survive",   // not in the allow-list
         )
         val json = SettingsBackup.encode(prefs, "1.0")
@@ -24,6 +25,7 @@ class SettingsBackupTest {
         assertEquals(4, decoded["quick_launch_display"])
         assertEquals("AURORA_GLASS", decoded["overlay_look"])
         assertEquals(true, decoded["companion_follow_look"])
+        assertEquals(true, decoded[TelemetryMonitor.PREF_TASK_FPS])
         assertTrue("ignored_key" !in decoded)
     }
 

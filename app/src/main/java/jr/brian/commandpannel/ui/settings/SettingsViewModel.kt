@@ -50,7 +50,8 @@ enum class SettingsCategory(val key: String, @StringRes val titleRes: Int) {
     APPEARANCE("appearance", R.string.settings_cat_appearance),
     THEMES("themes", R.string.settings_cat_themes),
     REPLAY("replay", R.string.settings_cat_replay),
-    DIAGNOSTICS("diagnostics", R.string.settings_cat_diagnostics);
+    DIAGNOSTICS("diagnostics", R.string.settings_cat_diagnostics),
+    EXPERIMENTAL("experimental", R.string.settings_cat_experimental);
 
     companion object {
         fun fromKey(key: String): SettingsCategory? = entries.firstOrNull { it.key == key }
@@ -76,6 +77,8 @@ enum class SettingsCategory(val key: String, @StringRes val titleRes: Int) {
 data class SettingsState(
     val replaceStock: Boolean = false,
     val batteryEstimate: Boolean = false,
+    /** Experimental: per-game FPS from the root helper instead of the compositor's count (#4). */
+    val taskFps: Boolean = false,
     val hideNetSpeed: Boolean = false,
     val hideTileLabels: Boolean = false,
     val keepOnScreen: Boolean = true,
@@ -187,6 +190,7 @@ class SettingsViewModel @Inject constructor(
     private fun load() = SettingsState(
         replaceStock = prefs.getBoolean("replace_stock_assistant", false),
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
+        taskFps = prefs.getBoolean(jr.brian.commandpannel.system.TelemetryMonitor.PREF_TASK_FPS, false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
         keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
@@ -683,6 +687,12 @@ class SettingsViewModel @Inject constructor(
     fun setBatteryEstimate(enable: Boolean) {
         prefs.edit().putBoolean("battery_estimate", enable).apply()
         _state.value = _state.value.copy(batteryEstimate = enable)
+    }
+
+    /** The overlay's telemetry reads this pref every sample, so saving it is enough. */
+    fun setTaskFps(enable: Boolean) {
+        prefs.edit().putBoolean(jr.brian.commandpannel.system.TelemetryMonitor.PREF_TASK_FPS, enable).apply()
+        _state.value = _state.value.copy(taskFps = enable)
     }
 
     fun setHideNetSpeed(enable: Boolean) {
