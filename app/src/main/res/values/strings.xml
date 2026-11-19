@@ -153,6 +153,10 @@
     <string name="settings_cat_replay_desc">Save clips of what just happened, from the overlay, a double press or TCP SC</string>
     <string name="settings_cat_keyboard_desc">Get ThorKBM, the keyboard and mouse app for the Thor</string>
     <string name="settings_rail_move">Move %1$s</string>
+    <string name="settings_group_panel">Panel</string>
+    <string name="settings_group_look">Look</string>
+    <string name="settings_group_extras">Extras</string>
+    <string name="settings_group_advanced">Advanced</string>
 
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>

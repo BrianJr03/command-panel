@@ -35,4 +35,15 @@ class SettingsBackupTest {
         assertNull(SettingsBackup.decode("""{"format":"command-panel-backup","schemaVersion":99,"prefs":{}}"""))
         assertNull(SettingsBackup.decode("not json"))
     }
+
+    @Test
+    fun railGroupOrdersAreBackedUp() {
+        val prefs = mapOf(
+            "rail_order" to "general,diagnostics",
+            "rail_group_order" to "advanced,panel,look,extras",
+            "rail_sections_look" to "themes,appearance",
+        )
+        val decoded = SettingsBackup.decode(SettingsBackup.encode(prefs, "1.0"))!!
+        assertEquals(prefs, decoded)
+    }
 }

@@ -61,17 +61,7 @@ enum class SettingsCategory(val key: String, @StringRes val titleRes: Int) {
          * The rail order saved as a CSV of keys. Unknown keys and repeats are dropped; sections missing from it (new
          * ones, or an older saved order) go in at their default position relative to the saved ones.
          */
-        fun ordered(csv: String?): List<SettingsCategory> {
-            val saved = csv?.split(",")?.mapNotNull { fromKey(it.trim()) }?.distinct().orEmpty()
-            val out = saved.toMutableList()
-            for (cat in entries) {
-                if (cat in out) continue
-                // After the nearest section that comes before it by default (or first, if none is placed yet).
-                val prev = entries.subList(0, cat.ordinal).lastOrNull { it in out }
-                out.add(if (prev == null) 0 else out.indexOf(prev) + 1, cat)
-            }
-            return out
-        }
+        fun ordered(csv: String?): List<SettingsCategory> = tolerantOrder(csv, entries, ::fromKey)
     }
 }
 

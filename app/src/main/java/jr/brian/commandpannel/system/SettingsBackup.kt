@@ -3,6 +3,7 @@ package jr.brian.commandpannel.system
 import android.content.Context
 import android.media.MediaScannerConnection
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.ui.settings.RailLayout
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -25,8 +26,8 @@ object SettingsBackup {
         "suppress_bottom_tip", "rgb_accent_sync", "qs_enabled_tiles", "qs_hide_labels",
         "quick_launch_component", "quick_launch_display", "quick_launch_after",
         "overlay_look", CustomLookStore.KEY, ThemeSources.KEY, "companion_follow_look", "nav_bar_order", "quick_launch_show_app",
-        "rail_order", TelemetryMonitor.PREF_TASK_FPS,
-    )
+        RailLayout.KEY_LEGACY_ORDER, TelemetryMonitor.PREF_TASK_FPS,
+    ) + RailLayout.KEYS
 
     /** Serializes the exported prefs to JSON. Pure, so it is unit-tested. */
     fun encode(all: Map<String, *>, appVersion: String): String {
@@ -100,6 +101,8 @@ object SettingsBackup {
             is Long -> editor.putLong(k, v)
             is String -> editor.putString(k, v)
         }
+        // A backup from before rail groups: drop the current group orders so its flat rail order is migrated.
+        RailLayout.staleAfterRestore(values.keys).forEach(editor::remove)
         editor.apply()
         return values.size
     }
