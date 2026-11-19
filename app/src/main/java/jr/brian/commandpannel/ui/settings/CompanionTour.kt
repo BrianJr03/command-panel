@@ -100,7 +100,7 @@ import kotlin.math.roundToInt
 internal enum class TourSpot(val inPane: Boolean = true) {
     RAIL(false),
     RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_DIAGNOSTICS(false),
-    REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, PREVIEW,
+    REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, SAVE_CLIP, PREVIEW,
     BUTTON_ORDER, QUICK_LAUNCH,
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
     OVERLAY_THEME, FOLLOW_LOOK, RGB_ACCENT,
@@ -150,6 +150,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(general, TourSpot.BACKUP, R.string.settings_backup_title, R.string.tour_backup_body),
         TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
         TourStep(general, TourSpot.REPLAY, R.string.tile_name_replay_buffer, R.string.tour_replay_body),
+        TourStep(general, TourSpot.SAVE_CLIP, R.string.settings_save_clip_title, R.string.tour_save_clip_body),
         TourStep(general, TourSpot.PREVIEW, R.string.settings_preview_title, R.string.tour_preview_body),
 
         sectionIntro(navBar, R.string.tour_nav_bar_body),

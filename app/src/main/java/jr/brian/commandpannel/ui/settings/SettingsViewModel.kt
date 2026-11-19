@@ -110,6 +110,12 @@ data class SettingsState(
     val updateMessage: String? = null,
     /** When updates were last checked (ms), 0 if never. */
     val updateLastCheck: Long = 0L,
+    /** TCP Save Clip (the Back Button Hero trigger): installed, and paired with this build. */
+    val saveClip: jr.brian.commandpannel.system.update.SaveClipStatus = jr.brian.commandpannel.system.update.SaveClipStatus.Missing,
+    /** A TCP Save Clip download or install is running. */
+    val saveClipBusy: Boolean = false,
+    /** Result of the last TCP Save Clip install, shown in its card. */
+    val saveClipMessage: String? = null,
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -183,6 +189,7 @@ class SettingsViewModel @Inject constructor(
         replayMic = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_MIC, false),
         replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
+        saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
     )
 
     /** The service reads this pref on each AYN press, so saving it is enough. */
@@ -724,6 +731,7 @@ class SettingsViewModel @Inject constructor(
         override fun onReceive(c: android.content.Context, i: Intent) {
             val pkg = i.data?.schemeSpecificPart
             if (pkg in BdsaDetector.PACKAGES || pkg == sibling.siblingPackage) refreshBdsa(keepMessage = true)
+            if (pkg == jr.brian.commandpannel.system.update.SaveClipInstaller.PACKAGE) refreshSaveClip()
         }
     }
 
@@ -1047,6 +1055,63 @@ class SettingsViewModel @Inject constructor(
             tourPending = false
             startTour()
         }
+    }
+
+    // ---- TCP Save Clip ----
+
+    /** Re-reads whether TCP Save Clip is installed and paired (companion resume, package changes). */
+    fun refreshSaveClip() {
+        _state.value = _state.value.copy(saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(app))
+    }
+
+    /**
+     * Downloads TCP Save Clip from the release matching this version and installs it like an update: through the root
+     * shell, or else Android's installer. A copy without the permission (another key, or installed before Command
+     * Panel) is removed first, so the fresh install gets it.
+     */
+    fun installSaveClip() {
+        if (_state.value.saveClipBusy) return
+        val replace = _state.value.saveClip is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission
+        _state.value = _state.value.copy(saveClipBusy = true, saveClipMessage = null)
+        viewModelScope.launch {
+            val installer = jr.brian.commandpannel.system.update.SaveClipInstaller
+            var handOff: java.io.File? = null
+            val failure = withContext(Dispatchers.IO) {
+                runCatching {
+                    val asset = runCatching { installer.asset(currentVersion) }.getOrElse { e ->
+                        if (e is jr.brian.commandpannel.system.HttpStatusException && e.code == 404) null else throw e
+                    } ?: return@runCatching app.getString(R.string.msg_save_clip_not_in_release, currentVersion)
+                    val apk = installer.download(app, asset)
+                    val out = installer.installWithRoot(privileged, apk, replace)
+                    when {
+                        out == null -> { handOff = apk; null }
+                        out.lines().any { it.trim() == "Success" } -> null
+                        else -> app.getString(R.string.msg_save_clip_failed, out.lines().lastOrNull { it.isNotBlank() } ?: "")
+                    }
+                }.getOrElse { e -> app.getString(R.string.msg_save_clip_failed, e.message ?: e.javaClass.simpleName) }
+            }
+            val message = failure ?: handOff?.let(::installSaveClipWithSystemInstaller) ?: run {
+                val status = installer.status(app)
+                app.getString(
+                    if (status is jr.brian.commandpannel.system.update.SaveClipStatus.Ready) R.string.msg_save_clip_installed
+                    else R.string.settings_save_clip_no_permission,
+                )
+            }
+            _state.value = _state.value.copy(saveClipBusy = false, saveClipMessage = message, saveClip = installer.status(app))
+        }
+    }
+
+    /** No root shell: hands the APK to Android's installer (asking for "install unknown apps" first). Returns the message. */
+    private fun installSaveClipWithSystemInstaller(apk: java.io.File): String {
+        val updates = jr.brian.commandpannel.system.update.UpdateInstaller
+        if (!updates.canUseSystemInstaller(app)) {
+            runCatching { app.startActivity(updates.installerPermissionIntent(app)) }
+            return app.getString(R.string.msg_save_clip_allow_installs)
+        }
+        return runCatching { app.startActivity(updates.systemInstallerIntent(app, apk)) }
+            .fold({ app.getString(R.string.msg_save_clip_finish_in_installer) }) { e ->
+                app.getString(R.string.msg_save_clip_failed, e.message ?: e.javaClass.simpleName)
+            }
     }
 
     // ---- companion tour ----
