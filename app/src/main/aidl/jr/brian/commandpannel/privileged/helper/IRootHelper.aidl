@@ -19,8 +19,11 @@ interface IRootHelper {
     /** Linear brightness 0..1 of a logical display. */
     float getDisplayBrightness(int displayId);
 
-    /** temporary = true while a slider is being dragged; false commits the value. */
-    void setDisplayBrightness(int displayId, float brightness, boolean temporary);
+    /**
+     * temporary = true while a slider is being dragged; false commits the value. Returns whether the call went
+     * through (v8; void before).
+     */
+    boolean setDisplayBrightness(int displayId, float brightness, boolean temporary);
 
     /**
      * Ties the helper's lifetime to the app. When this token's process dies the helper waits HelperProtocol.GRACE_MS

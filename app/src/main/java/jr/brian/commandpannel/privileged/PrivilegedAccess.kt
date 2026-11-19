@@ -45,6 +45,9 @@ class PrivilegedAccess @Inject constructor() {
 
     val isHelperConnected: Boolean get() = RootHelper.isConnected
 
+    /** The helper's connection state, to act when it (re)connects. */
+    val helperState: kotlinx.coroutines.flow.StateFlow<RootHelper.State> get() = RootHelper.state
+
     /** Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout or null. */
     fun shell(command: String, timeoutMs: Int = 5_000): String? {
         RootHelper.binder?.let { h ->
@@ -60,9 +63,11 @@ class PrivilegedAccess @Inject constructor() {
     fun removeTask(taskId: Int): Boolean =
         RootHelper.binder?.let { runCatching { it.removeTask(taskId) }.getOrDefault(false) } ?: false
 
-    fun setDisplayBrightness(displayId: Int, brightness: Float, temporary: Boolean) {
-        RootHelper.binder?.let { runCatching { it.setDisplayBrightness(displayId, brightness, temporary) } }
-    }
+    /** False when the helper is down or the call failed, so a restore can be kept and retried. */
+    fun setDisplayBrightness(displayId: Int, brightness: Float, temporary: Boolean): Boolean =
+        RootHelper.binder?.let {
+            runCatching { it.setDisplayBrightness(displayId, brightness, temporary) }.getOrDefault(false)
+        } ?: false
 
     /** Mirrors a physical display's layer stack onto [surface] via the root helper (Replay Buffer capture). */
     fun startDisplayMirror(surface: android.view.Surface, layerStack: Int, srcW: Int, srcH: Int, dstW: Int, dstH: Int): Boolean =

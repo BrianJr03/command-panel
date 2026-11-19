@@ -1,9 +1,11 @@
 package jr.brian.commandpannel.system
 
+import jr.brian.commandpannel.system.ScreenModePlan.BLANK_BOTTOM
+import jr.brian.commandpannel.system.ScreenModePlan.BLANK_TOP
 import jr.brian.commandpannel.system.ScreenModePlan.FocusSave
+import jr.brian.commandpannel.system.ScreenModePlan.NONE
 import jr.brian.commandpannel.system.ScreenModePlan.Panel
-import jr.brian.commandpannel.system.ScreenModePlan.Plan
-import jr.brian.commandpannel.system.ScreenModePlan.State
+import jr.brian.commandpannel.system.ScreenModePlan.Saved
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,95 +14,102 @@ import org.junit.Test
 
 class ScreenModePlanTest {
 
-    private val nothing = State()
-
-    /** Applies a plan's flag changes the way the controller does (assuming every snapshot succeeds). */
-    private fun State.after(plan: Plan) = State(
-        topBlanked = (topBlanked && Panel.TOP !in plan.restore) || plan.blank == Panel.TOP,
-        bottomBlanked = (bottomBlanked && Panel.BOTTOM !in plan.restore) || plan.blank == Panel.BOTTOM,
-        focusSaved = (focusSaved || plan.saveFocus != FocusSave.NONE) && !plan.restoreFocus,
-    )
+    // ---- blank state (#35) ----
 
     @Test
     fun `fresh start in dual touches nothing`() {
-        // The #12 bug: opening the app (service start) in dual restored a stale or full brightness.
-        val plan = ScreenModePlan.plan(nothing, mode = 0, fromDual = false)!!
-        assertNull(plan.blank)
-        assertTrue(plan.restore.isEmpty())
+        val plan = ScreenModePlan.plan(NONE, focusSaved = false, fromNone = true)!!
+        assertNull(plan.cover)
+        assertNull(plan.focusLock)
         assertFalse(plan.restoreFocus)
         assertEquals(FocusSave.NONE, plan.saveFocus)
     }
 
     @Test
-    fun `dual to top only blanks the bottom and saves its level and focus`() {
-        val plan = ScreenModePlan.plan(nothing, mode = 1, fromDual = true)!!
-        assertEquals(Panel.BOTTOM, plan.blank)
-        assertTrue(plan.snapshot)
-        assertTrue(plan.restore.isEmpty())
+    fun `only top screen covers the bottom and locks focus to the top`() {
+        val plan = ScreenModePlan.plan(BLANK_BOTTOM, focusSaved = false, fromNone = true)!!
+        assertEquals(Panel.BOTTOM, plan.cover)
+        assertEquals(1, plan.focusLock)
         assertEquals(FocusSave.CURRENT, plan.saveFocus)
     }
 
     @Test
-    fun `back to dual restores only what was blanked`() {
-        val state = State(bottomBlanked = true, focusSaved = true)
-        val plan = ScreenModePlan.plan(state, mode = 0, fromDual = false)!!
-        assertEquals(listOf(Panel.BOTTOM), plan.restore)
-        assertTrue(plan.restoreFocus)
-        assertEquals(nothing, state.after(plan))
+    fun `only bottom screen covers the top and locks focus to the bottom`() {
+        val plan = ScreenModePlan.plan(BLANK_TOP, focusSaved = false, fromNone = true)!!
+        assertEquals(Panel.TOP, plan.cover)
+        assertEquals(2, plan.focusLock)
     }
 
     @Test
-    fun `switching single modes hands the blank over and keeps flags right`() {
-        var state = nothing
-        val toTopOnly = ScreenModePlan.plan(state, mode = 1, fromDual = true)!!
-        state = state.after(toTopOnly)
-        assertEquals(State(bottomBlanked = true, focusSaved = true), state)
-
-        val toBottomOnly = ScreenModePlan.plan(state, mode = 2, fromDual = false)!!
-        assertEquals(Panel.TOP, toBottomOnly.blank)
-        assertTrue("top is still lit, so its level is the user's", toBottomOnly.snapshot)
-        assertEquals(listOf(Panel.BOTTOM), toBottomOnly.restore)
-        assertEquals("focus saved on leaving dual is kept", FocusSave.NONE, toBottomOnly.saveFocus)
-        state = state.after(toBottomOnly)
-        assertEquals(State(topBlanked = true, focusSaved = true), state)
-
-        val back = ScreenModePlan.plan(state, mode = 1, fromDual = false)!!
-        assertEquals(listOf(Panel.TOP), back.restore)
-        assertTrue(back.snapshot)
-        state = state.after(back)
-
-        val dual = ScreenModePlan.plan(state, mode = 0, fromDual = false)!!
-        assertEquals(listOf(Panel.BOTTOM), dual.restore)
-        assertEquals(nothing, state.after(dual))
+    fun `back to dual restores focus lock only if we saved it`() {
+        assertTrue(ScreenModePlan.plan(NONE, focusSaved = true, fromNone = false)!!.restoreFocus)
+        assertFalse(ScreenModePlan.plan(NONE, focusSaved = false, fromNone = false)!!.restoreFocus)
     }
 
     @Test
-    fun `restart while blanked re-drops without overwriting the saved level`() {
-        val state = State(bottomBlanked = true, focusSaved = true)
-        val plan = ScreenModePlan.plan(state, mode = 1, fromDual = false)!!
-        assertEquals(Panel.BOTTOM, plan.blank)
-        assertFalse("bottom is at 0 now; snapshotting would lose the real level", plan.snapshot)
-        assertTrue(plan.restore.isEmpty())
+    fun `switching straight between blanks keeps the focus saved from dual`() {
+        // Top covered -> bottom covered: the values saved on leaving dual are still the user's, don't overwrite them.
+        val plan = ScreenModePlan.plan(BLANK_TOP, focusSaved = true, fromNone = false)!!
+        assertEquals(FocusSave.NONE, plan.saveFocus)
+        assertEquals(Panel.TOP, plan.cover)
+    }
+
+    @Test
+    fun `a service restart while blanked covers the panel again without touching what was saved`() {
+        val plan = ScreenModePlan.plan(BLANK_BOTTOM, focusSaved = true, fromNone = false)!!
+        assertEquals(Panel.BOTTOM, plan.cover)
         assertEquals(FocusSave.NONE, plan.saveFocus)
     }
 
     @Test
-    fun `fresh start straight into single mode saves default focus`() {
-        val plan = ScreenModePlan.plan(nothing, mode = 2, fromDual = false)!!
-        assertEquals(Panel.TOP, plan.blank)
-        assertTrue(plan.snapshot)
-        assertEquals(FocusSave.DEFAULT, plan.saveFocus)
+    fun `starting straight into a blank with nothing saved restores 0 later`() {
+        assertEquals(FocusSave.DEFAULT, ScreenModePlan.plan(BLANK_BOTTOM, focusSaved = false, fromNone = false)!!.saveFocus)
     }
 
     @Test
-    fun `restore order is bottom first`() {
-        val plan = ScreenModePlan.plan(State(topBlanked = true, bottomBlanked = true), mode = 0, fromDual = false)!!
-        assertEquals(listOf(Panel.BOTTOM, Panel.TOP), plan.restore)
+    fun `an unknown state does nothing`() {
+        assertNull(ScreenModePlan.plan(7, focusSaved = false, fromNone = true))
     }
 
     @Test
-    fun `unknown mode does nothing`() {
-        assertNull(ScreenModePlan.plan(nothing, mode = 7, fromDual = true))
+    fun `the long press blanks the bottom, and wakes either blanked screen`() {
+        assertEquals(BLANK_BOTTOM, ScreenModePlan.afterLongPress(NONE))
+        assertEquals(NONE, ScreenModePlan.afterLongPress(BLANK_BOTTOM))
+        assertEquals(NONE, ScreenModePlan.afterLongPress(BLANK_TOP))
+    }
+
+    @Test
+    fun `a vendor mode of 1 or 2 is adopted, dual and unknown values are not`() {
+        assertEquals(BLANK_BOTTOM, ScreenModePlan.adoptVendorMode(1))
+        assertEquals(BLANK_TOP, ScreenModePlan.adoptVendorMode(2))
+        assertNull(ScreenModePlan.adoptVendorMode(0))
+        assertNull(ScreenModePlan.adoptVendorMode(5))
+    }
+
+    @Test
+    fun `blank numbers match the Mode tab`() {
+        // The Mode tab passes 0 / 1 / 2 (dual, only top, only bottom) straight through.
+        assertEquals(Panel.BOTTOM, ScreenModePlan.blankedPanel(1))
+        assertEquals(Panel.TOP, ScreenModePlan.blankedPanel(2))
+        assertNull(ScreenModePlan.blankedPanel(0))
+    }
+
+    // ---- levels saved by older versions (#36) ----
+
+    @Test
+    fun `saved levels are restored once, bottom first, whatever is blanked now`() {
+        assertEquals(listOf(Panel.BOTTOM, Panel.TOP), ScreenModePlan.legacyRestores(Saved(top = true, bottom = true)))
+        assertEquals(listOf(Panel.TOP), ScreenModePlan.legacyRestores(Saved(top = true)))
+        assertTrue(ScreenModePlan.legacyRestores(Saved()).isEmpty())
+    }
+
+    @Test
+    fun `a saved level is forgotten only once it was applied`() {
+        assertTrue("helper down: keep it", ScreenModePlan.keepSavedLevel(0.4f, applied = false))
+        assertFalse("restored: forget it", ScreenModePlan.keepSavedLevel(0.4f, applied = true))
+        // Nothing usable to come back to: dropping it is safe, and keeping it would retry forever.
+        assertFalse(ScreenModePlan.keepSavedLevel(Float.NaN, applied = false))
+        assertFalse(ScreenModePlan.keepSavedLevel(0f, applied = false))
     }
 
     @Test
@@ -108,6 +117,7 @@ class ScreenModePlanTest {
         assertFalse(ScreenModePlan.isRestorable(null))
         assertFalse(ScreenModePlan.isRestorable(Float.NaN))
         assertFalse(ScreenModePlan.isRestorable(0f))
+        assertFalse(ScreenModePlan.isRestorable(-1f))
         assertFalse(ScreenModePlan.isRestorable(0.005f))
         assertFalse(ScreenModePlan.isRestorable(1.5f))
         assertTrue(ScreenModePlan.isRestorable(0.3f))

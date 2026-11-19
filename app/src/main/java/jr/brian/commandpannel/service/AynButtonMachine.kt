@@ -7,11 +7,12 @@ package jr.brian.commandpannel.service
  *
  * Broadcast `action.tcc.button.key.event` carries `key_action_down` and `key_isLongPress`:
  *  - down, not long  -> no-op (never toggle on key-down, or the following key-up closes it again)
- *  - down, long      -> consume the press, hide the overlay, blank the bottom screen. If the bottom screen is already
- *                       blanked by us, wake it instead (still consumed), so a firmware that only ever sends
- *                       "down+long" can still get the screen back (#14). A repeat within the same hold is ignored.
- *  - up              -> if a long press was consumed, reset and stop; else ignored on the keyguard; else if the
- *                       bottom screen is blanked, wake it; else toggle the overlay (debounced)
+ *  - down, long      -> consume the press, hide the overlay, blank the bottom screen. If a screen is already
+ *                       blanked by us ([isBlanked]: either one), wake it instead (still consumed), so a firmware that
+ *                       only ever sends "down+long" can still get the screen back (#14). A repeat within the same hold
+ *                       is ignored.
+ *  - up              -> if a long press was consumed, reset and stop; else ignored on the keyguard; else if a
+ *                       screen is blanked, wake it; else toggle the overlay (debounced)
  *
  * With [doublePressEnabled] on, that key-up action waits [doublePressWindowMs] (via [schedule]) for a second press;
  * a second key-up in time cancels it and calls [onDoublePress] instead. A long press cancels a pending press.
@@ -20,11 +21,11 @@ package jr.brian.commandpannel.service
  */
 class AynButtonMachine(
     private val isKeyguardLocked: () -> Boolean,
-    private val isBottomBlanked: () -> Boolean,
+    private val isBlanked: () -> Boolean,
     private val onToggleOverlay: () -> Unit,
     private val onHideOverlay: () -> Unit,
     private val onBlankBottom: () -> Unit,
-    private val onWakeBottom: () -> Unit,
+    private val onWake: () -> Unit,
     private val now: () -> Long = System::currentTimeMillis,
     private val debounceMs: Long = 400L,
     private val doublePressEnabled: () -> Boolean = { false },
@@ -54,9 +55,9 @@ class AynButtonMachine(
                 if (repeat) return
                 cancelPending?.invoke()
                 cancelPending = null
-                if (isBottomBlanked()) {
+                if (isBlanked()) {
                     // Already blanked by us: wake instead of blanking again. Its key-up, if any, is swallowed.
-                    onWakeBottom()
+                    onWake()
                     return
                 }
                 onHideOverlay()
@@ -92,8 +93,8 @@ class AynButtonMachine(
     }
 
     private fun singlePress() {
-        if (isBottomBlanked()) {
-            onWakeBottom()
+        if (isBlanked()) {
+            onWake()
             return
         }
         // Stock's guard: toggle if the clock went back/equal (first press) or enough time has passed.

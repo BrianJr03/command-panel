@@ -222,7 +222,8 @@ class SettingsRepository(
     fun refresh() = refreshFromSettings()
 
     private fun refreshFromSettings() {
-        val mode = settings.getInt(Keys.DISPLAY_MODE, 0)
+        // Our own screen-off state, not the vendor's mode (which stays 0, #35).
+        val mode = ScreenModeController.blankState(prefs)
         val focus = settings.getInt(Keys.FOCUS_LOCK, 0)
         val peak = settings.getFloat(Keys.PEAK_REFRESH, 60f)
         val themeMode = settings.getInt(Keys.THEME_MODE, 4)
@@ -392,8 +393,12 @@ class SettingsRepository(
 
     // ---- OverlayActions (writes) ----
 
+    /**
+     * "Only top screen" / "only bottom screen" / dual: Command Panel's own screen-off state, which [ScreenModeController]
+     * applies with a black cover. The vendor's display mode stays 0, since its "off" screen dims every app window (#35).
+     */
     override fun selectMode(mode: Int) {
-        settings.putInt(Keys.DISPLAY_MODE, mode)
+        ScreenModeController.select(prefs, mode)
     }
 
     override fun setTopBrightness(fraction: Float, committed: Boolean) {

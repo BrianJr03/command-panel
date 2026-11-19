@@ -23,11 +23,11 @@ class AynButtonMachineTest {
 
         fun machine(debounceMs: Long = 400L) = AynButtonMachine(
             isKeyguardLocked = { keyguard },
-            isBottomBlanked = { blanked },
+            isBlanked = { blanked },
             onToggleOverlay = { toggles++ },
             onHideOverlay = { hides++ },
             onBlankBottom = { blanks++; blanked = true },
-            onWakeBottom = { wakes++; blanked = false },
+            onWake = { wakes++; blanked = false },
             now = { clock },
             debounceMs = debounceMs,
             doublePressEnabled = { doublePress },
@@ -154,8 +154,8 @@ class AynButtonMachineTest {
     fun synchronousScheduler_leavesNoStalePendingPress() {
         val r = Recorder().apply { doublePress = true }
         val m = AynButtonMachine(
-            isKeyguardLocked = { false }, isBottomBlanked = { false },
-            onToggleOverlay = { r.toggles++ }, onHideOverlay = {}, onBlankBottom = {}, onWakeBottom = {},
+            isKeyguardLocked = { false }, isBlanked = { false },
+            onToggleOverlay = { r.toggles++ }, onHideOverlay = {}, onBlankBottom = {}, onWake = {},
             now = { r.clock }, doublePressEnabled = { true }, onDoublePress = { r.doubles++ },
         )
         r.clock = 1000; up(m)

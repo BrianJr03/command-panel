@@ -29,12 +29,13 @@ object DisplayBrightness {
         }
     }
 
-    fun set(displayId: Int, brightness: Float, temporary: Boolean) {
-        val g = global ?: return
-        runCatching {
+    /** True if the call went through. */
+    fun set(displayId: Int, brightness: Float, temporary: Boolean): Boolean {
+        val g = global ?: return false
+        return runCatching {
             val name = if (temporary) "setTemporaryBrightness" else "setBrightness"
             g.javaClass.getMethod(name, Int::class.javaPrimitiveType, Float::class.javaPrimitiveType)
                 .invoke(g, displayId, brightness)
-        }.onFailure { Log.w(TAG, "set($displayId,$brightness,temp=$temporary) failed", it) }
+        }.onFailure { Log.w(TAG, "set($displayId,$brightness,temp=$temporary) failed", it) }.isSuccess
     }
 }

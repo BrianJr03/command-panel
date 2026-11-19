@@ -143,6 +143,16 @@ class AssistantService : Service() {
                 // Registered only in debug builds; checked again so a release build never acts on them.
                 ACTION_DEBUG_PLUGIN_START -> if (BuildConfig.DEBUG) debugStartPlugin(intent)
                 ACTION_DEBUG_PLUGIN_END -> if (BuildConfig.DEBUG) pluginSession.end(EndReason.DEBUG)
+                ACTION_DEBUG_HELPER_STOP -> if (BuildConfig.DEBUG) {
+                    Log.i(TAG, "debug: stopping the root helper")
+                    jr.brian.commandpannel.privileged.RootHelper.shutdown()
+                }
+                ACTION_DEBUG_HELPER_START -> if (BuildConfig.DEBUG) scope.launch {
+                    Log.i(TAG, "debug: starting the root helper")
+                    privileged.initialize(applicationContext)
+                }
+                // The Mode tab's own path (dual / only top / only bottom), for scripts.
+                ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
@@ -219,7 +229,7 @@ class AssistantService : Service() {
         repository.onQuickLaunched = ::onQuickLaunched
         machine = AynButtonMachine(
             isKeyguardLocked = { keyguard.isKeyguardLocked },
-            isBottomBlanked = { screenMode.isBottomBlanked() },
+            isBlanked = { screenMode.isBlanked() },
             // During a plugin session the AYN press ends it and brings the panel back, instead of toggling.
             onToggleOverlay = { togglePanel(EndReason.AYN_PRESS) },
             // Long press: the plugin hides first, then the panel hides and the bottom screen blanks as usual.
@@ -227,8 +237,8 @@ class AssistantService : Service() {
                 pluginSession.end(EndReason.AYN_LONG_PRESS)
                 overlay.hide()
             },
-            onBlankBottom = { repository.selectMode(1) },
-            onWakeBottom = { repository.selectMode(0) },
+            onBlankBottom = { repository.selectMode(jr.brian.commandpannel.system.ScreenModePlan.BLANK_BOTTOM) },
+            onWake = { repository.selectMode(jr.brian.commandpannel.system.ScreenModePlan.NONE) },
             doublePressEnabled = { Prefs.of(applicationContext).getBoolean(PREF_DOUBLE_PRESS_REPLAY, false) },
             onDoublePress = { saveOrArmReplay(SOURCE_DOUBLE_PRESS) },
             schedule = { ms, block ->
@@ -297,7 +307,8 @@ class AssistantService : Service() {
         quickLaunchReturn.cancel()
         pluginSession.destroy()
         repository.stop()
-        if (hardwareRunning) screenMode.stop()
+        // The service going away keeps the blank state, so a restart covers the panel again.
+        if (hardwareRunning) screenMode.stop(handOver = false)
         overlay.destroy()
         scope.cancel()
         super.onDestroy()
@@ -464,7 +475,8 @@ class AssistantService : Service() {
             pluginSession.end(EndReason.STANDBY)
             overlay.hide()
             if (hardwareRunning) {
-                screenMode.stop()
+                // Something else takes the screens: hand them over in dual.
+                screenMode.stop(handOver = true)
                 tapWaker.stop()
                 hardwareRunning = false
             }
@@ -509,6 +521,9 @@ class AssistantService : Service() {
             if (BuildConfig.DEBUG) {
                 addAction(ACTION_DEBUG_PLUGIN_START)
                 addAction(ACTION_DEBUG_PLUGIN_END)
+                addAction(ACTION_DEBUG_HELPER_STOP)
+                addAction(ACTION_DEBUG_HELPER_START)
+                addAction(ACTION_DEBUG_SELECT_MODE)
             }
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
@@ -571,6 +586,13 @@ class AssistantService : Service() {
         const val ACTION_DEBUG_PLUGIN_START = "jr.brian.commandpannel.action.DEBUG_PLUGIN_START"
         /** Debug builds only: end the Panel plugin session. */
         const val ACTION_DEBUG_PLUGIN_END = "jr.brian.commandpannel.action.DEBUG_PLUGIN_END"
+        /** Debug builds only: stop the root helper and keep it down until [ACTION_DEBUG_HELPER_START] (scripts). */
+        const val ACTION_DEBUG_HELPER_STOP = "jr.brian.commandpannel.action.DEBUG_HELPER_STOP"
+        /** Debug builds only: start (connect) the root helper again. */
+        const val ACTION_DEBUG_HELPER_START = "jr.brian.commandpannel.action.DEBUG_HELPER_START"
+        /** Debug builds only: pick a screen mode as the Mode tab does ([EXTRA_MODE]: 0 dual, 1 only top, 2 only bottom). */
+        const val ACTION_DEBUG_SELECT_MODE = "jr.brian.commandpannel.action.DEBUG_SELECT_MODE"
+        const val EXTRA_MODE = "mode"
         /** On [ACTION_DEBUG_PLUGIN_START]: the plugin service, as `package/class`; the first listed one when missing. */
         const val EXTRA_PLUGIN_COMPONENT = "component"
         /** On [ACTION_DEBUG_PLUGIN_START]: also accept a plugin whose signing key isn't allowlisted. */
