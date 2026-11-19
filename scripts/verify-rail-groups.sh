@@ -11,7 +11,11 @@
 #   - A on a header toggles it; Right on an open header moves into the pane, Left comes back to the selected section;
 #   - expanded state survives a force-stop and relaunch;
 #   - a touch tap on a header expands it;
-#   - A / D-pad / A moves a section inside its group (rail_sections_panel), and B drops without leaving the app.
+#   - A / D-pad / A moves a section inside its group (rail_sections_panel), and B drops without leaving the app;
+#   - Y / D-pad / A moves a group (rail_group_order), every group folds while it's lifted, its sections keep their
+#     order, B drops, A on a header still toggles it, and dragging a header's handle moves it by touch;
+#   - the tour's Groups step spotlights a group header and lists the A / Y / A controls, and each section step opens
+#     its group first (Panel, Look, Advanced); Y during the tour skips it and never moves a group.
 # Screenshots of each step go to $OUT_DIR for the PM's eyes (look and feel).
 #   --no-build  Installs the debug APK already built instead of building it.
 set -uo pipefail
@@ -73,6 +77,33 @@ pref_has() { pref "$1" | tr ',' '\n' | grep -qx "$2"; }
 pref_lacks() { ! pref_has "$1" "$2"; }
 focus_lacks() { ! focus_has "$1"; }
 
+# Command Panel is the focused app on the top screen (display 0).
+in_front() {
+  sh_dev dumpsys activity activities | awk '/^Display #/{d=$2} d == "#0" && /topResumedActivity=/ && !p {print; p=1}' | grep -q "$PKG"
+}
+# Drops rail_expanded so every group starts collapsed, checking the prefs file and retrying (after a force-stop) if
+# the edit didn't stick.
+clear_expanded() {
+  local i
+  for i in 1 2 3; do
+    sh_dev am force-stop "$PKG"
+    sleep 1
+    sh_dev "run-as $PKG sed -i '/name=\"rail_expanded\"/d' $PREFS"
+    [ -z "$(pref rail_expanded)" ] && ! sh_dev run-as "$PKG" cat "$PREFS" | grep -q 'name="rail_expanded"' && return 0
+  done
+  return 1
+}
+# Walks the tour with A until a step showing $1, stopping if the tour ends (so it never runs past the last step).
+tour_to() {
+  local i
+  for i in $(seq 1 "${2:-20}"); do
+    ui_has "$1" && return 0
+    ui_has "Skip tour" || return 1
+    key KEYCODE_BUTTON_A
+  done
+  ui_has "$1"
+}
+
 launch() {
   sh_dev am start -W -n "$COMPANION" --display 0 >/dev/null
   sleep 2
@@ -104,8 +135,12 @@ restore_prefs() {
 trap restore_prefs EXIT
 
 # Start with every group collapsed: drop rail_expanded from the prefs file.
+# Start from the default rail: no saved group or section order (the checks below expect Panel first, Nav Bar above
+# Tiles). The user's prefs come back at the end either way.
 sh_dev am force-stop "$PKG"
-sh_dev run-as "$PKG" sed -i '/name="rail_expanded"/d' "$PREFS"
+sh_dev "run-as $PKG sed -i -e '/name=\"rail_group_order\"/d' -e '/name=\"rail_sections_/d' -e '/name=\"rail_order\"/d' $PREFS"
+check "rail starts in the default order" test -z "$(pref rail_group_order)"
+check "rail_expanded cleared (every group collapsed)" clear_expanded
 
 # --- gamepad --------------------------------------------------------------------------------------------------------
 
@@ -175,6 +210,7 @@ shot 08-touch
 # --- reorder inside a group -----------------------------------------------------------------------------------------
 
 step "Move Nav Bar below Tiles inside Panel"
+sh_dev am force-stop "$PKG"   # fresh start: General selected, focus on it
 launch
 key KEYCODE_DPAD_DOWN   # Panel header
 key KEYCODE_DPAD_DOWN   # Nav Bar
@@ -191,7 +227,122 @@ key KEYCODE_BUTTON_A
 key KEYCODE_DPAD_UP
 key KEYCODE_BUTTON_B
 check "rail_sections_panel back to nav_bar,tiles" test "$(pref rail_sections_panel)" = "nav_bar,tiles"
-check "companion still in front on display 0" sh -c "adb shell dumpsys window displays | grep -q 'mFocusedApp=.*$PKG'"
+check "companion still in front on display 0" in_front
+
+# --- moving groups (#30) --------------------------------------------------------------------------------------------
+
+step "Y picks up Panel, every group folds while it's lifted, D-pad Down moves it below Look"
+sh_dev am force-stop "$PKG"   # fresh start: General selected, focus on it
+launch
+key KEYCODE_DPAD_DOWN   # Panel header (Panel and Look are open from the steps above)
+check "Panel header has focus" focus_has "Panel"
+key KEYCODE_BUTTON_Y
+check "while lifted, Panel shows collapsed" ui_has "Expand Panel"
+check "while lifted, Look shows collapsed" ui_has "Expand Look"
+check "while lifted, no section rows from Panel" test "$(grep -o 'text="Tiles"' "$OUT_DIR/ui.xml" | wc -l | tr -d ' ')" -eq 0
+shot 11-group-lifted
+key KEYCODE_DPAD_DOWN
+key KEYCODE_BUTTON_A
+check "rail_group_order starts look,panel" test "$(pref rail_group_order | cut -d, -f1-2)" = "look,panel"
+check "Panel's own section order kept" test "$(pref rail_sections_panel)" = "nav_bar,tiles"
+check "Panel and Look open again after the drop" ui_has "Collapse Panel"
+check "focus stays on the Panel header" focus_has "Panel"
+shot 12-group-moved
+
+step "B drops a lifted group; Up can't move it above General"
+key KEYCODE_BUTTON_Y
+key KEYCODE_DPAD_UP
+key KEYCODE_DPAD_UP     # already first: stays put, never above General
+key KEYCODE_BUTTON_B
+check "rail_group_order back to panel first" test "$(pref rail_group_order | cut -d, -f1)" = "panel"
+check "focus stays on the Panel header" focus_has "Panel"
+check "companion still in front on display 0" in_front
+
+step "A on a header still opens and closes it (doesn't pick it up)"
+key KEYCODE_BUTTON_A
+check "A collapses Panel" ui_has "Expand Panel"
+check "group order unchanged by A" test "$(pref rail_group_order | cut -d, -f1)" = "panel"
+key KEYCODE_BUTTON_A
+
+step "Touch: drag Look's handle below Extras"
+# One slot is the gap between two collapsed headers (every group folds while one is dragged).
+dump_ui
+center_y() { grep -oE "<node [^>]*content-desc=\"$1\"[^>]*>" "$OUT_DIR/ui.xml" | head -1 | grep -o 'bounds="[^"]*"' | grep -oE '[0-9]+' | tr '\n' ' ' | awk '{print int(($2 + $4) / 2)}'; }
+tap_node "Collapse Panel" || true; tap_node "Collapse Look" || true
+dump_ui
+yp="$(center_y "Move Panel")"; yl="$(center_y "Move Look")"
+if [ -n "$yp" ] && [ -n "$yl" ]; then
+  slot=$(( yl - yp ))
+  # Open both again, so Panel's sections fold away above Look as the drag starts.
+  tap_node "Expand Panel" || true; tap_node "Expand Look" || true
+  dump_ui
+  b="$(grep -oE '<node [^>]*content-desc="Move Look"[^>]*>' "$OUT_DIR/ui.xml" | head -1 | grep -o 'bounds="[^"]*"' | grep -oE '[0-9]+' | tr '\n' ' ')"
+  set -- $b
+  x=$(( ($1 + $3) / 2 )); y=$(( ($2 + $4) / 2 ))
+  sh_dev input -d 0 swipe "$x" "$y" "$x" $(( y + slot * 5 / 4 )) 1200 >/dev/null
+  sleep 1.5
+  check "Look moved exactly one row, below Extras" test "$(pref rail_group_order)" = "panel,extras,look,advanced"
+  shot 13-touch-group-drag
+else
+  fail "found the Panel and Look move handles"
+fi
+
+# --- the tour teaches the rail controls (#31) -----------------------------------------------------------------------
+
+step "Tour: the Groups step spotlights a group header and lists A / Y / A"
+# Collapse every group first, so the step has to open its own.
+check "rail_expanded cleared (every group collapsed)" clear_expanded
+launch
+# "Take the tour" sits in General's pane; scroll the pane until it shows.
+found=false
+for i in 1 2 3 4 5 6; do
+  if tap_node "Take the tour"; then
+    # "Take the tour" first replays the overlay's onboarding on the bottom screen; the companion tour starts once
+    # that ends. While it's up the companion forwards Y to it as Skip.
+    for j in 1 2 3; do
+      sleep 2
+      ui_has "Skip tour" && { found=true; break; }
+      key KEYCODE_BUTTON_Y
+    done
+    break
+  fi
+  sh_dev input -d 0 swipe 1200 900 1200 300 300 >/dev/null; sleep 0.6
+done
+check "started the tour (Skip shows)" $found
+check "reached the Groups step" tour_to "Groups"
+check "it lists A: open or close" ui_has "Open or close a group. D-pad Right and Left work too."
+check "it lists Y: move a group" ui_has "On a group: pick it up, move it with the D-pad, then press A, Y or B to drop it."
+check "it lists A: move a section" ui_has "On a section: pick it up and move it within its group, like Button Order."
+# The tour overlay hides the rail from uiautomator, so the open groups are read from prefs.
+check "the step opened Panel (its header is spotlit)" pref_has rail_expanded panel
+shot 14-tour-groups-step
+
+step "Tour: each section step opens its group before the spotlight"
+key KEYCODE_BUTTON_A   # Nav Bar intro
+check "reached Nav Bar's intro" ui_has "NAV BAR"
+shot 15-tour-nav-bar
+check "reached Appearance" tour_to "APPEARANCE"
+check "reaching Appearance opened Look" pref_has rail_expanded look
+shot 16-tour-look
+check "reached Diagnostics" tour_to "DIAGNOSTICS" 30
+check "reaching Diagnostics opened Advanced" pref_has rail_expanded advanced
+shot 17-tour-diagnostics
+order_before="$(pref rail_group_order)"
+key KEYCODE_BUTTON_Y   # Skip ends the tour (Y is Skip while the tour is up, not a group pick-up)
+check "tour closed" ui_lacks "Skip tour"
+check "companion still in front after Skip" in_front
+check "Y during the tour didn't move a group" test "$(pref rail_group_order)" = "$order_before"
+
+step "Y where it has no job (on a section) does nothing"
+sh_dev am force-stop "$PKG"
+launch
+check "General has focus" focus_has "General"
+sh_dev logcat -c
+key KEYCODE_BUTTON_Y
+sleep 1
+check "no moveTaskToBack" sh -c "! adb logcat -d | grep -q moveTaskToBack"
+check "companion still in front" in_front
+check "General still has focus" focus_has "General"
 
 echo
 echo "Done: $passes passed, $fails failed. Screenshots in $OUT_DIR"

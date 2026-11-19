@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -273,12 +274,18 @@ internal fun SettingsContent(
         ),
     ) {
     CompositionLocalProvider(LocalTourTargets provides if (touring || followingLook) tourTargets else null) {
-    Row(Modifier.fillMaxSize().then(backdrop).systemBarsPadding()) {
+    Row(
+        Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
+            // Y only has a job on a group header (pick it up / drop it) and in the tour. Anywhere else nothing handles
+            // it, and the system turns an unhandled Y into Back, which sends Command Panel to the background.
+            .onKeyEvent { it.key == Key.ButtonY },
+    ) {
         // Like the pane: focus (and a section being moved) scrolls in with room for its focus ring and scale.
         PaddedBringIntoView {
             NavRail(
                 nav, state.railLayout, state.railExpanded, railRequesters, headerRequesters,
-                onToggle = vm::setRailGroupExpanded, onReorder = vm::reorderRailSections, focusSelected = focusRail,
+                onToggle = vm::setRailGroupExpanded, onReorder = vm::reorderRailSections,
+                onReorderGroups = vm::reorderRailGroups, focusSelected = focusRail,
             ) { nav = it }
         }
         PaddedBringIntoView {
@@ -410,6 +417,7 @@ private fun NavRail(
     headerRequesters: Map<RailGroup, FocusRequester>,
     onToggle: (RailGroup, Boolean) -> Unit,
     onReorder: (RailGroup, List<String>) -> Unit,
+    onReorderGroups: (List<String>) -> Unit,
     focusSelected: () -> Unit,
     onSelect: (NavItem) -> Unit,
 ) {
@@ -421,8 +429,15 @@ private fun NavRail(
     val railScroll = rememberScrollState()
     val railBounds = remember { mutableStateOf(Rect.Zero) }
     val scope = rememberCoroutineScope()
+    // Groups move among themselves. While one is lifted every group shows collapsed, so the rows being moved are all
+    // header height and the plain list reorder works as is.
+    val groupKeys = layout.groups.map { it.key }
+    val groupReorder = remember(railScroll) { ReorderListState(groupKeys, scope, railScroll) { railBounds.value } }
+    groupReorder.onCommit = onReorderGroups
+    LaunchedEffect(groupKeys) { groupReorder.sync(groupKeys) }
+    val movingGroup = groupReorder.grabbed != null || groupReorder.dragged != null
+    val shown = if (movingGroup) emptySet() else expanded
     // Sections move only inside their own group, so each group has its own reorder state.
-    // TODO(#30): move whole groups too.
     val reorders = RailGroup.entries.associateWith { g ->
         val keys = layout.sectionsOf(g).map { it.key }
         val r = remember(railScroll, g) { ReorderListState(keys, scope, railScroll) { railBounds.value } }
@@ -430,8 +445,8 @@ private fun NavRail(
         LaunchedEffect(r, keys) { r.sync(keys) }
         r
     }
-    val moving = reorders.values.any { it.grabbed != null }
-    val rows = layout.visibleRows(expanded)
+    val moving = movingGroup || reorders.values.any { it.grabbed != null }
+    val rows = layout.visibleRows(shown)
     val motion = LocalTccLookSpec.current.traits.animate
     // The focused row's own bring-into-view stops it flush with the padded edge, which leaves the app header scrolled
     // off. Focusing the first (or last) visible row scrolls the rail all the way to that end instead. Skipped while a
@@ -475,26 +490,42 @@ private fun NavRail(
         key(pinned.category.key) {
             RailItem(pinned, pinned == selected, requesters.getValue(pinned), null, navShape, onSelect) { edgeScroll(pinned.category.key) }
         }
-        for (g in layout.groups) {
-            val open = g in expanded
-            val header = RailRow.Header(g).id
-            key(header) {
-                RailGroupHeader(
-                    g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
-                    onToggle = { onToggle(g, it) },
-                ) { edgeScroll(header) }
-            }
-            if (!open) continue
-            val reorder = reorders.getValue(g)
-            reorder.items.forEach { k ->
-                val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
-                key(k) {
-                    RailItem(
-                        item, item == selected, requesters.getValue(item), reorder, navShape, onSelect,
-                        indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
-                    ) { edgeScroll(k) }
-                }
-            }
+        groupReorder.items.forEach { gk ->
+            val g = RailGroup.fromKey(gk) ?: return@forEach
+            // The whole group (header and its sections) is keyed, so it moves as one block. Keying only the header let
+            // a reopened group's sections take its slot, which recreated the header and threw away its focus.
+            key(gk) { RailGroupBlock(g, g in shown, selected, headerRequesters, requesters, reorders.getValue(g), groupReorder, navShape, onToggle, onSelect, edgeScroll) }
+        }
+    }
+}
+
+@Composable
+private fun RailGroupBlock(
+    g: RailGroup,
+    open: Boolean,
+    selected: NavItem,
+    headerRequesters: Map<RailGroup, FocusRequester>,
+    requesters: Map<NavItem, FocusRequester>,
+    reorder: ReorderListState,
+    groupReorder: ReorderListState,
+    navShape: Shape,
+    onToggle: (RailGroup, Boolean) -> Unit,
+    onSelect: (NavItem) -> Unit,
+    edgeScroll: (String) -> Unit,
+) {
+    val header = RailRow.Header(g).id
+    RailGroupHeader(
+        g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
+        groupReorder, onToggle = { onToggle(g, it) },
+    ) { edgeScroll(header) }
+    if (!open) return
+    reorder.items.forEach { k ->
+        val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
+        key(k) {
+            RailItem(
+                item, item == selected, requesters.getValue(item), reorder, navShape, onSelect,
+                indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
+            ) { edgeScroll(k) }
         }
     }
 }
@@ -502,6 +533,8 @@ private fun NavRail(
 /**
  * A rail group's header. A, a tap, or D-pad Right (while collapsed) opens it; A, a tap, or D-pad Left (while open)
  * closes it. D-pad Right on an open header goes to the pane, like a section. Focusing it doesn't change the pane.
+ * Moving the group: Y picks it up (A is open / close here), the D-pad moves it, and A, Y or B drops it. Touch: drag the
+ * trailing handle.
  */
 @Composable
 private fun RailGroupHeader(
@@ -510,14 +543,41 @@ private fun RailGroupHeader(
     holdsSelected: Boolean,
     requester: FocusRequester,
     shape: Shape,
+    reorder: ReorderListState,
     onToggle: (Boolean) -> Unit,
     onFocused: () -> Unit,
 ) {
+    val key = group.key
     val f = focusState()
-    val scale by focusScale(f.value, 1.04f, "navScale")
+    val lifted = reorder.isLifted(key)
+    val grabbed = reorder.grabbed == key
+    val scale by focusScale(f.value || lifted, if (lifted) 1.06f else 1.04f, "navScale")
+    val spacingPx = with(LocalDensity.current) { RAIL_ITEM_SPACING.toPx() }
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val bring = remember { BringIntoViewRequester() }
+    val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    // Losing focus while picked up (e.g. a tap elsewhere) drops the group where it is.
+    LaunchedEffect(f.value) { if (!f.value && reorder.grabbed == key) reorder.drop() }
+    // Moving the header row to its new place drops its focus, so once the group is put down (gamepad or touch), focus
+    // comes back to it instead of landing on the selected section.
+    val wasLifted = remember { booleanArrayOf(false) }
+    LaunchedEffect(lifted) {
+        if (lifted) { wasLifted[0] = true; return@LaunchedEffect }
+        if (!wasLifted[0]) return@LaunchedEffect
+        wasLifted[0] = false
+        // After its group's sections open again and the rail settles.
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        runCatching { requester.requestFocus() }
+    }
+    // Where the header sat when a touch drag began, and its place in the list then. Groups above it fold as the drag
+    // starts, which moves it up; the first layout after that shifts the drag by the same amount so the header stays
+    // under the finger.
+    val dragStart = remember { floatArrayOf(Float.NaN, -1f) }
+    val headerTop = remember { floatArrayOf(0f) }
     // A collapsed group holding the selected section keeps its highlight, so you can see where you are.
     val bg by focusColor(
-        when { f.value -> p.surfaceHigh; holdsSelected && !open -> p.accentSoft; else -> Color.Transparent },
+        when { f.value || lifted -> p.surfaceHigh; holdsSelected && !open -> p.accentSoft; else -> Color.Transparent },
         "navBg",
     )
     val motion = LocalTccLookSpec.current.traits.animate
@@ -527,23 +587,61 @@ private fun RailGroupHeader(
         label = "railChevron",
     )
     val label = stringResource(group.titleRes)
-    val lit = f.value || holdsSelected
+    val lit = f.value || lifted || holdsSelected
     Row(
         modifier = Modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale; this.shape = shape }
+            .then(if (holdsSelected) Modifier.tourTarget(TourSpot.RAIL_GROUP) else Modifier)
+            .onSizeChanged { reorder.slotPx = it.height + spacingPx }
+            // Before graphicsLayer, so this is the laid-out spot, without the drag translation.
+            .onGloballyPositioned { c ->
+                val top = c.positionInRoot().y
+                val from = dragStart[0]
+                if (!from.isNaN() && top != from) {
+                    // Only the fold, not a slot swap (those already adjust the drag themselves).
+                    if (reorder.dragged == key && reorder.items.indexOf(key) == dragStart[1].toInt()) reorder.shiftDrag(from - top)
+                    dragStart[0] = Float.NaN
+                }
+                headerTop[0] = top
+            }
+            .zIndex(if (lifted) 1f else 0f)
+            .graphicsLayer {
+                translationY = reorder.translationOf(key)
+                scaleX = scale; scaleY = scale
+                shadowElevation = if (lifted) 10.dp.toPx() else 0f
+                this.shape = shape
+            }
+            .bringIntoViewRequester(bring)
             .clip(shape).background(bg)
-            .then(if (f.value) Modifier.border(1.5.dp, p.accent, shape) else Modifier)
+            .then(
+                when {
+                    grabbed -> Modifier.border(2.dp, p.accent, shape)
+                    f.value -> Modifier.border(1.5.dp, p.accent, shape)
+                    else -> Modifier
+                },
+            )
             .focusRequester(requester)
             .onFocusChanged { if (it.isFocused) onFocused() }
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                if (grabbed) return@onKeyEvent when (e.key) {
+                    Key.DirectionUp, Key.DirectionDown -> {
+                        reorder.moveGrabbed(up = e.key == Key.DirectionUp)
+                        scope.launch { bring.bringIntoView() }
+                        true
+                    }
+                    // Stays on the rail while a group is picked up.
+                    Key.DirectionLeft, Key.DirectionRight -> true
+                    Key.ButtonY, Key.Back, Key.ButtonB, Key.Escape -> { reorder.drop(); true }
+                    else -> false
+                }
                 when (e.key) {
+                    Key.ButtonY -> { reorder.grab(key); true }
                     Key.DirectionRight -> if (!open) { onToggle(true); true } else false
                     Key.DirectionLeft -> if (open) { onToggle(false); true } else false
                     else -> false
                 }
             }
-            .focusControl(f) { onToggle(!open) }
+            .focusControl(f) { if (grabbed) reorder.drop() else onToggle(!open) }
             .noRippleClickable {
                 // Closing by touch while one of its sections has focus: keep focus on the rail, on this header.
                 if (open) runCatching { requester.requestFocus() }
@@ -560,6 +658,8 @@ private fun RailGroupHeader(
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             style = tccTextStyle(),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         Icon(
@@ -567,6 +667,29 @@ private fun RailGroupHeader(
             contentDescription = stringResource(if (open) R.string.settings_rail_collapse else R.string.settings_rail_expand, label),
             tint = if (f.value) p.accent else p.textTertiary,
             modifier = Modifier.size(30.dp).rotate(turn).padding(5.dp),
+        )
+        Icon(
+            Icons.Rounded.DragHandle,
+            contentDescription = stringResource(R.string.settings_rail_move, label),
+            tint = if (lifted || f.value) p.accent else p.textTertiary,
+            modifier = Modifier.size(30.dp)
+                .onGloballyPositioned { handleCoords[0] = it }
+                .pointerInput(key) {
+                    detectDragGestures(
+                        onDragStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            // Its sections fold away while it moves: keep focus on the rail, on this header.
+                            runCatching { requester.requestFocus() }
+                            dragStart[0] = headerTop[0]
+                            dragStart[1] = reorder.items.indexOf(key).toFloat()
+                            reorder.startDrag(key, handleCoords[0]?.localToRoot(it)?.y ?: 0f)
+                        },
+                        onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
+                        onDragEnd = { dragStart[0] = Float.NaN; reorder.endDrag() },
+                        onDragCancel = { dragStart[0] = Float.NaN; reorder.endDrag() },
+                    )
+                }
+                .padding(5.dp),
         )
     }
 }
@@ -602,6 +725,13 @@ private fun RailItem(
     val scope = rememberCoroutineScope()
     val bring = remember { BringIntoViewRequester() }
     val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    // During the tour, the section it's on scrolls into view on the rail, so its spotlight isn't off screen.
+    val touring = LocalTourTargets.current != null
+    LaunchedEffect(on, touring) {
+        if (!on || !touring) return@LaunchedEffect
+        androidx.compose.runtime.withFrameNanos { }
+        bring.bringIntoView()
+    }
     // Losing focus while picked up (e.g. a tap elsewhere) drops the section where it is.
     LaunchedEffect(f.value) { if (!f.value && reorder?.grabbed == key) reorder.drop() }
     Row(

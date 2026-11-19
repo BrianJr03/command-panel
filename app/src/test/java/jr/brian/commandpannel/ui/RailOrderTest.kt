@@ -227,4 +227,43 @@ class RailOrderTest {
         assertEquals("look,advanced", RailExpanded.encode(setOf(ADVANCED, LOOK)))
         assertEquals(setOf(PANEL, EXTRAS), RailExpanded.parse(RailExpanded.encode(setOf(PANEL, EXTRAS))))
     }
+    // ---- moving groups (#30) ----
+
+    @Test
+    fun `moving a group keeps every group's own section order`() {
+        val before = RailLayout.DEFAULT
+            .withSectionOrder(LOOK, listOf("themes", "appearance"))
+            .withSectionOrder(ADVANCED, listOf("experimental", "diagnostics"))
+        val after = before.withGroupOrder(listOf("advanced", "look", "panel", "extras"))
+        assertEquals(listOf(ADVANCED, LOOK, PANEL, EXTRAS), after.groups)
+        assertEquals(before.sections, after.sections)
+        assertEquals(
+            listOf(GENERAL, EXPERIMENTAL, DIAGNOSTICS, THEMES, APPEARANCE, NAV_BAR, QUICK_TOGGLES, REPLAY, KEYBOARD),
+            after.flat,
+        )
+    }
+
+    @Test
+    fun `a group move round-trips through prefs and General stays first`() {
+        val moved = RailLayout.DEFAULT.withGroupOrder(listOf("extras", "panel", "advanced", "look"))
+        val back = RailLayout.read { moved.prefs()[it] }
+        assertEquals(moved, back)
+        assertEquals(GENERAL, back.flat.first())
+        assertEquals("extras,panel,advanced,look", moved.prefs()["rail_group_order"])
+    }
+
+    @Test
+    fun `while a group is lifted only headers show, in the group order`() {
+        val l = RailLayout.DEFAULT.withGroupOrder(listOf("look", "advanced", "panel", "extras"))
+        assertEquals(
+            listOf(RailRow.Section(GENERAL), RailRow.Header(LOOK), RailRow.Header(ADVANCED), RailRow.Header(PANEL), RailRow.Header(EXTRAS)),
+            l.visibleRows(emptySet()),
+        )
+    }
+
+    @Test
+    fun `a group order naming General or a section ignores those keys`() {
+        val l = RailLayout.DEFAULT.withGroupOrder(listOf("general", "advanced", "themes", "panel"))
+        assertEquals(listOf(ADVANCED, PANEL, LOOK, EXTRAS), l.groups)
+    }
 }

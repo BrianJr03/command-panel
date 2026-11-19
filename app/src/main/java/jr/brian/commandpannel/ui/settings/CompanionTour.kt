@@ -99,6 +99,8 @@ import kotlin.math.roundToInt
 /** A region the tour can spotlight. [inPane] regions live in the scrolling content pane (the rest are on the rail). */
 internal enum class TourSpot(val inPane: Boolean = true) {
     RAIL(false),
+    /** The header of the group holding the selected section. */
+    RAIL_GROUP(false),
     RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_REPLAY(false), RAIL_KEYBOARD(false), RAIL_DIAGNOSTICS(false), RAIL_EXPERIMENTAL(false),
     REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, SAVE_CLIP, PREVIEW,
     BUTTON_ORDER, QUICK_LAUNCH,
@@ -125,12 +127,19 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     }
 }
 
-/** One stop on the tour: the [section] to show (null keeps the current one) and the [spot] to light (null: none). */
+/** One line of a step's controls legend: a gamepad button badge and what it does. */
+internal class TourControl(val button: GamepadButton, @StringRes val labelRes: Int)
+
+/**
+ * One stop on the tour: the [section] to show (null keeps the current one) and the [spot] to light (null: none).
+ * [controls] lists buttons to teach, drawn under the body with the same badges as the tour's own buttons.
+ */
 internal class TourStep(
     val section: SettingsCategory?,
     val spot: TourSpot?,
     @StringRes val titleRes: Int,
     @StringRes val bodyRes: Int,
+    val controls: List<TourControl> = emptyList(),
 )
 
 private fun sectionIntro(category: SettingsCategory, @StringRes body: Int) =
@@ -155,6 +164,15 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
         TourStep(general, TourSpot.PREVIEW, R.string.settings_preview_title, R.string.tour_preview_body),
 
+        // The rail's groups and how to open and move them, on the group holding Nav Bar (it opens with it).
+        TourStep(
+            navBar, TourSpot.RAIL_GROUP, R.string.tour_groups_title, R.string.tour_groups_body,
+            controls = listOf(
+                TourControl(GamepadButton.A, R.string.tour_groups_open),
+                TourControl(GamepadButton.Y, R.string.tour_groups_move_group),
+                TourControl(GamepadButton.A, R.string.tour_groups_move_section),
+            ),
+        ),
         sectionIntro(navBar, R.string.tour_nav_bar_body),
         TourStep(navBar, TourSpot.BUTTON_ORDER, R.string.settings_button_order, R.string.tour_button_order_body),
         TourStep(navBar, TourSpot.QUICK_LAUNCH, R.string.settings_quick_launch, R.string.tour_quick_launch_body),
@@ -516,5 +534,13 @@ private fun TourStepText(step: TourStep) {
         }
         Text(lookLabel(title), color = p.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, style = tccDisplayTextStyle())
         Text(stringResource(step.bodyRes), color = p.textSecondary, fontSize = 14.sp, lineHeight = 20.sp)
+        if (step.controls.isNotEmpty()) Spacer(Modifier.height(2.dp))
+        step.controls.forEach { c ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                jr.brian.commandpannel.ui.components.GamepadGlyph(c.button, p.accent, tccTextStyle())
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(c.labelRes), color = p.textSecondary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f))
+            }
+        }
     }
 }

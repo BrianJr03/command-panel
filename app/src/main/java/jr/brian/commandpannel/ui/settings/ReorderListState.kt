@@ -42,7 +42,11 @@ internal class ReorderListState(
     var grabbed by mutableStateOf<String?>(null)
         private set
 
+    /** How far the finger has moved the dragged row from its slot. Only this decides when rows swap. */
     private var dragOffset by mutableFloatStateOf(0f)
+
+    /** Extra, drawing-only offset for the dragged row (see [shiftDrag]); never counts toward a swap. */
+    private var visualShift by mutableFloatStateOf(0f)
 
     /** Row height plus the spacing between rows, in px; set by the rows as they measure. */
     var slotPx = 0f
@@ -56,7 +60,7 @@ internal class ReorderListState(
     private fun shiftOf(key: String) = shifts.getOrPut(key) { Animatable(0f) }
 
     /** Vertical translation for [key]: the finger offset while dragged, else its slide-into-place animation. */
-    fun translationOf(key: String): Float = if (key == dragged) dragOffset else shiftOf(key).value
+    fun translationOf(key: String): Float = if (key == dragged) dragOffset + visualShift else shiftOf(key).value
 
     fun isLifted(key: String) = key == dragged || key == grabbed
 
@@ -72,6 +76,7 @@ internal class ReorderListState(
         startOrder = items.toList()
         dragged = key
         dragOffset = 0f
+        visualShift = 0f
         this.pointerRootY = pointerRootY
         autoScroll?.cancel()
         autoScroll = scope.launch { autoScrollLoop() }
@@ -84,12 +89,21 @@ internal class ReorderListState(
         settle()
     }
 
+    /**
+     * Draws the dragged row [dy] further without the finger moving, e.g. when rows above it fold away mid-drag, so it
+     * stays under the finger. Drawing only: swaps still follow the finger's real movement, one row at a time.
+     */
+    fun shiftDrag(dy: Float) {
+        if (dragged != null) visualShift += dy
+    }
+
     fun endDrag() {
         autoScroll?.cancel()
         val key = dragged ?: return
-        val residual = dragOffset
+        val residual = dragOffset + visualShift
         dragged = null
         dragOffset = 0f
+        visualShift = 0f
         // Ease the dropped row from where the finger left it into its slot.
         scope.launch { shiftOf(key).run { snapTo(residual); animateTo(0f, spring()) } }
         commitIfChanged()
@@ -125,8 +139,10 @@ internal class ReorderListState(
         val key = dragged ?: return
         if (slotPx <= 0f) return
         var i = items.indexOf(key)
-        while (dragOffset > slotPx / 2 && i < items.lastIndex) { swap(i, i + 1, animateMover = false); dragOffset -= slotPx; i++ }
-        while (dragOffset < -slotPx / 2 && i > 0) { swap(i, i - 1, animateMover = false); dragOffset += slotPx; i-- }
+        val (to, left) = settleTarget(i, items.lastIndex, dragOffset, slotPx)
+        while (i < to) { swap(i, i + 1, animateMover = false); i++ }
+        while (i > to) { swap(i, i - 1, animateMover = false); i-- }
+        dragOffset = left
     }
 
     /** Moves the row at [from] to [to]; the displaced neighbor (and optionally the mover) slide from their old spot. */
@@ -168,4 +184,17 @@ internal class ReorderListState(
     private companion object {
         const val MAX_SCROLL_PX = 22f
     }
+}
+
+/**
+ * Where a row dragged [offset] px from slot [index] belongs: it passes a neighbor once it is more than half a slot
+ * past it. Returns the new index and the offset left over from that slot. Pure, so it is unit-tested.
+ */
+internal fun settleTarget(index: Int, lastIndex: Int, offset: Float, slotPx: Float): Pair<Int, Float> {
+    if (slotPx <= 0f) return index to offset
+    var i = index
+    var o = offset
+    while (o > slotPx / 2 && i < lastIndex) { o -= slotPx; i++ }
+    while (o < -slotPx / 2 && i > 0) { o += slotPx; i-- }
+    return i to o
 }

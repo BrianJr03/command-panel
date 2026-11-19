@@ -752,9 +752,14 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(navOrder = order.split(","))
     }
 
-    /** Saves a new section order inside one rail group (TODO(#30): group order and moving groups). */
-    fun reorderRailSections(group: RailGroup, keys: List<String>) {
-        val layout = _state.value.railLayout.withSectionOrder(group, keys)
+    /** Saves a new section order inside one rail group. */
+    fun reorderRailSections(group: RailGroup, keys: List<String>) =
+        saveRailLayout(_state.value.railLayout.withSectionOrder(group, keys))
+
+    /** Saves a new order for the rail's groups (General stays on top). */
+    fun reorderRailGroups(keys: List<String>) = saveRailLayout(_state.value.railLayout.withGroupOrder(keys))
+
+    private fun saveRailLayout(layout: RailLayout) {
         val edit = prefs.edit()
         layout.prefs().forEach { (k, v) -> edit.putString(k, v) }
         edit.apply()
