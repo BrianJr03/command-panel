@@ -2,14 +2,15 @@ package jr.brian.commandpannel.system
 
 import android.content.Context
 import android.database.ContentObserver
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.system.ScreenModePlan.Panel
 import jr.brian.commandpannel.system.SystemSettings.Keys
 
 /**
@@ -23,15 +24,19 @@ import jr.brian.commandpannel.system.SystemSettings.Keys
  * Stock covers the top with a privileged `TYPE_BOOT_PROGRESS` window that the vendor exempts from its single-screen
  * dim. Our app-type overlay can't use that window type, and the vendor force-dims any app window on the "off" panel
  * to alpha 0.8, so the cover alone only dims the screen. To actually black it out we also drop the blanked panel's
- * backlight to 0 through the root helper — snapshotting both panels' brightness on the dual→single transition (so a
- * value already pulled down by blanking never overwrites it) and restoring it when dual returns. On the top panel the
- * system status bar (a higher-z window) still shows through the overlay, but its backlight is off too, so the panel
- * reads as black.
+ * backlight to 0 through the root helper, saving that panel's level just before (never once it's already dropped)
+ * and restoring it when the panel comes back. On the top panel the system status bar (a higher-z window) still shows
+ * through the overlay, but its backlight is off too, so the panel reads as black.
+ *
+ * Only what we changed is undone: a fresh start in dual leaves brightness and focus lock alone (see [ScreenModePlan]).
+ * What we changed lives in prefs, so a service restart while a panel is blanked still knows what to restore.
  */
 class ScreenModeController(
     private val context: Context,
     private val privileged: PrivilegedAccess,
     private val onHideOverlay: () -> Unit,
+    /** Called on the main thread shortly after a panel's brightness was restored, so the sliders can re-read it. */
+    private val onBrightnessRestored: () -> Unit = {},
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val topology = DisplayTopology(context)
@@ -46,14 +51,18 @@ class ScreenModeController(
         override fun onChange(selfChange: Boolean) = apply(settings.getInt(Keys.DISPLAY_MODE, 0))
     }
 
+    private val notifyRestored = Runnable { onBrightnessRestored() }
+
     fun start() {
         context.contentResolver.registerContentObserver(settings.uriFor(Keys.DISPLAY_MODE), false, observer)
         tracked = settings.getInt(Keys.DISPLAY_MODE, 0)
+        migrateLegacyState(tracked)
         apply(tracked)
     }
 
     fun stop() {
         context.contentResolver.unregisterContentObserver(observer)
+        main.removeCallbacks(notifyRestored)
     }
 
     fun isBottomBlanked(): Boolean = bottomCover != null
@@ -61,87 +70,141 @@ class ScreenModeController(
     private fun apply(mode: Int) {
         val old = tracked
         tracked = mode
-        when (mode) {
-            0 -> restoreDual()
-            1 -> blankBottom(fromDual = old == 0)
-            2 -> blankTop(fromDual = old == 0)
+        val plan = ScreenModePlan.plan(readState(), mode, fromDual = old == 0) ?: return
+        // Save focus lock before it's overwritten below.
+        saveFocusState(plan.saveFocus)
+        when (plan.blank) {
+            null -> {
+                setTouch("0,0")
+                removeBottomCover()
+                removeTopCover()
+            }
+            Panel.BOTTOM -> {
+                removeTopCover()
+                onHideOverlay()
+                settings.putInt(Keys.FOCUS_LOCK, 1)
+                settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
+                setTouch("0,1")
+                showBottomCover()
+            }
+            Panel.TOP -> {
+                removeBottomCover()
+                onHideOverlay()
+                settings.putInt(Keys.FOCUS_LOCK, 2)
+                settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
+                setTouch("1,0")
+                showTopCover()
+            }
+        }
+        // Cover + backlight-off = a genuinely black panel (a normal app window can't stay fully opaque on the
+        // Thor's "off" screen: the vendor force-dims it to 0.8).
+        plan.blank?.let { blank(it, plan.snapshot) }
+        // Only panels we dropped come back, and only to the level we saved.
+        plan.restore.forEach { restoreBrightness(it) }
+        if (plan.restoreFocus) restoreFocusState()
+        if (plan.restore.isNotEmpty()) {
+            main.removeCallbacks(notifyRestored)
+            // The display applies a new level asynchronously; give it a moment before the sliders re-read it.
+            main.postDelayed(notifyRestored, RESTORE_NOTIFY_DELAY_MS)
         }
     }
 
-    private fun saveFocusState() {
+    /** What we changed ourselves and still have to undo. */
+    private fun readState() = ScreenModePlan.State(
+        topBlanked = prefs.contains(KEY_BLANKED_TOP),
+        bottomBlanked = prefs.contains(KEY_BLANKED_BOTTOM),
+        focusSaved = prefs.getBoolean(KEY_FOCUS_SAVED, false),
+    )
+
+    private fun saveFocusState(source: ScreenModePlan.FocusSave) {
+        val (focus, sysKey) = when (source) {
+            ScreenModePlan.FocusSave.NONE -> return
+            ScreenModePlan.FocusSave.CURRENT ->
+                settings.getInt(Keys.FOCUS_LOCK, 0) to settings.getInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 0)
+            ScreenModePlan.FocusSave.DEFAULT -> 0 to 0
+        }
         prefs.edit()
-            .putInt("saved_focus_lock", settings.getInt(Keys.FOCUS_LOCK, 0))
-            .putInt("saved_sys_key_lock", settings.getInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 0))
+            .putInt(KEY_FOCUS_LOCK, focus)
+            .putInt(KEY_SYS_KEY_LOCK, sysKey)
+            .putBoolean(KEY_FOCUS_SAVED, true)
             .apply()
     }
 
-    private fun restoreDual() {
-        setTouch("0,0")
-        removeBottomCover()
-        removeTopCover()
-        // Both panels come back on: a normal app window can't stay fully opaque on the Thor's "off" screen (the
-        // vendor force-dims it to 0.8), so the cover is paired with a backlight-off; undo it here.
-        restoreBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
-        restoreBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
-        settings.putInt(Keys.FOCUS_LOCK, prefs.getInt("saved_focus_lock", 0))
-        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt("saved_sys_key_lock", 0))
-    }
-
-    private fun blankBottom(fromDual: Boolean) {
-        if (fromDual) { saveFocusState(); snapshotBrightness() }
-        removeTopCover()
-        onHideOverlay()
-        settings.putInt(Keys.FOCUS_LOCK, 1)
-        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
-        setTouch("0,1")
-        showBottomCover()
-        // Cover + backlight-off = genuinely black bottom panel; top panel returns to its saved level.
-        dropBacklight(topology.bottomDisplay)
-        restoreBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
-    }
-
-    private fun blankTop(fromDual: Boolean) {
-        if (fromDual) { saveFocusState(); snapshotBrightness() }
-        removeBottomCover()
-        onHideOverlay()
-        settings.putInt(Keys.FOCUS_LOCK, 2)
-        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
-        setTouch("1,0")
-        showTopCover()
-        dropBacklight(topology.topDisplay)
-        restoreBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
+    private fun restoreFocusState() {
+        settings.putInt(Keys.FOCUS_LOCK, prefs.getInt(KEY_FOCUS_LOCK, 0))
+        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt(KEY_SYS_KEY_LOCK, 0))
+        prefs.edit().remove(KEY_FOCUS_SAVED).apply()
     }
 
     /**
-     * Captures both panels' brightness at the moment we leave dual, so the blanked panel can be restored to the
-     * user's real level later. Taken only on the dual→single transition (not on single↔single switches) so a
-     * value already pulled down by blanking never overwrites the saved one.
+     * Drops [panel]'s backlight to 0. With [snapshot], first saves its current level (still the user's own, since we
+     * haven't dropped it yet) as the restore target. If that level can't be read, the panel keeps its backlight
+     * (cover only) rather than go black with nothing to bring it back to. Without [snapshot] the panel is already
+     * ours (a service restart while blanked): just drop it again.
      */
-    private fun snapshotBrightness() {
-        saveBrightness(topology.bottomDisplay, KEY_BRIGHTNESS_BOTTOM)
-        saveBrightness(topology.topDisplay, KEY_BRIGHTNESS_TOP)
-    }
-
-    private fun saveBrightness(display: android.view.Display?, prefKey: String) {
-        val id = display?.displayId ?: return
-        val current = privileged.getDisplayBrightness(id)
-        if (current != null && current.isFinite() && current > MIN_LIT_BRIGHTNESS) {
-            prefs.edit().putFloat(prefKey, current).apply()
+    private fun blank(panel: Panel, snapshot: Boolean) {
+        val id = displayOf(panel)?.displayId ?: return
+        if (snapshot) {
+            val current = privileged.getDisplayBrightness(id)
+            if (current == null || !ScreenModePlan.isRestorable(current)) {
+                Log.w(TAG, "not dropping $panel backlight: level $current can't be restored later")
+                return
+            }
+            prefs.edit().putFloat(keyOf(panel), current).apply()
         }
+        privileged.setDisplayBrightness(id, 0f, false)
     }
 
-    /** Drops a panel's backlight to 0 — a genuinely black screen, since an app cover alone can't beat the vendor dim. */
-    private fun dropBacklight(display: android.view.Display?) {
-        privileged.setDisplayBrightness(display?.displayId ?: return, 0f, false)
+    /**
+     * Brings [panel] back to the level saved when we dropped it, then forgets it. For the top panel it also writes
+     * `screen_brightness`, which is what the top slider reads (and observes), the same way the slider commits.
+     */
+    private fun restoreBrightness(panel: Panel) {
+        val key = keyOf(panel)
+        val saved = prefs.getFloat(key, Float.NaN)
+        prefs.edit().remove(key).apply()
+        val id = displayOf(panel)?.displayId ?: return
+        if (!ScreenModePlan.isRestorable(saved)) return
+        privileged.setDisplayBrightness(id, saved, false)
+        if (panel == Panel.TOP) settings.putInt(Keys.SCREEN_BRIGHTNESS, ScreenModePlan.toScreenBrightnessSetting(saved))
     }
 
-    /** Restores the display to the brightness captured before blanking (defaults to full if nothing was saved). */
-    private fun restoreBrightness(display: android.view.Display?, prefKey: String) {
-        val id = display?.displayId ?: return
-        val saved = prefs.getFloat(prefKey, 1f)
-        if (saved > MIN_LIT_BRIGHTNESS && saved <= 1f) {
-            privileged.setDisplayBrightness(id, saved, false)
+    /**
+     * One-time move off the old keys, whose saved levels were never cleared (so every start in dual restored them).
+     * Only the panel that is blanked right now keeps its old level, and only if it isn't lit.
+     */
+    private fun migrateLegacyState(mode: Int) {
+        if (prefs.getBoolean(KEY_STATE_V2, false)) return
+        val edit = prefs.edit()
+        val blanked = when (mode) {
+            1 -> Panel.BOTTOM
+            2 -> Panel.TOP
+            else -> null
         }
+        if (blanked != null) {
+            val legacy = prefs.getFloat(legacyKeyOf(blanked), Float.NaN)
+            val current = displayOf(blanked)?.displayId?.let { privileged.getDisplayBrightness(it) }
+            if (ScreenModePlan.isRestorable(legacy) && !ScreenModePlan.isRestorable(current)) {
+                edit.putFloat(keyOf(blanked), legacy)
+            }
+            if (prefs.contains(KEY_FOCUS_LOCK)) edit.putBoolean(KEY_FOCUS_SAVED, true)
+        }
+        edit.remove(legacyKeyOf(Panel.BOTTOM)).remove(legacyKeyOf(Panel.TOP)).putBoolean(KEY_STATE_V2, true).apply()
+    }
+
+    private fun displayOf(panel: Panel) = when (panel) {
+        Panel.TOP -> topology.topDisplay
+        Panel.BOTTOM -> topology.bottomDisplay
+    }
+
+    private fun keyOf(panel: Panel) = when (panel) {
+        Panel.TOP -> KEY_BLANKED_TOP
+        Panel.BOTTOM -> KEY_BLANKED_BOTTOM
+    }
+
+    private fun legacyKeyOf(panel: Panel) = when (panel) {
+        Panel.TOP -> "saved_brightness_top"
+        Panel.BOTTOM -> "saved_brightness_bottom"
     }
 
     private fun setTouch(value: String) {
@@ -190,7 +253,7 @@ class ScreenModeController(
             dimAmount = 0f
         }
         return runCatching { wm.addView(view, lp); view }
-            .onFailure { android.util.Log.w("ScreenModeController", "cover addView failed on display ${display.displayId}", it) }
+            .onFailure { Log.w(TAG, "cover addView failed on display ${display.displayId}", it) }
             .getOrNull()
     }
 
@@ -202,9 +265,15 @@ class ScreenModeController(
     }
 
     private companion object {
-        /** Below this, a saved brightness is treated as "already off" and not used as a restore target. */
-        const val MIN_LIT_BRIGHTNESS = 0.01f
-        const val KEY_BRIGHTNESS_BOTTOM = "saved_brightness_bottom"
-        const val KEY_BRIGHTNESS_TOP = "saved_brightness_top"
+        const val TAG = "ScreenModeController"
+        const val RESTORE_NOTIFY_DELAY_MS = 300L
+        /** Present only while we hold that panel's backlight at 0; the value is the level to restore. */
+        const val KEY_BLANKED_BOTTOM = "blanked_brightness_bottom"
+        const val KEY_BLANKED_TOP = "blanked_brightness_top"
+        /** True only while the focus-lock settings hold our single-screen values. */
+        const val KEY_FOCUS_SAVED = "focus_lock_saved"
+        const val KEY_FOCUS_LOCK = "saved_focus_lock"
+        const val KEY_SYS_KEY_LOCK = "saved_sys_key_lock"
+        const val KEY_STATE_V2 = "screen_mode_state_v2"
     }
 }

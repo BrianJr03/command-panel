@@ -132,7 +132,11 @@ class AssistantService : Service() {
         isRunning = true
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
-        screenMode = ScreenModeController(applicationContext, privileged, onHideOverlay = { overlay.hide() })
+        screenMode = ScreenModeController(
+            applicationContext, privileged,
+            onHideOverlay = { overlay.hide() },
+            onBrightnessRestored = { repository.refresh() },
+        )
         repository.onHideOverlay = { overlay.hide() }
         coexistence = StockCoexistence(applicationContext, privileged, scope)
         tapWaker = ExternalDisplayTapWaker(applicationContext, privileged, scope)

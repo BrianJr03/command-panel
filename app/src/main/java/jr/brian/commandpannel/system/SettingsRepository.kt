@@ -124,6 +124,12 @@ class SettingsRepository(
 
     // ---- reads ----
 
+    /**
+     * Re-reads everything, for changes nothing observes: the bottom panel's brightness has no setting behind it, so
+     * the screen-mode controller calls this after restoring a panel it had blanked.
+     */
+    fun refresh() = refreshFromSettings()
+
     private fun refreshFromSettings() {
         val mode = settings.getInt(Keys.DISPLAY_MODE, 0)
         val focus = settings.getInt(Keys.FOCUS_LOCK, 0)
