@@ -349,6 +349,19 @@ internal fun FocusRow(
     )
 }
 
+/** A focusable switch row inside a card (several toggles sharing one card); A or a tap flips it. */
+@Composable
+internal fun SwitchRow(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    FocusRow(selected = false, onClick = { onChange(!checked) }) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle())
+            CardDesc(description)
+        }
+        Spacer(Modifier.width(16.dp))
+        AccentSwitch(checked, onChange)
+    }
+}
+
 @Composable
 internal fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     FocusRow(selected, onClick) {

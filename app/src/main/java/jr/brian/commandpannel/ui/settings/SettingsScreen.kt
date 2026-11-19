@@ -161,6 +161,7 @@ internal fun SettingsContent(
     // from BDSA's app).
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         vm.refreshBdsa()
+        vm.refreshSaveClip()
         onPauseOrDispose { }
     }
     val scroll = rememberScrollState()
@@ -485,24 +486,26 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         state.replayEnabled, vm::setReplayEnabled,
         Modifier.tourTarget(TourSpot.REPLAY),
     )
-    SwitchCard(
-        stringResource(R.string.settings_replay_double_press),
-        stringResource(R.string.settings_replay_double_press_desc),
-        state.replayDoublePress, vm::setReplayDoublePress,
-        Modifier.tourTarget(TourSpot.REPLAY),
-    )
-    SwitchCard(
-        stringResource(R.string.settings_replay_game_audio),
-        stringResource(R.string.settings_replay_game_audio_desc),
-        state.replayGameAudio, vm::setReplayGameAudio,
-        Modifier.tourTarget(TourSpot.REPLAY),
-    )
-    SwitchCard(
-        stringResource(R.string.settings_replay_mic),
-        stringResource(R.string.settings_replay_mic_desc),
-        state.replayMic, vm::setReplayMic,
-        Modifier.tourTarget(TourSpot.REPLAY),
-    )
+    Card(Modifier.tourTarget(TourSpot.REPLAY)) {
+        CardTitle(stringResource(R.string.settings_replay_options))
+        Spacer(Modifier.height(6.dp))
+        SwitchRow(
+            stringResource(R.string.settings_replay_double_press),
+            stringResource(R.string.settings_replay_double_press_desc),
+            state.replayDoublePress, vm::setReplayDoublePress,
+        )
+        SwitchRow(
+            stringResource(R.string.settings_replay_game_audio),
+            stringResource(R.string.settings_replay_game_audio_desc),
+            state.replayGameAudio, vm::setReplayGameAudio,
+        )
+        SwitchRow(
+            stringResource(R.string.settings_replay_mic),
+            stringResource(R.string.settings_replay_mic_desc),
+            state.replayMic, vm::setReplayMic,
+        )
+    }
+    SaveClipCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_capture))
         Spacer(Modifier.height(10.dp))
@@ -541,6 +544,48 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
         Spacer(Modifier.height(12.dp))
         AccentButton(stringResource(R.string.settings_replay_save_now), enabled = state.replayEnabled, onClick = vm::saveReplayClip)
         state.replayMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
+    }
+}
+
+/**
+ * TCP Save Clip, the trigger app Back Button Hero launches to save a clip: whether it's installed and paired with this
+ * build, and an Install / Reinstall button that fetches the one from this version's release. Debug builds pair only
+ * with a locally built trigger (signature permission), so they get a note instead of the button.
+ */
+@Composable
+private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
+    Card(Modifier.tourTarget(TourSpot.SAVE_CLIP)) {
+        CardTitle(stringResource(R.string.settings_save_clip_title))
+        CardDesc(stringResource(R.string.settings_save_clip_desc))
+        Spacer(Modifier.height(10.dp))
+        val status = state.saveClip
+        val (line, tone) = when (status) {
+            is jr.brian.commandpannel.system.update.SaveClipStatus.Ready ->
+                stringResource(R.string.settings_save_clip_ready, status.version) to p.accent
+            is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission ->
+                stringResource(R.string.settings_save_clip_no_permission) to p.textPrimary
+            jr.brian.commandpannel.system.update.SaveClipStatus.Missing ->
+                stringResource(R.string.settings_save_clip_missing) to p.textSecondary
+        }
+        Text(line, color = tone, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle())
+        if (BuildConfig.DEBUG) {
+            Spacer(Modifier.height(6.dp))
+            InfoLine(stringResource(R.string.settings_save_clip_debug_note))
+        } else if (status !is jr.brian.commandpannel.system.update.SaveClipStatus.Ready) {
+            Spacer(Modifier.height(10.dp))
+            // Stays enabled while busy (a disabled button drops gamepad focus); installSaveClip ignores repeats.
+            AccentButton(
+                stringResource(
+                    when {
+                        state.saveClipBusy -> R.string.settings_save_clip_installing
+                        status is jr.brian.commandpannel.system.update.SaveClipStatus.NoPermission -> R.string.settings_save_clip_reinstall
+                        else -> R.string.settings_save_clip_install
+                    },
+                ),
+                onClick = vm::installSaveClip,
+            )
+        }
+        state.saveClipMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
 }
 
