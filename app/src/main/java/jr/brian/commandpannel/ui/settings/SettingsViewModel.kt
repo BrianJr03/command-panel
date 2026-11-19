@@ -116,6 +116,8 @@ data class SettingsState(
     val replayMessage: String? = null,
     val replayTarget: jr.brian.commandpannel.privileged.ReplayTarget = jr.brian.commandpannel.privileged.ReplayTarget.DEFAULT,
     val replayDoublePress: Boolean = false,
+    val replayGameAudio: Boolean = true,
+    val replayMic: Boolean = false,
     /** Custom clips folder relative to internal storage, or `null` for the default (TCP Clips). */
     val replayClipsDir: String? = null,
     val appPickerOpen: Boolean = false,
@@ -177,6 +179,8 @@ class SettingsViewModel @Inject constructor(
         replayPreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.fromKey(prefs.getString("replay_bitrate", null)),
         replayTarget = jr.brian.commandpannel.privileged.ReplayTarget.fromKey(prefs.getString("replay_target", null)),
         replayDoublePress = prefs.getBoolean(AssistantService.PREF_DOUBLE_PRESS_REPLAY, false),
+        replayGameAudio = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_GAME_AUDIO, true),
+        replayMic = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_MIC, false),
         replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
     )
@@ -223,6 +227,16 @@ class SettingsViewModel @Inject constructor(
     fun setReplayPreset(preset: jr.brian.commandpannel.privileged.ReplayBitratePreset) {
         prefs.edit().putString("replay_bitrate", preset.key).apply()
         _state.value = _state.value.copy(replayPreset = preset, replayMessage = replaySettingMessage())
+    }
+
+    fun setReplayGameAudio(enable: Boolean) {
+        prefs.edit().putBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_GAME_AUDIO, enable).apply()
+        _state.value = _state.value.copy(replayGameAudio = enable, replayMessage = replaySettingMessage())
+    }
+
+    fun setReplayMic(enable: Boolean) {
+        prefs.edit().putBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_MIC, enable).apply()
+        _state.value = _state.value.copy(replayMic = enable, replayMessage = replaySettingMessage())
     }
 
     fun setReplayTarget(target: jr.brian.commandpannel.privileged.ReplayTarget) {

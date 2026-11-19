@@ -62,4 +62,13 @@ interface IRootHelper {
      * displays can be captured at once (v6). stopDisplayMirror tears all of them down.
      */
     boolean addDisplayMirror(in Surface surface, int layerStack, int srcW, int srcH, int dstW, int dstH);
+
+    /**
+     * Streams 48 kHz 16-bit stereo PCM into [sink] (v7): game audio (what apps play, still heard on the speakers)
+     * and/or the mic, mixed. False if no requested source opened. Only the app's uid (or root) may call it.
+     */
+    boolean startAudioCapture(in ParcelFileDescriptor sink, boolean game, boolean mic);
+
+    /** Stops startAudioCapture and closes its stream (v7). */
+    void stopAudioCapture();
 }

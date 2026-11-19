@@ -3,6 +3,7 @@ package jr.brian.commandpannel.system
 import android.content.Context
 import android.util.Log
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.ReplayAudio
 import jr.brian.commandpannel.privileged.ReplayBitratePreset
 import jr.brian.commandpannel.privileged.ReplayCaptureEngine
 import jr.brian.commandpannel.privileged.ReplayTarget
@@ -37,6 +38,11 @@ class ReplayBufferController(
 
     private fun target(): ReplayTarget = ReplayTarget.fromKey(prefs.getString("replay_target", null))
 
+    private fun sound(): ReplayAudio = ReplayAudio(
+        game = prefs.getBoolean(PREF_GAME_AUDIO, true),
+        mic = prefs.getBoolean(PREF_MIC, false),
+    )
+
     /**
      * The clips folder: the user's custom folder while it still exists, else TCP Clips. A custom folder deleted outside
      * the app is dropped (pref cleared) rather than silently recreated. If the check itself fails, the folder is kept.
@@ -65,7 +71,7 @@ class ReplayBufferController(
         applyEnabledState()
     }
 
-    fun arm(): Boolean = engine.start(windowSeconds(), preset(), target())
+    fun arm(): Boolean = engine.start(windowSeconds(), preset(), target(), sound())
 
     fun disarm() = engine.stop()
 
@@ -97,7 +103,7 @@ class ReplayBufferController(
             }
             is ReplayRingBuffer.Slice.Clip -> {
                 val tmp = File(context.cacheDir, "replay_tmp.mp4")
-                if (!ReplayClipWriter.write(slice, format, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
+                if (!ReplayClipWriter.write(slice, format, engine.audioFormat, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 val dir = clipsRelativeDir()
                 val path = ScreenRecorderEngine.buildReplayClipPath(
                     targetMode = engine.target.mode,
@@ -116,5 +122,10 @@ class ReplayBufferController(
                 return path
             }
         }
+    }
+
+    companion object {
+        const val PREF_GAME_AUDIO = "replay_game_audio"
+        const val PREF_MIC = "replay_mic"
     }
 }
