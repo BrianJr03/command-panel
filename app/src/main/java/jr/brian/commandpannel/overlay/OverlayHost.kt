@@ -45,6 +45,8 @@ val LocalOverlayWindowBlur = staticCompositionLocalOf<OverlayWindowBlur?> { null
  * the stock app's `TYPE_BOOT_PROGRESS` (2021) is denied. `FLAG_LAYOUT_NO_LIMITS` is never set (it would lay the
  * surface out at the top display's width and clip the right edge). `WindowManagerService` ignores window animations
  * for a non-system overlay, so show/hide is animated on the view (200 ms slide + fade), matching stock's feel.
+ * `FLAG_ALT_FOCUSABLE_IM` (set by stock too) keeps the soft keyboard above the panel: a window that is only
+ * `FLAG_NOT_FOCUSABLE` is Z-ordered over the input method and would cover a game's keyboard.
  *
  * All window mutations run on the main thread.
  */
@@ -92,7 +94,7 @@ class OverlayHost(
         val lp = WindowManager.LayoutParams(
             size.x, size.y,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.CENTER
