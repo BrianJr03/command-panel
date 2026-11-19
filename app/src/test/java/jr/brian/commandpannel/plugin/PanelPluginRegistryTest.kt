@@ -50,4 +50,39 @@ class PanelPluginRegistryTest {
         ) { true }
         assertEquals(listOf("a.pkg/.One v1", "a.pkg/.Two v1", "z.pkg/.Svc v1"), keys(found))
     }
+
+    @Test
+    fun `a trusted plugin declaring a future or no version gets no tile`() {
+        val asked = mutableListOf<String>()
+        val found = PanelPluginRegistry.select(
+            listOf(
+                candidate("jr.brian.thorkbm", version = 2),
+                candidate("jr.brian.thorkbm", cls = ".Str", version = "2"),
+                candidate("jr.brian.thorkbm", cls = ".None", version = null),
+                candidate("jr.brian.thorkbm", cls = ".Zero", version = 0),
+            ),
+        ) { asked += it; true }
+        assertEquals(emptyList<String>(), keys(found))
+        assertEquals(emptyList<String>(), asked)
+    }
+
+    @Test
+    fun `only the usable service of a package with several versions is listed`() {
+        // The fake plugin's layout: one v1 service, one declaring v2, one with no version.
+        val pkg = "jr.brian.commandpanel.fakeplugin"
+        val found = PanelPluginRegistry.select(
+            listOf(
+                candidate(pkg, cls = ".FutureVersionService", version = 2, label = "Fake plugin (v2)"),
+                candidate(pkg, cls = ".NoVersionService", version = null, label = "Fake plugin (no version)"),
+                candidate(pkg, cls = ".FakePluginService", version = 1, label = "Fake plugin"),
+            ),
+        ) { true }
+        assertEquals(listOf("$pkg/.FakePluginService v1"), keys(found))
+    }
+
+    @Test
+    fun `an untrusted plugin with a future version is dropped either way`() {
+        val found = PanelPluginRegistry.select(listOf(candidate("evil.app", version = 2))) { false }
+        assertEquals(emptyList<String>(), keys(found))
+    }
 }

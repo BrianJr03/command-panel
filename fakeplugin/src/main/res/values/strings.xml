@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CP Fake Plugin</string>
+    <string name="plugin_label">Fake plugin</string>
+    <string name="plugin_label_future">Fake plugin (v2)</string>
+    <string name="plugin_label_no_version">Fake plugin (no version)</string>
+    <!-- On the fake plugin's bottom-screen window. -->
+    <string name="overlay_label">Fake plugin\n%1$s mode\ndisplay %2$d</string>
+</resources>

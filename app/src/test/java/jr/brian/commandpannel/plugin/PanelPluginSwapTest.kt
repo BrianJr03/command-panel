@@ -156,6 +156,78 @@ class PanelPluginSwapTest {
         assertEquals(emptyList<Effect>(), swap.end(EndReason.AYN_PRESS))
     }
 
+    @Test
+    fun `MSG_CLOSED while waiting for MSG_SHOWN keeps the panel and hides the plugin`() {
+        swap.start(kbm, 1)
+        val id = swap.sessionId
+        swap.onConnected(id)
+        assertEquals(listOf(Effect.ShowPanel, Effect.SendHide, Effect.Unbind), swap.onClosed(id))
+        assertEquals(Phase.IDLE, swap.phase)
+        assertEquals(null, swap.nextDeadline)
+        assertEquals(emptyList<Effect>(), swap.onShown(id))
+        assertEquals(Owner.Panel, swap.owner)
+    }
+
+    @Test
+    fun `a plugin that dies before MSG_SHOWN gets no MSG_HIDE and the panel stays`() {
+        swap.start(kbm, 1)
+        val id = swap.sessionId
+        swap.onConnected(id)
+        assertEquals(listOf(Effect.ShowPanel, Effect.Unbind), swap.onDied(id))
+        assertEquals(Owner.Panel, swap.owner)
+    }
+
+    @Test
+    fun `a second start while active is ignored and the plugin keeps the bottom screen`() {
+        val id = active()
+        assertEquals(emptyList<Effect>(), swap.start("other/.Svc", 1))
+        assertEquals(id, swap.sessionId)
+        assertEquals(Phase.ACTIVE, swap.phase)
+        assertEquals(Owner.Plugin(kbm), swap.owner)
+    }
+
+    @Test
+    fun `an AYN press while binding drops the session without MSG_HIDE`() {
+        swap.start(kbm, 1)
+        val id = swap.sessionId
+        assertEquals(listOf(Effect.ShowPanel, Effect.Unbind), swap.end(EndReason.AYN_PRESS))
+        assertEquals(Phase.IDLE, swap.phase)
+        assertEquals(null, swap.nextDeadline)
+        // The connection that lands after the press is from a dead session.
+        assertEquals(emptyList<Effect>(), swap.onConnected(id))
+        clock += PanelPluginSwap.BIND_TIMEOUT_MS
+        assertEquals(emptyList<Effect>(), swap.onTick())
+    }
+
+    @Test
+    fun `a late MSG_SHOWN from a timed-out session doesn't hide the panel during the next one`() {
+        swap.start(kbm, 1)
+        val old = swap.sessionId
+        swap.onConnected(old)
+        clock += PanelPluginContract.SHOWN_TIMEOUT_MS
+        swap.onTick()
+        swap.start(kbm, 1)
+        val current = swap.sessionId
+        swap.onConnected(current)
+        clock += 1_000 // the old session's MSG_SHOWN arrives about 4 s after its MSG_SHOW
+        assertEquals(emptyList<Effect>(), swap.onShown(old))
+        assertEquals(Phase.SHOWING, swap.phase)
+        assertEquals(Owner.Panel, swap.owner)
+        assertEquals(listOf(Effect.HidePanel), swap.onShown(current))
+    }
+
+    @Test
+    fun `the shown timeout starts at the connection, not at the start`() {
+        swap.start(kbm, 1)
+        clock += PanelPluginSwap.BIND_TIMEOUT_MS - 1
+        swap.onConnected(swap.sessionId)
+        clock += PanelPluginContract.SHOWN_TIMEOUT_MS - 1
+        assertEquals(emptyList<Effect>(), swap.onTick())
+        assertEquals(Phase.SHOWING, swap.phase)
+        clock += 1
+        assertEquals(listOf(Effect.ShowPanel, Effect.SendHide, Effect.Unbind), swap.onTick())
+    }
+
     // ---- owner rules ----
 
     @Test

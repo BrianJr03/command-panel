@@ -25,3 +25,5 @@ include(":app")
 include(":probe")
 // TCP Save Clip: a launcher-only app that asks Command Panel to save a replay (for Back Button Hero's "Launch app").
 include(":trigger")
+// Fake Panel plugin for scripts/verify-plugin.sh. Debug-only test tool, never part of a release.
+include(":fakeplugin")

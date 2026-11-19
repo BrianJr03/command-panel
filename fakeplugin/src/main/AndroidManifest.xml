@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Its UI is a TYPE_APPLICATION_OVERLAY window; scripts grant it with `appops set ... SYSTEM_ALERT_WINDOW allow`. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- To check that messages come from Command Panel (Message.sendingUid). -->
+    <queries>
+        <package android:name="jr.brian.commandpannel" />
+        <package android:name="jr.brian.commandpannel.debug" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+
+        <!-- The plugin Command Panel lists (if it trusted the key): contract version 1. Its behavior is the mode. -->
+        <service
+            android:name=".FakePluginService"
+            android:exported="true"
+            android:label="@string/plugin_label">
+            <intent-filter>
+                <action android:name="jr.brian.commandpanel.plugin.action.PANEL_PLUGIN" />
+            </intent-filter>
+            <meta-data
+                android:name="jr.brian.commandpanel.plugin.VERSION"
+                android:value="1" />
+        </service>
+
+        <!-- Same plugin, declaring a contract version newer than Command Panel speaks: must never be listed or started. -->
+        <service
+            android:name=".FutureVersionService"
+            android:exported="true"
+            android:label="@string/plugin_label_future">
+            <intent-filter>
+                <action android:name="jr.brian.commandpanel.plugin.action.PANEL_PLUGIN" />
+            </intent-filter>
+            <meta-data
+                android:name="jr.brian.commandpanel.plugin.VERSION"
+                android:value="2" />
+        </service>
+
+        <!-- Same plugin with no version meta-data: must never be listed or started. -->
+        <service
+            android:name=".NoVersionService"
+            android:exported="true"
+            android:label="@string/plugin_label_no_version">
+            <intent-filter>
+                <action android:name="jr.brian.commandpanel.plugin.action.PANEL_PLUGIN" />
+            </intent-filter>
+        </service>
+
+        <!-- Sets the mode from adb; the command line is in ModeReceiver's doc comment. -->
+        <receiver
+            android:name=".ModeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="jr.brian.commandpanel.fakeplugin.action.SET_MODE" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
