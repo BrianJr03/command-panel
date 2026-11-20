@@ -46,6 +46,7 @@ internal fun ReplaySourceScreenCard() {
     FocusCard(
         onActivate = { set(!on) },
         modifier = Modifier
+            .tourTarget(TourSpot.REPLAY_STUDIO)
             .newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_SOURCE_SCREEN)
             .newCornerDot(isNew, p.accent, p.bg)
             .noRippleClickable { set(!on) },

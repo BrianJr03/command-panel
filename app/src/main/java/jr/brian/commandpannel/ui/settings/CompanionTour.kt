@@ -102,7 +102,10 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     /** The header of the group holding the selected section. */
     RAIL_GROUP(false),
     RAIL_GENERAL(false), RAIL_NAV_BAR(false), RAIL_TILES(false), RAIL_APPEARANCE(false), RAIL_THEMES(false), RAIL_REPLAY(false), RAIL_KEYBOARD(false), RAIL_DIAGNOSTICS(false), RAIL_EXPERIMENTAL(false),
-    REPLACE_STOCK, OVERLAY_EXTRAS, BACKUP, UPDATES, REPLAY, SAVE_CLIP, PREVIEW,
+    REPLACE_STOCK, OVERLAY_EXTRAS, SHOW_NEW_DOTS, BACKUP, UPDATES, PREVIEW,
+    /** The Replay Studio card that leads Replay, with the "Play on the recorded screen" card under it. */
+    REPLAY_STUDIO, REPLAY, SAVE_CLIP,
+    THORKBM,
     BUTTON_ORDER, QUICK_LAUNCH,
     TILE_LABELS, TILE_ORDER, TILE_PICKER,
     OVERLAY_THEME, FOLLOW_LOOK, RGB_ACCENT,
@@ -152,7 +155,9 @@ internal val TOUR_STEPS: List<TourStep> = run {
     val appearance = SettingsCategory.APPEARANCE
     val themes = SettingsCategory.THEMES
     val replay = SettingsCategory.REPLAY
+    val keyboard = SettingsCategory.KEYBOARD
     val diagnostics = SettingsCategory.DIAGNOSTICS
+    val experimental = SettingsCategory.EXPERIMENTAL
     listOf(
         TourStep(null, null, R.string.tour_welcome_title, R.string.tour_welcome_body),
         TourStep(general, TourSpot.RAIL, R.string.tour_rail_title, R.string.tour_rail_body),
@@ -160,6 +165,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
         sectionIntro(general, R.string.tour_general_body),
         TourStep(general, TourSpot.REPLACE_STOCK, R.string.settings_replace_stock, R.string.tour_replace_stock_body),
         TourStep(general, TourSpot.OVERLAY_EXTRAS, R.string.tour_overlay_extras_title, R.string.tour_overlay_extras_body),
+        TourStep(general, TourSpot.SHOW_NEW_DOTS, R.string.settings_show_new_dots, R.string.tour_show_new_dots_body),
         TourStep(general, TourSpot.BACKUP, R.string.settings_backup_title, R.string.tour_backup_body),
         TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
         TourStep(general, TourSpot.PREVIEW, R.string.settings_preview_title, R.string.tour_preview_body),
@@ -197,11 +203,17 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(themes, TourSpot.BUILTIN, R.string.theme_builtin, R.string.tour_builtin_body),
 
         sectionIntro(replay, R.string.tour_replay_section_body),
+        TourStep(replay, TourSpot.REPLAY_STUDIO, R.string.settings_replay_studio, R.string.tour_replay_studio_body),
         TourStep(replay, TourSpot.SAVE_CLIP, R.string.settings_save_clip_title, R.string.tour_save_clip_body),
         TourStep(replay, TourSpot.REPLAY, R.string.tile_name_replay_buffer, R.string.tour_replay_body),
 
+        sectionIntro(keyboard, R.string.tour_keyboard_body),
+        TourStep(keyboard, TourSpot.THORKBM, R.string.settings_thorkbm_title, R.string.tour_thorkbm_body),
+
         sectionIntro(diagnostics, R.string.tour_diagnostics_body),
         TourStep(diagnostics, TourSpot.PRIVILEGED, R.string.settings_privileged_layer, R.string.tour_privileged_body),
+
+        sectionIntro(experimental, R.string.tour_experimental_body),
 
         TourStep(general, TourSpot.TOUR_REPLAY, R.string.tour_finish_title, R.string.tour_finish_body),
     )

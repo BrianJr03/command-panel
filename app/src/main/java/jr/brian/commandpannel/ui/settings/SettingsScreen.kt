@@ -912,6 +912,7 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.settings_show_new_dots),
         stringResource(R.string.settings_show_new_dots_desc),
         state.showNewDots, vm::setShowNewDots,
+        Modifier.tourTarget(TourSpot.SHOW_NEW_DOTS),
     )
     Card(Modifier.tourTarget(TourSpot.BACKUP)) {
         CardTitle(stringResource(R.string.settings_backup_title))
@@ -1040,7 +1041,8 @@ private fun ReplayAutoDeleteCard(
     val isNew = LocalNewBadges.current.state.cardNew(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_AUTO_DELETE)
     val title = stringResource(R.string.settings_replay_autodelete)
     Card(
-        Modifier.newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_AUTO_DELETE).newCornerDot(isNew, p.accent, p.bg),
+        Modifier.tourTarget(TourSpot.REPLAY)
+            .newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_AUTO_DELETE).newCornerDot(isNew, p.accent, p.bg),
     ) {
         // In a Box, so the zero-size label (the corner dot, described for TalkBack) adds no gap to the card's column.
         Box {
@@ -1148,7 +1150,8 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
 private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
     val isNew = LocalNewBadges.current.state.cardNew(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM)
     Card(
-        Modifier.newCard(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM).newCornerDot(isNew, p.accent, p.bg),
+        Modifier.tourTarget(TourSpot.THORKBM)
+            .newCard(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM).newCornerDot(isNew, p.accent, p.bg),
     ) {
         // The preview sits beside the details so the whole card fits on the top screen; on a card too narrow for that
         // (a wide look, a big font scale) it goes above them instead of squeezing the text.

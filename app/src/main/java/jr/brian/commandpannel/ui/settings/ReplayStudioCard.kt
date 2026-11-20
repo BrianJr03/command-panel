@@ -80,7 +80,8 @@ internal fun ReplayStudioCard(
         stringResource(R.string.settings_replay_studio_a11y_status, title)
     }
     Card(
-        Modifier.newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO).newCornerDot(isNew, p.accent, p.bg),
+        Modifier.tourTarget(TourSpot.REPLAY_STUDIO)
+            .newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO).newCornerDot(isNew, p.accent, p.bg),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             StudioPreview(summary)
