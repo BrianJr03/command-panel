@@ -39,6 +39,18 @@ class OverlayWindowBlur internal constructor(private val onRequest: (Float?) -> 
 val LocalOverlayWindowBlur = staticCompositionLocalOf<OverlayWindowBlur?> { null }
 
 /**
+ * Whether the panel is fully shown: true from the end of its show animation until a hide starts. Separate surfaces
+ * (a GIF background's, #60) don't follow the window's fade and slide, so they only show while it's settled. Not
+ * provided outside the overlay window (previews draw everything in their own window).
+ */
+class OverlayPanelSettled internal constructor() {
+    var value by mutableStateOf(false)
+        internal set
+}
+
+val LocalOverlayPanelSettled = staticCompositionLocalOf<OverlayPanelSettled?> { null }
+
+/**
  * Owns the bottom-screen overlay window: a `ComposeView` attached to the bottom display's `WindowManager`.
  *
  * Window type is `TYPE_APPLICATION_OVERLAY` (2038) — the probe confirmed a user app may add it on display 4, while
@@ -65,6 +77,7 @@ class OverlayHost(
     private var blurRadiusDp: Float? = null
     private val blur = OverlayWindowBlur { radiusDp -> onMain { blurRadiusDp = radiusDp; applyBlur() } }
     private val blurEnabledListener = Consumer<Boolean> { applyBlur() }
+    private val settled = OverlayPanelSettled()
 
     @Volatile
     var isShowing = false
@@ -102,7 +115,11 @@ class OverlayHost(
             setViewTreeLifecycleOwner(owner)
             setViewTreeViewModelStoreOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
-            setContent { CompositionLocalProvider(LocalOverlayWindowBlur provides blur) { content(::hide) } }
+            setContent {
+                CompositionLocalProvider(LocalOverlayWindowBlur provides blur, LocalOverlayPanelSettled provides settled) {
+                    content(::hide)
+                }
+            }
             alpha = 0f
             translationY = size.y * SLIDE_FRACTION
         }
@@ -140,6 +157,7 @@ class OverlayHost(
             .withEndAction {
                 // Not run if a hide cancels the animation; hide flushes instead.
                 fadingIn = false
+                settled.value = true
                 pendingVisible.flush()
             }
             .start()
@@ -150,6 +168,7 @@ class OverlayHost(
         val owner = lifecycleOwner
         isShowing = false
         fadingIn = false
+        settled.value = false
         onVisibilityChanged(false)
         // Hidden before it finished fading in: nobody should keep waiting for it.
         pendingVisible.flush()
@@ -172,6 +191,7 @@ class OverlayHost(
     fun destroy() = onMain {
         if (isShowing) onVisibilityChanged(false)
         fadingIn = false
+        settled.value = false
         pendingVisible.flush()
         composeView?.let { view ->
             releaseBlur(view)

@@ -16,6 +16,10 @@
 #   - JPG: EXIF rotation applied (left edge yellow, right edge blue), cropped to fill;
 #   - GIF: imported as animated; it animates while shown, at no more than about 30 fps (frames / ms from the
 #     "animation stopped" log line); decoding stops when the panel hides (log line, no frames while hidden);
+#   - GIF on its own surface (#60): it moves onto a SurfaceView layer once the panel is shown, the panel window
+#     doesn't repaint per frame, it plays at 20 fps or more on the surface, it leaves the surface as the hide starts
+#     (before the panel goes away) and no surface layer is left while hidden; per-thread CPU (top -H) and
+#     SurfaceFlinger's CPU for a GIF and a PNG go to numbers.txt;
 #   - limits: an animation over twice the screen is refused; a still photo over it is downscaled on import, to the
 #     smallest size that still covers twice the screen;
 #   - tile (#58): off shows the backdrop (red gone) and stops a GIF; on brings the image back; the pref flips;
@@ -119,6 +123,24 @@ measure() {
   note "$label: frames in 5 s = $f, CPU = ${c:-?}%, PSS = ${m:-?} kB"
   LAST_FRAMES="$f"
 }
+# The app's busiest threads (top -H, second 5 s sample) and SurfaceFlinger's CPU, into numbers.txt (#60).
+threads() {
+  local label="$1" pid out n sf
+  pid="$(sh_dev pidof "$PKG")"; [ -n "$pid" ] || return 0
+  out="$(sh_dev top -H -b -q -n 2 -d 5 -p "$pid" -o %CPU,CMD)"; n="$(echo "$out" | wc -l)"
+  note "$label: threads (% of a core): $(echo "$out" | tail -n $((n / 2)) | sort -rn | head -6 | awk '{ printf "%s %s, ", $2, $1 }')"
+  sf="$(sh_dev pidof surfaceflinger)"
+  [ -n "$sf" ] && note "$label: SurfaceFlinger CPU = $(sh_dev top -b -q -n 2 -d 5 -p "$sf" -o %CPU | tail -1 | xargs)%"
+}
+# The GIF's own surface (#60) in SurfaceFlinger's layer list. A SurfaceView layer is named after its window's title,
+# and the panel window has none, so it is "SurfaceView[]#<id>" (apps' own SurfaceViews carry their activity's name).
+surface_layers() { sh_dev dumpsys SurfaceFlinger --list | grep -c '^SurfaceView\[\]#'; }
+# Frames per second the player drew onto its surface, from the last "animation stopped" line.
+last_surface_fps() {
+  log_read
+  echo "$LOG" | grep "animation stopped" | tail -1 | sed -E 's/.* ms=([0-9]+).*surfaceFrames=([0-9]+).*/\2 \1/' |
+    awk '$2 > 0 { printf "%.1f", $1 * 1000 / $2 }'
+}
 
 # Bottom screen screenshot to $OUT_DIR/$1.png, and mean "R G B" of its left or right edge strip (8 px, middle half).
 shot() { adb exec-out screencap -d "$BOTTOM_PHYSICAL" -p > "$OUT_DIR/$1.png" 2>/dev/null; echo "  screenshot: $OUT_DIR/$1.png"; }
@@ -215,6 +237,8 @@ show_panel; check "panel shown on the bottom screen" test "$(panel_windows)" -ge
 shot png-shown
 rgb="$(edge_rgb png-shown left)"; check "left edge is red (RGB $rgb)" is_red "$rgb"
 measure "PNG shown"
+threads "PNG shown"
+check "a still image stays in the panel window (no surface)" test "$(surface_layers)" -eq 0
 hide_panel; check "panel hidden" test "$(panel_windows)" -eq 0
 measure "PNG hidden"
 
@@ -239,15 +263,29 @@ check "stored as an animation" log_has "animated=true"
 log_clear
 show_panel
 check "animation started when the panel showed" wait_for 5 'log_has "animation started"'
+# Once the show animation ends, the GIF moves onto its own surface under the panel (#60).
+check "the GIF moved onto its own surface once the panel was shown" wait_for 5 'log_has "surface attached"'
+check "its surface layer is up" wait_for 3 '[ "$(surface_layers)" -ge 1 ]'
 shot gif-a; sleep 0.7; shot gif-b
 check "frames change while shown" differs gif-a gif-b
 measure "GIF shown"
-check "it renders while shown (>= 40 frames in 5 s)" test "${LAST_FRAMES:-0}" -ge 40
-check "no more than about 30 fps of rendering (<= 175 frames in 5 s)" test "${LAST_FRAMES:-999}" -le 175
+# The panel window only repaints for its own updates (clock, readouts), not per GIF frame.
+check "the panel window doesn't repaint per frame (${LAST_FRAMES:-?} window frames in 5 s)" test "${LAST_FRAMES:-999}" -le 20
+threads "GIF shown"
+log_clear
 hide_panel
+# The image follows the panel out: off the surface when the hide starts, then the surface is gone.
+check "the GIF left its surface when the panel hid" wait_for 5 'log_has "surface detached"'
 check "animation stopped when the panel hid" wait_for 5 'log_has "animation stopped"'
-fps="$(last_fps)"; note "GIF playback: ${fps:-?} fps (source 50 fps)"
+log_read
+detach_line="$(echo "$LOG" | grep -n "surface detached" | head -1 | cut -d: -f1)"
+stop_line="$(echo "$LOG" | grep -n "animation stopped" | head -1 | cut -d: -f1)"
+check "it left the surface before the panel went away" test "${detach_line:-99}" -lt "${stop_line:-0}"
+check "no surface layer left while hidden" test "$(surface_layers)" -eq 0
+fps="$(last_fps)"; sfps="$(last_surface_fps)"
+note "GIF playback: ${fps:-?} fps drawn, ${sfps:-?} fps onto the surface (source 50 fps)"
 check "playback capped at 30 fps (${fps:-?} fps)" fps_capped "$fps"
+check "it really plays on the surface (${sfps:-?} fps, at least 20)" awk -v f="$sfps" 'BEGIN { exit !(f != "" && f >= 20) }'
 log_clear
 measure "GIF hidden"
 check "no frames while hidden (${LAST_FRAMES:-?} in 5 s)" test "${LAST_FRAMES:-999}" -le 2

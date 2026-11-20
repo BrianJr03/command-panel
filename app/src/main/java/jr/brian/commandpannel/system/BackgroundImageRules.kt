@@ -81,6 +81,15 @@ object BackgroundImageRules {
         )
     }
 
+    /**
+     * Whether an animation draws on its own surface under the panel (#60) instead of in the panel's window: only while
+     * it is playing in the overlay, the panel has finished its show animation (a surface doesn't follow the window's
+     * fade and slide), and a first frame exists to put in it (so the backdrop shows until then, never an empty hole).
+     * [settled] is `null` outside the overlay (previews).
+     */
+    fun drawsOnSurface(playing: Boolean, settled: Boolean?, hasFirstFrame: Boolean): Boolean =
+        playing && settled == true && hasFirstFrame
+
     /** When the next frame may be drawn: no sooner than [MIN_FRAME_MS] after the last one, nor in the past. */
     fun nextFrameAt(requestedAt: Long, lastFrameAt: Long, now: Long): Long =
         maxOf(requestedAt, lastFrameAt + MIN_FRAME_MS, now)

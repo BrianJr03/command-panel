@@ -24,7 +24,7 @@ import androidx.compose.ui.Alignment
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.system.UserFontStore
 import jr.brian.commandpannel.ui.theme.toSpec
-import jr.brian.commandpannel.ui.components.rememberLookBackgroundImage
+import jr.brian.commandpannel.ui.components.LookBackgroundImageLayer
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.components.tccLookScanlines
 import androidx.compose.ui.graphics.graphicsLayer
@@ -116,16 +116,15 @@ fun OverlayRoot(
         val image = jr.brian.commandpannel.system.BackgroundImageTile.shown(
             spec.traits.backgroundImage, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
         )
-        val imageLayer = rememberLookBackgroundImage(image)
         val backdrop = Modifier.tccLookBackdrop(
             spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = image == null,
         )
         Box(Modifier.fillMaxSize()) {
             if (image != null) {
-                // Backdrop, picture and panel each get a layer of their own, so an animation's frames redraw only the
-                // picture; the scanlines stay over the panel's content.
+                // Backdrop, picture and panel each get a layer of their own; once the panel is shown, a GIF draws on its
+                // own surface under the panel (#60). The scanlines stay over the panel's content.
                 Box(Modifier.matchParentSize().graphicsLayer().then(backdrop))
-                Box(Modifier.matchParentSize().graphicsLayer().then(imageLayer))
+                LookBackgroundImageLayer(image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize())
             }
             Column(
                 modifier = Modifier.fillMaxSize()

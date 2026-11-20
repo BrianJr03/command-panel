@@ -93,6 +93,18 @@ class BackgroundImageRulesTest {
     }
 
     @Test
+    fun `animations move to their own surface only once the panel is shown and a frame exists`() {
+        assertTrue(BackgroundImageRules.drawsOnSurface(playing = true, settled = true, hasFirstFrame = true))
+        // Showing or hiding (the surface wouldn't fade or slide with the window).
+        assertTrue(!BackgroundImageRules.drawsOnSurface(playing = true, settled = false, hasFirstFrame = true))
+        // Previews have no overlay window.
+        assertTrue(!BackgroundImageRules.drawsOnSurface(playing = true, settled = null, hasFirstFrame = true))
+        // Nothing to show yet: the backdrop stays.
+        assertTrue(!BackgroundImageRules.drawsOnSurface(playing = true, settled = true, hasFirstFrame = false))
+        assertTrue(!BackgroundImageRules.drawsOnSurface(playing = false, settled = true, hasFirstFrame = true))
+    }
+
+    @Test
     fun `frames are held to 30 fps`() {
         // The drawable asks for the next frame 10 ms after the last one: it waits until 33 ms.
         assertEquals(1033L, BackgroundImageRules.nextFrameAt(requestedAt = 1010, lastFrameAt = 1000, now = 1005))
