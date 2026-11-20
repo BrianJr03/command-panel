@@ -69,6 +69,8 @@ class ReplayPlayerActivity : ComponentActivity() {
     private val lowerScreen by lazy { LowerScreenWatch(applicationContext, privileged) }
     /** Where the current clip's video goes; [ReplayPlayerState.output] is its output. */
     private var route = PlaybackRoute.TOP
+    /** Holds focus so the D-pad's first press isn't eaten leaving touch mode ([PlayerKeyAnchor]). */
+    private var keyAnchor: PlayerKeyAnchor? = null
 
     private var player: ExoPlayer? = null
     private lateinit var currentPath: String
@@ -124,6 +126,8 @@ class ReplayPlayerActivity : ComponentActivity() {
                 },
             )
         }
+        // After setContent, so it sits beside the Compose root and holds focus instead of it.
+        keyAnchor = PlayerKeyAnchor(this).also { it.claim() }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -189,6 +193,11 @@ class ReplayPlayerActivity : ComponentActivity() {
             outState.putLong(KEY_TRIM_IN, it.points.inMs)
             outState.putLong(KEY_TRIM_OUT, it.points.outMs)
         }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) keyAnchor?.claim()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
