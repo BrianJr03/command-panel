@@ -83,7 +83,7 @@ class ReplayStudioViewModel @Inject constructor(
         thumbs.get(key(clip))?.let { return it }
         val image = loads.withPermit {
             withContext(Dispatchers.IO) {
-                runCatching { repo.thumbnail(clip)?.let(::decode) }.getOrNull()
+                runCatching { repo.thumbnail(clip)?.let { decodeClipThumbnail(it) } }.getOrNull()
             }
         }
         if (image != null) thumbs.put(key(clip), image)
@@ -117,16 +117,16 @@ class ReplayStudioViewModel @Inject constructor(
     /** A replaced file (same path, new contents) gets a fresh thumbnail and length. */
     private fun key(clip: ReplayClip) = "${clip.path}@${clip.modifiedMs}"
 
-    private fun decode(file: File): ImageBitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        val opts = BitmapFactory.Options().apply { inSampleSize = thumbnailSampleSize(bounds.outWidth, THUMB_WIDTH_PX) }
-        return BitmapFactory.decodeFile(file.path, opts)?.asImageBitmap()
-    }
-
     private companion object {
         const val THUMB_CACHE_SIZE = 60
         const val MAX_PARALLEL_LOADS = 3
-        const val THUMB_WIDTH_PX = 480
     }
+}
+
+/** Decodes a cached clip thumbnail at about grid-card size (also used by the Replay Studio settings card). */
+internal fun decodeClipThumbnail(file: File, targetWidthPx: Int = 480): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    val opts = BitmapFactory.Options().apply { inSampleSize = thumbnailSampleSize(bounds.outWidth, targetWidthPx) }
+    return BitmapFactory.decodeFile(file.path, opts)?.asImageBitmap()
 }

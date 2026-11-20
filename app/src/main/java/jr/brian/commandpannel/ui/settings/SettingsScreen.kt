@@ -934,6 +934,8 @@ private fun ReplayBufferCard(
     studioModifier: Modifier,
     onOpenStudio: () -> Unit,
 ) {
+    // First: Replay Studio, with the newest clip, like the active look at the top of Themes.
+    ReplayStudioCard(studioModifier, onOpenStudio)
     SwitchCard(
         stringResource(R.string.tile_name_replay_buffer),
         stringResource(R.string.settings_replay_desc),
@@ -942,23 +944,6 @@ private fun ReplayBufferCard(
     )
     // First after the main switch: the way to save clips from Back Button Hero.
     SaveClipCard(state, vm)
-    // Opens Replay Studio, where saved clips are watched, shared and deleted.
-    val studioNew = LocalNewBadges.current.state.cardNew(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO)
-    val studioTitle = stringResource(R.string.settings_replay_studio)
-    FocusCard(
-        onActivate = onOpenStudio,
-        modifier = studioModifier
-            .newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO)
-            .newCornerDot(studioNew, p.accent, p.bg)
-            .noRippleClickable(onClick = onOpenStudio),
-    ) {
-        Row {
-            CardTitle(studioTitle)
-            // Zero-size: the card's corner dot, described for TalkBack.
-            if (studioNew) NewBadgeLabel(studioTitle)
-        }
-        CardDesc(stringResource(R.string.settings_replay_studio_desc))
-    }
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_options))
         Spacer(Modifier.height(6.dp))

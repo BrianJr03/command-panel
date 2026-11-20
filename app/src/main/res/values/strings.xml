@@ -274,6 +274,13 @@
     <!-- Companion: Replay Studio (clip grid, share, delete) -->
     <string name="settings_replay_studio">Replay Studio</string>
     <string name="settings_replay_studio_desc">Watch, share and delete your saved clips.</string>
+    <string name="settings_replay_studio_newest">Newest: %1$s</string>
+    <string name="settings_replay_studio_open">Open Replay Studio</string>
+    <plurals name="settings_replay_studio_a11y">
+        <item quantity="one">Replay Studio, %1$d clip</item>
+        <item quantity="other">Replay Studio, %1$d clips</item>
+    </plurals>
+    <string name="settings_replay_studio_a11y_status">Replay Studio, %1$s</string>
     <string name="studio_title">Replay Studio</string>
     <string name="studio_back">Back</string>
     <string name="studio_loading">Loading clips…</string>
