@@ -228,7 +228,11 @@ class AssistantService : Service() {
         val overlayActions = object : OverlayActions by repository {
             override fun openPanelPlugin(key: String) = startPanelPlugin(key)
             override fun onTileClick(id: String) {
-                if (id == QuickSettingTileId.KEYBOARD.key) openKeyboard() else repository.onTileClick(id)
+                when (id) {
+                    QuickSettingTileId.KEYBOARD.key -> openKeyboard()
+                    QuickSettingTileId.REPLAY_STUDIO.key -> openReplayStudio()
+                    else -> repository.onTileClick(id)
+                }
             }
         }
         overlay = OverlayHost(
@@ -410,6 +414,20 @@ class AssistantService : Service() {
                 )
             }
         }
+    }
+
+    /** The panel's Replay Studio tile (#49): opens the companion on the top screen, straight onto Replay Studio. */
+    private fun openReplayStudio() {
+        Log.i(TAG, "replay studio tile: open")
+        val opts = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+        runCatching {
+            startActivity(
+                Intent(this, jr.brian.commandpannel.MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    .putExtra(jr.brian.commandpannel.MainActivity.EXTRA_SCREEN, jr.brian.commandpannel.MainActivity.SCREEN_REPLAY_STUDIO),
+                opts.toBundle(),
+            )
+        }.onFailure { Log.w(TAG, "replay studio tile: couldn't open the companion", it) }
     }
 
     private fun startPanelPlugin(key: String) {

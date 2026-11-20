@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
 import androidx.annotation.StringRes
@@ -59,6 +60,8 @@ enum class QuickSettingTileId(
     SCREENSHOT("screenshot", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.PhotoCamera), TileInteraction.DIALOG),
     CLEAR_ALL_TASKS("clear_all_tasks", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.DeleteSweep), TileInteraction.ACTION),
     REPLAY_BUFFER("replay_buffer", TileCategory.TOOLS, false, TileIcon.Stock("ic_qs_replay_buffer"), TileInteraction.TOGGLE),
+    /** Opens the companion on Replay Studio (#49). Next to Replay Buffer; a saved order gets it at the end. */
+    REPLAY_STUDIO("replay_studio", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.VideoLibrary), TileInteraction.ACTION),
     STICK_LED("stick_led", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.SportsEsports), TileInteraction.TOGGLE),
     /** Opens ThorKBM: a plugin swap, its app, or the companion's Keyboard section ([KeyboardTile]). */
     KEYBOARD("keyboard", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Keyboard), TileInteraction.ACTION);
@@ -88,6 +91,7 @@ enum class QuickSettingTileId(
         SCREENSHOT -> R.string.tile_name_screenshot
         CLEAR_ALL_TASKS -> R.string.tile_name_clear_all_tasks
         REPLAY_BUFFER -> R.string.tile_name_replay_buffer
+        REPLAY_STUDIO -> R.string.tile_name_replay_studio
         STICK_LED -> R.string.text_joystick_lights
         KEYBOARD -> R.string.virtual_keyboard_text
     }

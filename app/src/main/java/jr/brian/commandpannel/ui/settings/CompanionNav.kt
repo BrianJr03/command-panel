@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,6 +25,15 @@ internal object CompanionRoutes {
     const val REPLAY_STUDIO = "replay_studio"
 
     fun themes(tab: ThemeLibraryTab) = "themes?tab=${tab.key}"
+
+    /**
+     * The route for a [jr.brian.commandpannel.MainActivity.EXTRA_SCREEN] value, or null for one that can't be opened
+     * from outside. Only Replay Studio for now: Theme Studio needs a draft and the Themes library a tab.
+     */
+    fun forScreen(screen: String?): String? = when (screen) {
+        jr.brian.commandpannel.MainActivity.SCREEN_REPLAY_STUDIO -> REPLAY_STUDIO
+        else -> null
+    }
 }
 
 /**
@@ -42,6 +53,13 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
     val closeStudio: () -> Unit = {
         vm.closeStudio()
         nav.popBackStack()
+    }
+    // A screen asked for from outside (the panel's Replay Studio tile, #49), taken once. Back returns to settings.
+    val requestedScreen by jr.brian.commandpannel.CompanionPresence.requestedScreen.collectAsState()
+    LaunchedEffect(requestedScreen) {
+        val route = CompanionRoutes.forScreen(requestedScreen ?: return@LaunchedEffect)
+        jr.brian.commandpannel.CompanionPresence.requestedScreen.value = null
+        if (route != null) nav.navigate(route) { launchSingleTop = true }
     }
     NavHost(
         navController = nav,

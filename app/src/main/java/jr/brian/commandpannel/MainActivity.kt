@@ -26,6 +26,9 @@ object CompanionPresence {
 
     /** A section ([jr.brian.commandpannel.ui.settings.SettingsCategory.key]) to open, from [MainActivity.EXTRA_SECTION]. */
     val requestedSection = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** A screen to open on top of settings, from [MainActivity.EXTRA_SCREEN] (for example [MainActivity.SCREEN_REPLAY_STUDIO]). */
+    val requestedScreen = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 }
 
 @AndroidEntryPoint
@@ -45,10 +48,12 @@ class MainActivity : ComponentActivity() {
         takeSection(intent)
     }
 
-    /** Opens the section the intent asks for (the panel's Keyboard tile, #41), once. */
+    /** Opens the section (the panel's Keyboard tile, #41) or screen (its Replay Studio tile, #49) the intent asks for, once. */
     private fun takeSection(intent: Intent?) {
         intent?.getStringExtra(EXTRA_SECTION)?.let { CompanionPresence.requestedSection.value = it }
         intent?.removeExtra(EXTRA_SECTION)
+        intent?.getStringExtra(EXTRA_SCREEN)?.let { CompanionPresence.requestedScreen.value = it }
+        intent?.removeExtra(EXTRA_SCREEN)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +68,10 @@ class MainActivity : ComponentActivity() {
                 startActivity(
                     Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        .apply { intent?.getStringExtra(EXTRA_SECTION)?.let { putExtra(EXTRA_SECTION, it) } },
+                        .apply {
+                            intent?.getStringExtra(EXTRA_SECTION)?.let { putExtra(EXTRA_SECTION, it) }
+                            intent?.getStringExtra(EXTRA_SCREEN)?.let { putExtra(EXTRA_SCREEN, it) }
+                        },
                     opts.toBundle(),
                 )
             }.isSuccess
@@ -92,5 +100,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Opens the companion on this section: a [jr.brian.commandpannel.ui.settings.SettingsCategory.key]. */
         const val EXTRA_SECTION = "section"
+
+        /** Opens the companion on this screen, over settings; see [jr.brian.commandpannel.ui.settings.CompanionRoutes.forScreen]. */
+        const val EXTRA_SCREEN = "screen"
+        const val SCREEN_REPLAY_STUDIO = "replay_studio"
     }
 }

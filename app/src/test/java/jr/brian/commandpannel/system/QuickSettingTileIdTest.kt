@@ -67,4 +67,17 @@ class QuickSettingTileIdTest {
         val withKeyboard = QuickSettingTileId.toggle(savedEnabled, "keyboard", enable = true)
         assertEquals(listOf("wifi", "fan", "keyboard"), QuickSettingTileId.enabledKeys(withKeyboard, savedOrder))
     }
+
+    @Test
+    fun replayStudioTileIsOffByDefaultAndJoinsASavedOrderAtTheEnd() {
+        // A tile order saved before the Replay Studio tile existed (#49); new installs list it next to Replay Buffer.
+        val savedOrder = QuickSettingTileId.entries.filter { it != QuickSettingTileId.REPLAY_STUDIO }.joinToString(",") { it.key }
+        assertTrue("replay_studio" !in QuickSettingTileId.enabledKeys(null))
+        assertEquals("replay_studio", QuickSettingTileId.orderedKeys(savedOrder).last())
+        val roster = QuickSettingTileId.orderedKeys(null)
+        assertEquals(roster.indexOf("replay_buffer") + 1, roster.indexOf("replay_studio"))
+        assertEquals(TileInteraction.ACTION, QuickSettingTileId.REPLAY_STUDIO.interaction)
+        val withStudio = QuickSettingTileId.toggle("fan,wifi", "replay_studio", enable = true)
+        assertEquals(listOf("fan", "wifi", "replay_studio"), QuickSettingTileId.enabledKeys(withStudio, savedOrder))
+    }
 }

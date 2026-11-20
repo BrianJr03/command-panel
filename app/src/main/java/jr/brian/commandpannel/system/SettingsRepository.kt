@@ -341,6 +341,7 @@ class SettingsRepository(
                 QuickSettingTileId.SCREENSHOT -> str(R.string.tile_name_screenshot) to false
                 QuickSettingTileId.CLEAR_ALL_TASKS -> str(R.string.tile_clear_all_tasks) to false
                 QuickSettingTileId.REPLAY_BUFFER -> str(R.string.tile_replay_buffer) to prefs.getBoolean("replay_enabled", false)
+                QuickSettingTileId.REPLAY_STUDIO -> str(R.string.tile_replay_studio) to false
                 QuickSettingTileId.STICK_LED -> str(R.string.text_joystick_lights) to light
                 QuickSettingTileId.KEYBOARD -> str(R.string.virtual_keyboard_text) to false
             }
@@ -538,6 +539,7 @@ class SettingsRepository(
             }
             // focus_lock, performance, fan, controller, theme, trigger_mode, screenshot → modal dialogs (in the overlay)
             // keyboard → AssistantService (it owns the Panel plugin session)
+            // replay_studio → AssistantService (opens the companion)
         }
         refreshFromSettings()
     }

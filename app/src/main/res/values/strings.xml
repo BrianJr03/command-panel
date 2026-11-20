@@ -99,6 +99,7 @@
     <string name="tile_name_screenshot">Screenshot</string>
     <string name="tile_name_clear_all_tasks">Clear All Tasks</string>
     <string name="tile_name_replay_buffer">Replay Buffer</string>
+    <string name="tile_name_replay_studio">Replay Studio</string>
     <string name="tile_category_stock">Stock</string>
     <string name="tile_category_android">Android System</string>
     <string name="tile_category_tools">Tools</string>
@@ -115,6 +116,7 @@
     <string name="tile_virtual_mouse">Virtual\nMouse</string>
     <string name="tile_clear_all_tasks">Clear All\nTasks</string>
     <string name="tile_replay_buffer">Replay\nBuffer</string>
+    <string name="tile_replay_studio">Replay\nStudio</string>
     <string name="tile_trigger_digital">Trigger:\nDigital</string>
     <string name="tile_trigger_analog">Trigger:\nAnalog</string>
     <string name="tile_trigger_both">Trigger:\nBoth</string>
