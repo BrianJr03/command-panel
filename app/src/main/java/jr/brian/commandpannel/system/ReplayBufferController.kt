@@ -10,6 +10,7 @@ import jr.brian.commandpannel.privileged.ReplayTarget
 import jr.brian.commandpannel.privileged.ReplayClipWriter
 import jr.brian.commandpannel.privileged.ReplayRingBuffer
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
+import jr.brian.commandpannel.replay.studio.ClipAutoDelete
 import jr.brian.commandpannel.replay.studio.ClipRepository
 import java.io.File
 
@@ -134,10 +135,13 @@ class ReplayBufferController(
                 // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI.
                 val uri = android.net.Uri.fromFile(File(path))
                 privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${shellQuote(uri.toString())} >/dev/null 2>&1")
+                val bytes = tmp.length()
                 runCatching { tmp.delete() }
                 // Replay Studio keeps listing this folder after the user picks another one.
                 ClipRepository.rememberDir(prefs, dir)
                 Log.i(tag, "saved replay clip -> $path")
+                // Auto-delete old clips (#50), in the background so the save reports right away.
+                ClipAutoDelete.afterSave(context, privileged, path, bytes)
                 return path
             }
         }

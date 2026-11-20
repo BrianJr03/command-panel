@@ -44,6 +44,8 @@ class ReplayStudioViewModel @Inject constructor(
 ) : AndroidViewModel(app) {
 
     private val repo = ClipRepository(app, privileged)
+    private val autoDelete = ClipAutoDelete(app, privileged)
+    private var autoDeleteRan = false
 
     private val _state = MutableStateFlow(ReplayStudioState())
     val state: StateFlow<ReplayStudioState> = _state.asStateFlow()
@@ -57,6 +59,11 @@ class ReplayStudioViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
+            // Auto-delete old clips (#50) once per visit, before the first listing, so removed clips never show.
+            if (!autoDeleteRan) {
+                autoDeleteRan = true
+                withContext(Dispatchers.IO) { runCatching { autoDelete.run() } }
+            }
             val clips = withContext(Dispatchers.IO) { runCatching { repo.list() }.getOrNull() }
             _state.update {
                 if (clips == null) it.copy(loading = false, unavailable = true, clips = emptyList())

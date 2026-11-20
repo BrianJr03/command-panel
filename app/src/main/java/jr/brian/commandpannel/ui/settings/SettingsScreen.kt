@@ -979,6 +979,8 @@ private fun ReplayBufferCard(
             InfoLine(stringResource(text), p.danger)
         }
     }
+    // Right after the options card: what happens to saved clips over time (#50).
+    ReplayAutoDeleteCard(state.replayAutoDelete, vm::setReplayAutoDelete)
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_capture))
         Spacer(Modifier.height(10.dp))
@@ -1017,6 +1019,60 @@ private fun ReplayBufferCard(
         Spacer(Modifier.height(12.dp))
         AccentButton(stringResource(R.string.settings_replay_save_now), enabled = state.replayEnabled, onClick = vm::saveReplayClip)
         state.replayMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
+    }
+}
+
+/**
+ * "Auto-delete old clips" (#50): off by default; when on, an age rule and a size cap, each with its own switch and
+ * preset chips. The chips show only while their rule is on. Runs after each save and when Replay Studio opens.
+ */
+@Composable
+private fun ReplayAutoDeleteCard(
+    rules: jr.brian.commandpannel.replay.studio.AutoDeleteRules,
+    onChange: (jr.brian.commandpannel.replay.studio.AutoDeleteRules) -> Unit,
+) {
+    val presets = jr.brian.commandpannel.replay.studio.AutoDeleteRules
+    Card {
+        SwitchRow(
+            stringResource(R.string.settings_replay_autodelete),
+            stringResource(R.string.settings_replay_autodelete_desc),
+            rules.enabled,
+        ) { onChange(rules.copy(enabled = it)) }
+        if (!rules.enabled) return@Card
+        SwitchRow(
+            stringResource(R.string.settings_replay_autodelete_age),
+            stringResource(R.string.settings_replay_autodelete_age_desc),
+            rules.ageOn,
+        ) { onChange(rules.copy(ageOn = it)) }
+        if (rules.ageOn) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                presets.AGE_DAY_PRESETS.forEach { days ->
+                    Chip(
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.settings_replay_autodelete_days, days, days),
+                        selected = rules.ageDays == days,
+                    ) { onChange(rules.copy(ageDays = days)) }
+                }
+            }
+        }
+        SwitchRow(
+            stringResource(R.string.settings_replay_autodelete_size),
+            stringResource(R.string.settings_replay_autodelete_size_desc),
+            rules.sizeOn,
+        ) { onChange(rules.copy(sizeOn = it)) }
+        if (rules.sizeOn) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                presets.SIZE_GB_PRESETS.forEach { gb ->
+                    Chip(
+                        stringResource(R.string.settings_replay_autodelete_gb, gb),
+                        selected = rules.sizeGb == gb,
+                    ) { onChange(rules.copy(sizeGb = gb)) }
+                }
+            }
+        }
+        if (!rules.active) {
+            Spacer(Modifier.height(4.dp))
+            InfoLine(stringResource(R.string.settings_replay_autodelete_no_rule))
+        }
     }
 }
 

@@ -292,6 +292,18 @@
         <item quantity="other">Replay Studio, %1$d clips</item>
     </plurals>
     <string name="settings_replay_studio_a11y_status">Replay Studio, %1$s</string>
+    <string name="settings_replay_autodelete">Auto-delete old clips</string>
+    <string name="settings_replay_autodelete_desc">Removes your oldest clips after each save and when Replay Studio opens, so they don\'t fill your storage.</string>
+    <string name="settings_replay_autodelete_age">Older than</string>
+    <string name="settings_replay_autodelete_age_desc">Deletes clips older than this.</string>
+    <plurals name="settings_replay_autodelete_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="settings_replay_autodelete_size">Keep under</string>
+    <string name="settings_replay_autodelete_size_desc">Deletes the oldest clips until all of them fit in this much space.</string>
+    <string name="settings_replay_autodelete_gb">%1$d GB</string>
+    <string name="settings_replay_autodelete_no_rule">Turn on a rule above to start deleting clips.</string>
     <string name="studio_title">Replay Studio</string>
     <string name="studio_back">Back</string>
     <string name="studio_loading">Loading clips…</string>

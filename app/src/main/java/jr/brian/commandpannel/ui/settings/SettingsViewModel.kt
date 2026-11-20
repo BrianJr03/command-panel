@@ -164,6 +164,8 @@ data class SettingsState(
     val replaySoundVideoOnly: Boolean = false,
     /** Custom clips folder relative to internal storage, or `null` for the default (TCP Clips). */
     val replayClipsDir: String? = null,
+    /** "Auto-delete old clips" in the Replay Buffer section (#50). */
+    val replayAutoDelete: jr.brian.commandpannel.replay.studio.AutoDeleteRules = jr.brian.commandpannel.replay.studio.AutoDeleteRules(),
     val appPickerOpen: Boolean = false,
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
@@ -229,6 +231,7 @@ class SettingsViewModel @Inject constructor(
         replayMic = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_MIC, false),
         replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
+        replayAutoDelete = jr.brian.commandpannel.replay.studio.AutoDeleteRules.read(prefs),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
         thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
         thorKbmPluginKeys = thorKbmPluginKeys(),
@@ -239,6 +242,12 @@ class SettingsViewModel @Inject constructor(
         railExpanded = RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)),
         newBadges = loadNewBadges(),
     )
+
+    /** Auto-delete rules are read on each save and when Replay Studio opens, so saving them is enough. */
+    fun setReplayAutoDelete(rules: jr.brian.commandpannel.replay.studio.AutoDeleteRules) {
+        rules.save(prefs)
+        _state.value = _state.value.copy(replayAutoDelete = rules)
+    }
 
     /** The service reads this pref on each AYN press, so saving it is enough. */
     fun setReplayDoublePress(enable: Boolean) {
