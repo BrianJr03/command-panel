@@ -45,6 +45,8 @@ object ScreenRecorderEngine {
     const val MAX_REPLAY_BUFFER_BYTES = 160L * 1024L * 1024L // 160 MB
     private const val MIN_REPLAY_BUFFER_BYTES = 8L * 1024L * 1024L
     private const val REPLAY_HEADROOM = 1.25
+    /** Highest `_n` tried for clips saved in the same second; nobody saves 99 clips a second. */
+    const val MAX_REPLAY_NAME_ATTEMPTS = 99
     private val REPLAY_CLIP_NAME_REGEX = Regex("^Replay_[0-9]{8}_[0-9]{6}(_[0-9]+)?_(Top|Bottom|Both)\\.mp4$")
 
     // Error / stop-reason codes shared with the app.
@@ -172,6 +174,27 @@ object ScreenRecorderEngine {
         baseDir: String = REPLAY_CLIPS_DIR,
     ): String {
         return "${baseDir.trimEnd('/')}/Replay_${timestampStr}_${replayTargetFolder(targetMode)}.mp4"
+    }
+
+    /**
+     * The first free clip path for [basePath] (from [buildReplayClipPath]), given the file names already in its folder
+     * ([taken]): [basePath] itself, else the same name with `_2`, `_3`, ... before the screen suffix
+     * (`Replay_<ts>_2_Top.mp4`), so two saves in the same second don't overwrite each other. `null` if
+     * [MAX_REPLAY_NAME_ATTEMPTS] are all taken or [basePath] isn't a clip name. Pure.
+     */
+    fun pickFreeReplayClipPath(basePath: String, taken: Set<String>): String? {
+        val dir = basePath.substringBeforeLast('/', missingDelimiterValue = "")
+        val leaf = basePath.substringAfterLast('/')
+        if (!REPLAY_CLIP_NAME_REGEX.matches(leaf)) return null
+        if (leaf !in taken) return basePath
+        val stem = leaf.removeSuffix(".mp4")
+        val screen = stem.substringAfterLast('_')
+        val head = stem.substringBeforeLast('_')
+        for (n in 2..MAX_REPLAY_NAME_ATTEMPTS) {
+            val candidate = "${head}_${n}_$screen.mp4"
+            if (candidate !in taken) return if (dir.isEmpty()) candidate else "$dir/$candidate"
+        }
+        return null
     }
 
     /** What a clip captured ("Top" / "Bottom" / "Both"): its subfolder under the clips folder and its file-name suffix. */

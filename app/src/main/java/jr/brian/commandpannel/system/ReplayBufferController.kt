@@ -108,15 +108,29 @@ class ReplayBufferController(
                 val tmp = File(context.cacheDir, "replay_tmp.mp4")
                 if (!ReplayClipWriter.write(slice, format, engine.audioFormat, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 val dir = clipsRelativeDir()
-                val path = ScreenRecorderEngine.buildReplayClipPath(
+                val basePath = ScreenRecorderEngine.buildReplayClipPath(
                     targetMode = engine.target.mode,
                     baseDir = "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$dir/${ScreenRecorderEngine.replayTargetFolder(engine.target.mode)}",
                 )
-                if (!ScreenRecorderEngine.isValidReplayClipOutputPath(path)) {
+                if (!ScreenRecorderEngine.isValidReplayClipOutputPath(basePath)) {
+                    runCatching { tmp.delete() }
                     return "error:${ScreenRecorderEngine.REPLAY_ERR_INVALID_PATH}"
                 }
-                val parent = path.substringBeforeLast('/')
-                privileged.shell("mkdir -p ${shellQuote(parent)} && cp ${shellQuote(tmp.absolutePath)} ${shellQuote(path)} && chmod 664 ${shellQuote(path)}")
+                val parent = basePath.substringBeforeLast('/')
+                // Root lists the folder (the app can't always see it), so a second save in the same second gets `_2`.
+                val taken = privileged.shell("mkdir -p ${shellQuote(parent)} && ls -1 ${shellQuote(parent)} 2>/dev/null; echo $LIST_END")
+                    ?.takeIf { it.contains(LIST_END) }
+                    ?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
+                val path = taken?.let { ScreenRecorderEngine.pickFreeReplayClipPath(basePath, it) }
+                    ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it) }
+                val copied = path != null && privileged.shell(
+                    "cp ${shellQuote(tmp.absolutePath)} ${shellQuote(path)} && chmod 664 ${shellQuote(path)} && echo $COPY_OK",
+                )?.contains(COPY_OK) == true
+                if (!copied || path == null) {
+                    Log.w(tag, "couldn't copy the clip into $parent (name ${path ?: "unavailable"})")
+                    runCatching { tmp.delete() }
+                    return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
+                }
                 // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI.
                 val uri = android.net.Uri.fromFile(File(path))
                 privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${shellQuote(uri.toString())} >/dev/null 2>&1")
@@ -135,5 +149,9 @@ class ReplayBufferController(
 
         /** Longest a save waits for audio to start flowing after arming. [save] runs off the main thread. */
         const val AUDIO_READY_TIMEOUT_MS = 500L
+
+        /** Shell output markers: the folder listing finished, and the copy succeeded. */
+        private const val LIST_END = "__CP_LS_END__"
+        private const val COPY_OK = "__CP_COPY_OK__"
     }
 }
