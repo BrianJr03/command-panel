@@ -15,8 +15,8 @@ android {
         applicationId = "jr.brian.commandpannel"
         minSdk = 33
         targetSdk = 37
-        versionCode = 17
-        versionName = "0.11.0"
+        versionCode = 18
+        versionName = "0.11.1"
     }
 
     buildTypes {

@@ -1,24 +1,16 @@
-## Command Panel v0.11.0
+## Command Panel v0.11.1
 
-Replay Studio: watch, trim, share and manage your Replay Buffer clips without leaving Command Panel.
+A clearer companion: an updated tour, and an easier way to rearrange the settings list.
 
-### New
-- **Replay Studio.** All your saved clips in one place, at the top of Settings, Extras, Replay Buffer. Every clip shows a thumbnail, its length, its date and which screen it came from, including clips TCP SC saved.
-- **Watch clips in the app.** A plays or pauses, the D-pad skips 5 seconds, L1 and R1 move between clips and B closes. The Replay Buffer pauses while you watch and starts again when you close the player.
-- **Play on the screen it was recorded on.** An optional setting: bottom screen clips play on the bottom screen, and clips of both screens play across both, top half on top and bottom half below.
-- **Trim before you share.** Press Y in the player, set the start and end with L1 and R1, preview with X and save a shorter copy. Your original clip stays as it is.
-- **Share and delete.** Press X on a clip to share it to any app or delete it.
-- **View right after saving.** The "Clip saved" message and notification have a View button that opens the new clip.
-- **Replay Studio tile.** Add it to the panel to open Replay Studio from anywhere.
-- **Auto-delete old clips.** Optional: remove clips older than a set number of days, or keep your clips under a size limit. The clip you just saved is never removed.
-- **Hide the new dots.** Settings, General has a Show New Dots switch.
+### Improvements
+- **Updated tour.** The companion tour now covers Replay Studio, the Keyboard and Experimental sections, and the Show New Dots switch.
+- **See what you're moving.** When you pick up a section or group in the settings list, a hint at the bottom shows what's moving and how to drop it, and the spots it can't go fade out.
+- **Y moves, A opens.** In the settings list, press Y to pick up a section, just like a group. A on a section now takes you into its settings.
+- **TCP SC is a Replay Buffer shortcut.** The app now explains that a home screen shortcut, a gesture app or an app like Back Button Hero can open TCP SC to save a clip.
 
-### Fixes
-- **Two clips in one second.** Saving two clips within the same second no longer overwrites the first one.
+See the [v0.11.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.11.0) for the previous release.
 
-See the [v0.10.1 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.10.1) for the previous release.
-
-> **About `tcp-sc-0.11.0.apk`:** an optional helper app, TCP SC. Apps like Back Button Hero can launch it to save a Replay Buffer clip. You only need it for that, and Command Panel can install it for you from its Replay Buffer section. If you install it by hand, install it after Command Panel.
+> **About `tcp-sc-0.11.1.apk`:** an optional helper app, TCP SC. It's a shortcut for Replay Buffer: open it from a home screen shortcut, a gesture app or an app like Back Button Hero to save a clip. You only need it for that, and Command Panel can install it for you from its Replay Buffer section. If you install it by hand, install it after Command Panel.
 
 ---
 *Licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*
