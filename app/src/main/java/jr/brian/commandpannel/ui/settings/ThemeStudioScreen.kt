@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -149,6 +152,9 @@ internal fun ThemeStudioScreen(
     fun undo() { history.undo(draft)?.let { draft = it; historyTick++ } }
     fun redo() { history.redo(draft)?.let { draft = it; historyTick++ } }
     var confirmDiscard by remember { mutableStateOf(false) }
+    // The first time Studio opens, a tip says L3 / R3 undo and redo, since the buttons are icons only (#63).
+    val tipPrefs = jr.brian.commandpannel.system.Prefs.of(androidx.compose.ui.platform.LocalContext.current)
+    var showUndoTip by remember { mutableStateOf(!tipPrefs.getBoolean(StudioUndoTip.KEY_SEEN, false)) }
     val dirty = draft != lastSaved
     val requestClose: () -> Unit = { if (draft != lastSaved) confirmDiscard = true else onClose() }
     LaunchedEffect(draft) { StudioDraft.look.value = draft }
@@ -226,8 +232,9 @@ internal fun ThemeStudioScreen(
             // Read through the tick, so these update with the history.
             val canUndo = historyTick.let { history.canUndo }
             val canRedo = historyTick.let { history.canRedo }
-            Chip(stringResource(R.string.theme_undo), enabled = canUndo, glyph = GamepadButton.L3, focusableWhenDisabled = true) { undo() }
-            Chip(stringResource(R.string.theme_redo), enabled = canRedo, glyph = GamepadButton.R3, focusableWhenDisabled = true) { redo() }
+            // Icons only, so the look's name has room (#63); L3 / R3 do the same, as the first-run tip says.
+            IconChip(Icons.AutoMirrored.Rounded.Undo, stringResource(R.string.theme_undo), enabled = canUndo) { undo() }
+            IconChip(Icons.AutoMirrored.Rounded.Redo, stringResource(R.string.theme_redo), enabled = canRedo) { redo() }
             GamepadTextField(
                 value = draft.name,
                 onValueChange = { edit(draft.copy(name = it.take(40))) },
@@ -339,6 +346,12 @@ internal fun ThemeStudioScreen(
             }
         }
     }
+    }
+    if (showUndoTip) {
+        StudioUndoTipDialog(onDismiss = {
+            tipPrefs.edit().putBoolean(StudioUndoTip.KEY_SEEN, true).apply()
+            showUndoTip = false
+        })
     }
     if (confirmDiscard) {
         DiscardChangesDialog(

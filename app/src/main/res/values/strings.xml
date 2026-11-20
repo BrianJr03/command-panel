@@ -507,6 +507,9 @@
     <string name="theme_changed">Changed</string>
     <string name="theme_undo">Undo</string>
     <string name="theme_redo">Redo</string>
+    <string name="theme_undo_tip_title">Undo and redo</string>
+    <string name="theme_undo_tip_body">L3 undoes and R3 redoes your last change.</string>
+    <string name="theme_undo_tip_ok">Got it</string>
     <string name="theme_color_hue">Hue</string>
     <string name="theme_color_saturation">Saturation</string>
     <string name="theme_color_brightness">Brightness</string>
