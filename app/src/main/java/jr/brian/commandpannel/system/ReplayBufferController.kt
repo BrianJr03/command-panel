@@ -10,6 +10,7 @@ import jr.brian.commandpannel.privileged.ReplayTarget
 import jr.brian.commandpannel.privileged.ReplayClipWriter
 import jr.brian.commandpannel.privileged.ReplayRingBuffer
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
+import jr.brian.commandpannel.replay.studio.ClipRepository
 import java.io.File
 
 /**
@@ -120,6 +121,8 @@ class ReplayBufferController(
                 val uri = android.net.Uri.fromFile(File(path))
                 privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${shellQuote(uri.toString())} >/dev/null 2>&1")
                 runCatching { tmp.delete() }
+                // Replay Studio keeps listing this folder after the user picks another one.
+                ClipRepository.rememberDir(prefs, dir)
                 Log.i(tag, "saved replay clip -> $path")
                 return path
             }
