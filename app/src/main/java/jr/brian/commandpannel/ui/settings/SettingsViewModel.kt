@@ -132,6 +132,8 @@ data class SettingsState(
     val railLayout: RailLayout = RailLayout.DEFAULT,
     /** The rail groups that are open. */
     val railExpanded: Set<RailGroup> = emptySet(),
+    /** Which "new" bubbles show on the rail and in the panes. */
+    val newBadges: NewBadgeState = NewBadgeState(),
     /** TCP Save Clip (the Back Button Hero trigger): installed, and paired with this build. */
     val saveClip: jr.brian.commandpannel.system.update.SaveClipStatus = jr.brian.commandpannel.system.update.SaveClipStatus.Missing,
     /** A TCP Save Clip download or install is running. */
@@ -227,6 +229,7 @@ class SettingsViewModel @Inject constructor(
         thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
         railLayout = RailLayout.read { prefs.getString(it, null) },
         railExpanded = RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)),
+        newBadges = loadNewBadges(),
     )
 
     /** The service reads this pref on each AYN press, so saving it is enough. */
@@ -764,6 +767,34 @@ class SettingsViewModel @Inject constructor(
         layout.prefs().forEach { (k, v) -> edit.putString(k, v) }
         edit.apply()
         _state.value = _state.value.copy(railLayout = layout)
+    }
+
+    /**
+     * The "new" bubbles. The first time this runs it stores a baseline: an update from a version before bubbles shows
+     * this release's new things, a fresh install shows none of them.
+     */
+    private fun loadNewBadges(): NewBadgeState {
+        if (!prefs.contains(NewBadgeState.KEY_BASELINE)) {
+            val info = runCatching { getApplication<Application>().run { packageManager.getPackageInfo(packageName, 0) } }.getOrNull()
+            // Updated in place since it was installed, or used the companion before (its tour was seen).
+            val upgraded = (info != null && info.lastUpdateTime > info.firstInstallTime) || prefs.contains(KEY_TOUR_SEEN)
+            val code = info?.longVersionCode?.toInt() ?: jr.brian.commandpannel.BuildConfig.VERSION_CODE
+            prefs.edit().putInt(NewBadgeState.KEY_BASELINE, NewBadgeState.firstBaseline(code, upgraded)).apply()
+        }
+        return NewBadgeState(
+            baseline = prefs.getInt(NewBadgeState.KEY_BASELINE, Int.MAX_VALUE),
+            seen = NewBadgeState.parseSeen(prefs.getString(NewBadgeState.KEY_SEEN, null)),
+        )
+    }
+
+    /** Clears the bubble at [place] (focused or clicked); parents clear once their new children are all seen. */
+    fun markNewSeen(place: NewPlace) {
+        val badges = _state.value.newBadges
+        val keys = badges.keysAt(place)
+        if (keys.isEmpty()) return
+        val seen = badges.seen + keys
+        prefs.edit().putString(NewBadgeState.KEY_SEEN, NewBadgeState.encodeSeen(seen)).apply()
+        _state.value = _state.value.copy(newBadges = badges.copy(seen = seen))
     }
 
     /** Opens or closes a rail group, and remembers it. */

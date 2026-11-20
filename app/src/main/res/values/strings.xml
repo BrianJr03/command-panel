@@ -160,6 +160,7 @@
     <string name="settings_group_advanced">Advanced</string>
     <string name="settings_rail_expand">Expand %1$s</string>
     <string name="settings_rail_collapse">Collapse %1$s</string>
+    <string name="settings_new_badge_desc">%1$s is new since the last update</string>
 
     <!-- Companion: General -->
     <string name="settings_replace_stock">Replace Stock Assistant</string>

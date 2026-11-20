@@ -280,7 +280,10 @@ internal fun SettingsContent(
             } else null,
         ),
     ) {
-    CompositionLocalProvider(LocalTourTargets provides if (touring || followingLook) tourTargets else null) {
+    CompositionLocalProvider(
+        LocalTourTargets provides if (touring || followingLook) tourTargets else null,
+        LocalNewBadges provides NewBadgesHost(state.newBadges, vm::markNewSeen),
+    ) {
     Row(
         Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
             // Y only has a job on a group header (pick it up / drop it) and in the tour. Anywhere else nothing handles
@@ -293,7 +296,11 @@ internal fun SettingsContent(
                 nav, state.railLayout, state.railExpanded, railRequesters, headerRequesters,
                 onToggle = vm::setRailGroupExpanded, onReorder = vm::reorderRailSections,
                 onReorderGroups = vm::reorderRailGroups, focusSelected = focusRail,
-            ) { nav = it }
+            ) {
+                nav = it
+                // Focusing or tapping a section clears its own "new" bubble.
+                vm.markNewSeen(NewPlace.Section(it.category))
+            }
         }
         PaddedBringIntoView {
         // Marks the pane's controls, so the one you leave is remembered for D-pad Right from the rail.
@@ -594,6 +601,8 @@ private fun RailGroupHeader(
         label = "railChevron",
     )
     val label = stringResource(group.titleRes)
+    val badges = LocalNewBadges.current
+    val isNew = badges.state.groupNew(group)
     val lit = f.value || lifted || holdsSelected
     Row(
         modifier = Modifier.fillMaxWidth()
@@ -627,7 +636,7 @@ private fun RailGroupHeader(
                 },
             )
             .focusRequester(requester)
-            .onFocusChanged { if (it.isFocused) onFocused() }
+            .onFocusChanged { if (it.isFocused) { badges.onSeen(NewPlace.Group(group)); onFocused() } }
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 if (grabbed) return@onKeyEvent when (e.key) {
@@ -650,6 +659,7 @@ private fun RailGroupHeader(
             }
             .focusControl(f) { if (grabbed) reorder.drop() else onToggle(!open) }
             .noRippleClickable {
+                badges.onSeen(NewPlace.Group(group))
                 // Closing by touch while one of its sections has focus: keep focus on the rail, on this header.
                 if (open) runCatching { requester.requestFocus() }
                 onToggle(!open)
@@ -657,7 +667,11 @@ private fun RailGroupHeader(
             .padding(start = 14.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(group.icon, null, tint = if (lit) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
+        // The "new" dot sits on the icon's top-left corner, so it reads as part of the row focused or not.
+        Icon(
+            group.icon, null, tint = if (lit) p.accent else p.textSecondary,
+            modifier = Modifier.size(20.dp).newCornerDot(isNew, p.accent, if (bg.alpha == 0f) p.rail else bg),
+        )
         Spacer(Modifier.width(13.dp))
         Text(
             lookLabel(label),
@@ -669,6 +683,7 @@ private fun RailGroupHeader(
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (isNew) NewBadgeLabel(label)
         Icon(
             Icons.Rounded.ExpandMore,
             contentDescription = stringResource(if (open) R.string.settings_rail_collapse else R.string.settings_rail_expand, label),
@@ -719,6 +734,7 @@ private fun RailItem(
     onFocused: () -> Unit,
 ) {
     val key = item.category.key
+    val isNew = LocalNewBadges.current.state.sectionNew(item.category)
     val f = focusState()
     val lifted = reorder?.isLifted(key) == true
     val grabbed = reorder?.grabbed == key
@@ -786,7 +802,11 @@ private fun RailItem(
             .padding(start = if (indent) 26.dp else 14.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(item.icon, null, tint = if (on || f.value || lifted) p.accent else p.textSecondary, modifier = Modifier.size(20.dp))
+        // The "new" dot sits on the icon's top-left corner, so it reads as part of the row focused or not.
+        Icon(
+            item.icon, null, tint = if (on || f.value || lifted) p.accent else p.textSecondary,
+            modifier = Modifier.size(20.dp).newCornerDot(isNew, p.accent, if (bg.alpha == 0f) p.rail else bg),
+        )
         Spacer(Modifier.width(13.dp))
         Text(
             lookLabel(stringResource(item.category.titleRes)),
@@ -794,8 +814,11 @@ private fun RailItem(
             fontSize = 15.sp,
             fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
             style = tccTextStyle(),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (isNew) NewBadgeLabel(stringResource(item.category.titleRes))
         // General is pinned: no handle, but the same room, so every row is the same height.
         if (reorder == null) { Spacer(Modifier.size(30.dp)); return@Row }
         Icon(
@@ -1029,7 +1052,10 @@ private fun SaveClipCard(state: SettingsState, vm: SettingsViewModel) {
  */
 @Composable
 private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
-    Card {
+    val isNew = LocalNewBadges.current.state.cardNew(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM)
+    Card(
+        Modifier.newCard(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM).newCornerDot(isNew, p.accent, p.bg),
+    ) {
         // The preview sits beside the details so the whole card fits on the top screen; on a card too narrow for that
         // (a wide look, a big font scale) it goes above them instead of squeezing the text.
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -1053,7 +1079,13 @@ private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
 @Composable
 private fun ThorKbmDetails(state: SettingsState, vm: SettingsViewModel, previewAbove: Boolean) {
     val status = state.thorKbm
-    CardTitle(stringResource(R.string.settings_thorkbm_title))
+    Row {
+        CardTitle(stringResource(R.string.settings_thorkbm_title))
+        // Zero-size: the card's corner dot, described for TalkBack.
+        if (LocalNewBadges.current.state.cardNew(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM)) {
+            NewBadgeLabel(stringResource(R.string.settings_thorkbm_title))
+        }
+    }
     CardDesc(stringResource(R.string.settings_thorkbm_desc))
     InfoLine(stringResource(R.string.settings_thorkbm_plugin_note), tone = p.textTertiary)
     if (previewAbove) {
@@ -1231,11 +1263,20 @@ private fun QuickToggles(state: SettingsState, vm: SettingsViewModel, scroll: Sc
         Card(Modifier.tourTarget(TourSpot.TILE_PICKER)) {
             jr.brian.commandpannel.system.QuickSettingTileId.entries.filter { it.category == cat }.forEach { tile ->
                 val checked = tile.key in state.enabledTiles
-                FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
-                    QuickToggleIcon(state, tile)
-                    Spacer(Modifier.width(14.dp))
-                    Text(stringResource(tile.labelRes), color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
+                // A tile new in this update carries a "new" bubble until its row gets focus or a touch.
+                val newCard = NewItems.TILE_CARDS[tile.key]
+                val isNew = newCard != null && LocalNewBadges.current.state.cardNew(SettingsCategory.QUICK_TOGGLES, newCard)
+                Box(
+                    (if (newCard != null) Modifier.newCard(SettingsCategory.QUICK_TOGGLES, newCard) else Modifier)
+                        .newCornerDot(isNew, p.accent, p.surface),
+                ) {
+                    FocusRow(selected = false, onClick = { vm.setTileEnabled(tile.key, !checked) }) {
+                        QuickToggleIcon(state, tile)
+                        Spacer(Modifier.width(14.dp))
+                        Text(stringResource(tile.labelRes), color = p.textPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        if (isNew) NewBadgeLabel(stringResource(tile.labelRes))
+                        AccentSwitch(checked) { vm.setTileEnabled(tile.key, it) }
+                    }
                 }
             }
         }
