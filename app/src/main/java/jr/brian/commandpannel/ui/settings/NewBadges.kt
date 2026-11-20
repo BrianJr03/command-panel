@@ -80,6 +80,9 @@ data class NewBadgeState(
     /** Keys to mark seen when [place] is focused or clicked (only items at that exact place; parents roll up). */
     fun keysAt(place: NewPlace): Set<String> = items.filter { it.place == place && isNew(it) }.mapTo(mutableSetOf()) { it.key }
 
+    /** What the screens see: this state, or nothing new while "Show New Dots" is off (#54). [seen] is kept as is. */
+    fun shown(showDots: Boolean): NewBadgeState = if (showDots) this else copy(baseline = Int.MAX_VALUE)
+
     companion object {
         const val KEY_BASELINE = "new_badge_baseline"
         const val KEY_SEEN = "new_badge_seen"

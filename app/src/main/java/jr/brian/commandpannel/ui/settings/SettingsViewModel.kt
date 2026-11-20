@@ -73,6 +73,8 @@ data class SettingsState(
     val hideNetSpeed: Boolean = false,
     val hideTileLabels: Boolean = false,
     val keepOnScreen: Boolean = true,
+    /** The "new" corner dots and rail bubbles (#54). Off hides them without marking anything seen. */
+    val showNewDots: Boolean = true,
     val backupMessage: String? = null,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
@@ -201,6 +203,7 @@ class SettingsViewModel @Inject constructor(
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
         hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
         keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
+        showNewDots = prefs.getBoolean(KEY_SHOW_NEW_DOTS, true),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
         accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
@@ -756,6 +759,11 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(keepOnScreen = enable)
     }
 
+    fun setShowNewDots(enable: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_NEW_DOTS, enable).apply()
+        _state.value = _state.value.copy(showNewDots = enable)
+    }
+
     fun setTileEnabled(key: String, enable: Boolean) {
         val csv = jr.brian.commandpannel.system.QuickSettingTileId
             .toggle(prefs.getString("qs_enabled_tiles", null), key, enable)
@@ -806,6 +814,8 @@ class SettingsViewModel @Inject constructor(
 
     /** Clears the bubble at [place] (focused or clicked); parents clear once their new children are all seen. */
     fun markNewSeen(place: NewPlace) {
+        // Hidden dots stay unseen, so turning them back on shows what's still new.
+        if (!_state.value.showNewDots) return
         val badges = _state.value.newBadges
         val keys = badges.keysAt(place)
         if (keys.isEmpty()) return
@@ -1463,6 +1473,8 @@ class SettingsViewModel @Inject constructor(
         const val KEY_BDSA_DISABLED = "bdsa_disabled_by_command_panel"
         /** The companion tour was finished or skipped. Not backed up, so a restored backup still gets the tour. */
         const val KEY_TOUR_SEEN = "companion_tour_seen"
+        /** Pref for "Show New Dots" (#54); on unless turned off. */
+        const val KEY_SHOW_NEW_DOTS = "show_new_dots"
         /** Theme Studio's unsaved draft, autosaved while it's open. Not backed up. */
         const val KEY_STUDIO_DRAFT = "studio_draft"
         /** The companion rail's section order, as a CSV of [SettingsCategory] keys. Backed up. */

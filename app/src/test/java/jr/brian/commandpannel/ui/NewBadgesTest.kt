@@ -156,4 +156,33 @@ class NewBadgesTest {
         assertEquals(17, NewBadgeState.firstBaseline(versionCode = 16, upgraded = false))
         assertFalse(NewBadgeState(baseline = 17).sectionNew(replay))
     }
+
+    @Test
+    fun `with Show New Dots off nothing is new anywhere, and nothing gets marked seen`() {
+        val on = NewBadgeState(baseline = 14, seen = setOf("card:thorkbm"))
+        val off = on.shown(showDots = false)
+        for (item in NewItems.ALL) {
+            assertFalse(item.key, off.isNew(item))
+            assertEquals(item.key, emptySet<String>(), off.keysAt(item.place))
+            when (val place = item.place) {
+                is NewPlace.Group -> assertFalse(off.groupNew(place.group))
+                is NewPlace.Section -> assertFalse(off.sectionNew(place.section))
+                is NewPlace.Card -> {
+                    assertFalse(off.cardNew(place.section, place.card))
+                    assertFalse(off.sectionNew(place.section))
+                }
+            }
+        }
+        RailGroup.entries.forEach { assertFalse(it.name, off.groupNew(it)) }
+        // The seen set is kept, so turning the dots back on shows only what's still unseen.
+        assertEquals(on.seen, off.seen)
+    }
+
+    @Test
+    fun `with Show New Dots on the state is unchanged`() {
+        val on = NewBadgeState(baseline = 14, seen = setOf("card:thorkbm"))
+        assertEquals(on, on.shown(showDots = true))
+        assertFalse(on.shown(true).cardNew(KEYBOARD, NewItems.CARD_THORKBM))
+        assertTrue(on.shown(true).sectionNew(KEYBOARD))
+    }
 }

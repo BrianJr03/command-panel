@@ -292,7 +292,7 @@ internal fun SettingsContent(
     ) {
     CompositionLocalProvider(
         LocalTourTargets provides if (touring || followingLook) tourTargets else null,
-        LocalNewBadges provides NewBadgesHost(state.newBadges, vm::markNewSeen),
+        LocalNewBadges provides NewBadgesHost(state.newBadges.shown(state.showNewDots), vm::markNewSeen),
     ) {
     Row(
         Modifier.fillMaxSize().then(backdrop).systemBarsPadding()
@@ -907,6 +907,11 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.settings_keep_on_screen_desc),
         state.keepOnScreen, vm::setKeepOnScreen,
         Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
+    )
+    SwitchCard(
+        stringResource(R.string.settings_show_new_dots),
+        stringResource(R.string.settings_show_new_dots_desc),
+        state.showNewDots, vm::setShowNewDots,
     )
     Card(Modifier.tourTarget(TourSpot.BACKUP)) {
         CardTitle(stringResource(R.string.settings_backup_title))

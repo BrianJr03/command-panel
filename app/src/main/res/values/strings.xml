@@ -195,6 +195,8 @@
     <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>
     <string name="settings_keep_on_screen">Keep Apps That Are On Screen</string>
     <string name="settings_keep_on_screen_desc">When Clear All Tasks runs, keep apps showing on either screen, their companion screens and the home app. Turn off to clear everything except this app, the stock assistant and the system.</string>
+    <string name="settings_show_new_dots">Show New Dots</string>
+    <string name="settings_show_new_dots_desc">Put a dot on settings that are new after an update. Turning this off only hides the dots: anything you haven\'t seen yet shows again when you turn it back on.</string>
     <string name="settings_backup_title">Backup &amp; Restore</string>
     <string name="settings_backup_desc">Export the companion settings to a JSON file, or restore the most recent backup.</string>
     <string name="settings_backup_export">Export</string>
