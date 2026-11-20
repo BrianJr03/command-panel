@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import jr.brian.commandpannel.BuildConfig
 import jr.brian.commandpannel.R
@@ -42,10 +43,13 @@ import jr.brian.commandpannel.ui.overlay.OverlayActions
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.ui.overlay.PanelPluginButton
 import jr.brian.commandpannel.privileged.RootHelper
+import jr.brian.commandpannel.replay.studio.ReplayPauseGate
+import jr.brian.commandpannel.replay.studio.ReplayPlayerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -73,6 +77,12 @@ class AssistantService : Service() {
     private lateinit var coexistence: StockCoexistence
     private lateinit var tapWaker: ExternalDisplayTapWaker
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
+    /** Pauses the Replay Buffer while Replay Studio's player is in front (#46); only touched on [replayPlayerOps]. */
+    private val replayPlayerGate = ReplayPauseGate()
+    /** One at a time, in order, so a quick open-then-close never re-arms before the pause ran. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val replayPlayerOps = Dispatchers.IO.limitedParallelism(1)
+    private var replayPlayerWatch: kotlinx.coroutines.Job? = null
     private lateinit var bdsa: BdsaDetector
     private lateinit var quickLaunchReturn: QuickLaunchReturnWatcher
     /** Installed Panel plugins (their nav buttons) and the session that hands them the bottom screen (#19). */
@@ -156,6 +166,12 @@ class AssistantService : Service() {
                 ACTION_DEBUG_HELPER_START -> if (BuildConfig.DEBUG) scope.launch {
                     Log.i(TAG, "debug: starting the root helper")
                     privileged.initialize(applicationContext)
+                }
+                // Opens Replay Studio's player on a clip ([EXTRA_CLIP_PATH]), for scripts; the activity isn't exported.
+                ACTION_DEBUG_OPEN_PLAYER -> if (BuildConfig.DEBUG) {
+                    intent.getStringExtra(EXTRA_CLIP_PATH)?.let {
+                        ReplayPlayerActivity.launch(applicationContext, it)
+                    }
                 }
                 // The Mode tab's own path (dual / only top / only bottom), for scripts.
                 ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
@@ -308,6 +324,9 @@ class AssistantService : Service() {
             ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
             // Only reachable through ExternalTriggerReceiver (the service isn't exported); a no-op on standby.
             ACTION_REPLAY_SAVE_OR_ARM -> saveOrArmReplay(SOURCE_EXTERNAL)
+            // Sent by ReplayPlayerActivity (same app; the service isn't exported).
+            ACTION_REPLAY_PLAYER_OPEN -> onReplayPlayer(open = true)
+            ACTION_REPLAY_PLAYER_CLOSED -> onReplayPlayer(open = false)
         }
         return START_STICKY
     }
@@ -427,6 +446,50 @@ class AssistantService : Service() {
             overlay.show()
             pluginSession.start(plugin)
         }
+    }
+
+    /**
+     * Replay Studio's player came to the front ([open], also its periodic check-in) or left it. The Replay Buffer pauses
+     * so the clip isn't recorded, and comes back when the player leaves. While paused, a watch re-arms it if the player
+     * is gone or stops checking in, so the buffer never stays off. [ReplayPauseGate] makes every decision.
+     */
+    private fun onReplayPlayer(open: Boolean) {
+        scope.launch(replayPlayerOps) {
+            val action = if (open) {
+                replayPlayerGate.onPlayerOpen(SystemClock.elapsedRealtime(), replay.isArmed)
+            } else {
+                replayPlayerGate.onPlayerClose(replayEnabled())
+            }
+            applyReplayPlayerAction(action, if (open) "player open" else "player closed")
+            if (replayPlayerGate.paused && replayPlayerWatch?.isActive != true) {
+                replayPlayerWatch = scope.launch(replayPlayerOps) {
+                    while (replayPlayerGate.paused) {
+                        delay(ReplayPauseGate.CHECK_MS)
+                        val check = replayPlayerGate.onCheck(
+                            SystemClock.elapsedRealtime(),
+                            playerAlive = ReplayPlayerActivity.isStarted,
+                            enabled = replayEnabled(),
+                        )
+                        applyReplayPlayerAction(check, "player watch")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun replayEnabled(): Boolean = Prefs.of(applicationContext).getBoolean("replay_enabled", false)
+
+    /** Runs a [ReplayPauseGate] decision on the buffer. Logged as `replay-pause:` for scripts (verify-46.sh). */
+    private fun applyReplayPlayerAction(action: ReplayPauseGate.Action, reason: String) {
+        when (action) {
+            ReplayPauseGate.Action.DISARM -> runCatching { replay.disarm() }
+                .onFailure { Log.w(TAG, "replay-pause: disarm failed", it) }
+            ReplayPauseGate.Action.REARM -> if (!replay.isArmed) {
+                runCatching { replay.arm() }.onFailure { Log.w(TAG, "replay-pause: re-arm failed", it) }
+            }
+            ReplayPauseGate.Action.NONE -> if (reason == "player watch") return
+        }
+        Log.i(TAG, "replay-pause: $reason -> $action paused=${replayPlayerGate.paused} armed=${replay.isArmed}")
     }
 
     /**
@@ -572,6 +635,7 @@ class AssistantService : Service() {
             addAction(ACTION_REPLAY_SAVE)
             addAction(ACTION_REPLAY_REARM)
             if (BuildConfig.DEBUG) {
+                addAction(ACTION_DEBUG_OPEN_PLAYER)
                 addAction(ACTION_DEBUG_PLUGIN_START)
                 addAction(ACTION_DEBUG_PLUGIN_END)
                 addAction(ACTION_DEBUG_HELPER_STOP)
@@ -646,6 +710,13 @@ class AssistantService : Service() {
         /** Debug builds only: pick a screen mode as the Mode tab does ([EXTRA_MODE]: 0 dual, 1 only top, 2 only bottom). */
         const val ACTION_DEBUG_SELECT_MODE = "jr.brian.commandpannel.action.DEBUG_SELECT_MODE"
         const val EXTRA_MODE = "mode"
+        /** From Replay Studio's player: it's in front (sent again every minute as a check-in); pauses the buffer. */
+        const val ACTION_REPLAY_PLAYER_OPEN = "jr.brian.commandpannel.action.REPLAY_PLAYER_OPEN"
+        /** From Replay Studio's player: it left the front; the buffer re-arms if the user has it on. */
+        const val ACTION_REPLAY_PLAYER_CLOSED = "jr.brian.commandpannel.action.REPLAY_PLAYER_CLOSED"
+        /** Debug builds only: open Replay Studio's player on [EXTRA_CLIP_PATH] (scripts). */
+        const val ACTION_DEBUG_OPEN_PLAYER = "jr.brian.commandpannel.action.DEBUG_OPEN_PLAYER"
+        const val EXTRA_CLIP_PATH = "clip_path"
         /** On [ACTION_DEBUG_PLUGIN_START]: the plugin service, as `package/class`; the first listed one when missing. */
         const val EXTRA_PLUGIN_COMPONENT = "component"
         /** On [ACTION_DEBUG_PLUGIN_START]: also accept a plugin whose signing key isn't allowlisted. */

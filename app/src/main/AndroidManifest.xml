@@ -81,6 +81,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Replay Studio's player (#46). Not exported: only the app opens it (scripts use the debug-only
+             ACTION_DEBUG_OPEN_PLAYER broadcast). Handles display and size changes itself, so playback isn't restarted. -->
+        <activity
+            android:name=".replay.studio.ReplayPlayerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|uiMode" />
+
         <service
             android:name=".service.AssistantService"
             android:directBootAware="true"

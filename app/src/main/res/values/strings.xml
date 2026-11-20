@@ -251,6 +251,58 @@
     <string name="replay_target_bottom">Bottom screen</string>
     <string name="replay_target_both">Both screens</string>
 
+    <!-- Replay Studio: player -->
+    <string name="player_video_description">Clip video</string>
+    <string name="player_loading">Loading clip…</string>
+    <string name="player_error_open">Couldn\'t open this clip.</string>
+    <string name="player_error_playback">This clip can\'t be played. It may be damaged or only partly saved.</string>
+    <string name="player_error_hint">Press B to close, or L1 / R1 for another clip.</string>
+    <string name="player_no_newer">No newer clips</string>
+    <string name="player_no_older">No older clips</string>
+    <string name="player_counter">%1$d of %2$d</string>
+    <string name="player_time" translatable="false">%1$d:%2$02d</string>
+    <string name="player_time_of">%1$s / %2$s</string>
+    <string name="player_hint_play">Play</string>
+    <string name="player_hint_pause">Pause</string>
+    <string name="player_hint_seek">5 s</string>
+    <string name="player_hint_clips">Clips</string>
+    <string name="player_hint_close">Close</string>
+    <string name="player_key_dpad" translatable="false">◀ ▶</string>
+    <string name="player_key_shoulders" translatable="false">L1 R1</string>
+
+    <!-- Companion: Replay Studio (clip grid, share, delete) -->
+    <string name="settings_replay_studio">Replay Studio</string>
+    <string name="settings_replay_studio_desc">Watch, share and delete your saved clips.</string>
+    <string name="studio_title">Replay Studio</string>
+    <string name="studio_back">Back</string>
+    <string name="studio_loading">Loading clips…</string>
+    <string name="studio_unavailable_title">Clips can\'t be read right now</string>
+    <string name="studio_unavailable_desc">Replay Studio needs the root helper to read your clips folder. Run the checks in Diagnostics to start it again.</string>
+    <string name="studio_empty_title">No clips yet</string>
+    <string name="studio_empty_desc">Turn on the Replay Buffer and save a clip, and it shows up here.</string>
+    <plurals name="studio_clip_count">
+        <item quantity="one">%1$d clip</item>
+        <item quantity="other">%1$d clips</item>
+    </plurals>
+    <string name="studio_hint_play">Play</string>
+    <string name="studio_hint_options">Options</string>
+    <string name="studio_hint_back">Back</string>
+    <string name="studio_badge_top">Top</string>
+    <string name="studio_badge_bottom">Bottom</string>
+    <string name="studio_badge_both">Both</string>
+    <string name="studio_badge_trimmed">Trimmed</string>
+    <string name="studio_action_share">Share</string>
+    <string name="studio_action_trim">Trim</string>
+    <string name="studio_action_trim_soon">Coming soon</string>
+    <string name="studio_action_delete">Delete</string>
+    <string name="studio_share_title">Share clip</string>
+    <string name="studio_share_failed">Couldn\'t share the clip.</string>
+    <string name="studio_delete_title">Delete this clip?</string>
+    <string name="studio_delete_body">The clip from %1$s is removed from your device. This can\'t be undone.</string>
+    <string name="studio_delete_cancel">Cancel</string>
+    <string name="studio_delete_confirm">Delete</string>
+    <string name="studio_delete_failed">Couldn\'t delete the clip.</string>
+
     <!-- Companion: Quick Launch / Nav Bar -->
     <string name="settings_quick_launch">Quick Launch</string>
     <string name="settings_quick_launch_desc">Add a Launch button to the overlay nav bar that opens a chosen app on a chosen screen.</string>

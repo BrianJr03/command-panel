@@ -75,6 +75,8 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
+    // Replay Studio player. Only the core player: the video surface is our own SurfaceView (see ReplayVideoOutput).
+    implementation(libs.androidx.media3.exoplayer)
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20231013")  // real org.json for unit tests (the SDK one is a stub)
