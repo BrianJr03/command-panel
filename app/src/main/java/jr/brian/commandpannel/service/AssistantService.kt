@@ -43,6 +43,7 @@ import jr.brian.commandpannel.ui.overlay.OverlayActions
 import jr.brian.commandpannel.ui.overlay.OverlayRoot
 import jr.brian.commandpannel.ui.overlay.PanelPluginButton
 import jr.brian.commandpannel.privileged.RootHelper
+import jr.brian.commandpannel.replay.studio.ClipSavedNotice
 import jr.brian.commandpannel.replay.studio.ReplayPauseGate
 import jr.brian.commandpannel.replay.studio.ReplayPlayerActivity
 import kotlinx.coroutines.CoroutineScope
@@ -173,6 +174,8 @@ class AssistantService : Service() {
                         ReplayPlayerActivity.launch(applicationContext, it)
                     }
                 }
+                // The double press's save (toast and notification with View, #48), for scripts.
+                ACTION_DEBUG_SAVE_OR_ARM -> if (BuildConfig.DEBUG) saveOrArmReplay(SOURCE_DOUBLE_PRESS)
                 // The Mode tab's own path (dual / only top / only bottom), for scripts.
                 ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
@@ -511,7 +514,7 @@ class AssistantService : Service() {
                 }
                 ReplayTriggerAction.SAVE -> Unit
             }
-            // Say it right away; a second toast follows only if the save fails.
+            // Say it right away; a second toast says how it went (saved, with View, or failed).
             val saving = when (replay.armedTarget) {
                 jr.brian.commandpannel.privileged.ReplayTarget.TOP -> R.string.msg_replay_double_saving_top
                 jr.brian.commandpannel.privileged.ReplayTarget.BOTTOM -> R.string.msg_replay_double_saving_bottom
@@ -522,7 +525,17 @@ class AssistantService : Service() {
             Log.i(TAG, "replay save ($source): $result")
             sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
             if (result.startsWith("error:")) toast.show(getString(R.string.msg_save_failed, result.removePrefix("error:")))
+            ClipSavedNotice.savedPath(result)?.let(::announceClipSaved)
         }
+    }
+
+    /** A clip was saved at [path]: a toast and a notification, both with View, which opens it in the player (#48). */
+    private fun announceClipSaved(path: String) {
+        toast.show(getString(R.string.msg_replay_clip_saved), getString(R.string.notif_clip_saved_view)) {
+            Log.i(TAG, "clip-saved: view from toast")
+            ReplayPlayerActivity.launch(applicationContext, path)
+        }
+        ClipSavedNotice.notify(applicationContext, path)
     }
 
     /**
@@ -636,6 +649,7 @@ class AssistantService : Service() {
             addAction(ACTION_REPLAY_REARM)
             if (BuildConfig.DEBUG) {
                 addAction(ACTION_DEBUG_OPEN_PLAYER)
+                addAction(ACTION_DEBUG_SAVE_OR_ARM)
                 addAction(ACTION_DEBUG_PLUGIN_START)
                 addAction(ACTION_DEBUG_PLUGIN_END)
                 addAction(ACTION_DEBUG_HELPER_STOP)
@@ -717,6 +731,8 @@ class AssistantService : Service() {
         /** Debug builds only: open Replay Studio's player on [EXTRA_CLIP_PATH] (scripts). */
         const val ACTION_DEBUG_OPEN_PLAYER = "jr.brian.commandpannel.action.DEBUG_OPEN_PLAYER"
         const val EXTRA_CLIP_PATH = "clip_path"
+        /** Debug builds only: what a double press does (arm, or save a clip and announce it), for scripts (#48). */
+        const val ACTION_DEBUG_SAVE_OR_ARM = "jr.brian.commandpannel.action.DEBUG_SAVE_OR_ARM"
         /** On [ACTION_DEBUG_PLUGIN_START]: the plugin service, as `package/class`; the first listed one when missing. */
         const val EXTRA_PLUGIN_COMPONENT = "component"
         /** On [ACTION_DEBUG_PLUGIN_START]: also accept a plugin whose signing key isn't allowlisted. */
