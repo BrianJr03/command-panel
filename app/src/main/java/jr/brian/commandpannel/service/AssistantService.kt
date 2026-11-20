@@ -185,6 +185,12 @@ class AssistantService : Service() {
                 ACTION_DEBUG_SAVE_OR_ARM -> if (BuildConfig.DEBUG) saveOrArmReplay(SOURCE_DOUBLE_PRESS)
                 // The Mode tab's own path (dual / only top / only bottom), for scripts.
                 ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
+                // The Performance dialog's path (with its fan fallback), and opening a tile's dialog, for scripts (#59).
+                ACTION_DEBUG_SET_PERFORMANCE -> if (BuildConfig.DEBUG) repository.setPerformance(intent.getIntExtra(EXTRA_MODE, 0))
+                ACTION_DEBUG_OPEN_DIALOG -> if (BuildConfig.DEBUG) {
+                    showPanel(auto = false)
+                    jr.brian.commandpannel.ui.overlay.OverlayDebug.openDialog.value = intent.getStringExtra(EXTRA_TILE)
+                }
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
@@ -680,6 +686,8 @@ class AssistantService : Service() {
                 addAction(ACTION_DEBUG_HELPER_STOP)
                 addAction(ACTION_DEBUG_HELPER_START)
                 addAction(ACTION_DEBUG_SELECT_MODE)
+                addAction(ACTION_DEBUG_SET_PERFORMANCE)
+                addAction(ACTION_DEBUG_OPEN_DIALOG)
             }
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
@@ -749,6 +757,11 @@ class AssistantService : Service() {
         /** Debug builds only: pick a screen mode as the Mode tab does ([EXTRA_MODE]: 0 dual, 1 only top, 2 only bottom). */
         const val ACTION_DEBUG_SELECT_MODE = "jr.brian.commandpannel.action.DEBUG_SELECT_MODE"
         const val EXTRA_MODE = "mode"
+        /** Debug builds only: set `performance_mode` as the Performance dialog does ([EXTRA_MODE]: 0, 1 or 2). */
+        const val ACTION_DEBUG_SET_PERFORMANCE = "jr.brian.commandpannel.action.DEBUG_SET_PERFORMANCE"
+        /** Debug builds only: show the panel with a tile's dialog open ([EXTRA_TILE], e.g. `fan`). */
+        const val ACTION_DEBUG_OPEN_DIALOG = "jr.brian.commandpannel.action.DEBUG_OPEN_DIALOG"
+        const val EXTRA_TILE = "tile"
         /** From Replay Studio's player: it's in front (sent again every minute as a check-in); pauses the buffer. */
         const val ACTION_REPLAY_PLAYER_OPEN = "jr.brian.commandpannel.action.REPLAY_PLAYER_OPEN"
         /** From Replay Studio's player: it left the front; the buffer re-arms if the user has it on. */

@@ -85,6 +85,7 @@
     <string name="dialog_screenshot_top">Top Screen</string>
     <string name="dialog_screenshot_bottom">Bottom Screen</string>
     <string name="dialog_screenshot_both">Both Screens</string>
+    <string name="dialog_fan_speed">Fan\n%1$d%%</string>
 
     <!-- Quick tile names (companion list; stock tiles reuse stock keys) -->
     <string name="tile_name_wifi">Wi-Fi</string>

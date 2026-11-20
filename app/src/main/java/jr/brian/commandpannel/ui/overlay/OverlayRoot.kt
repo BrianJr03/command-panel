@@ -145,6 +145,8 @@ fun OverlayRoot(
                     )
                 }
             }
+            // Debug builds: scripts open a dialog in the real panel window only, not in look previews.
+            if (windowBlur != null) DebugDialogRequests { dialog = it }
             OverlayDialogLayer(dialog, state, actions, onDismiss = { dialog = OverlayDialogKind.NONE })
             if (showBottomTip) {
                 BottomTipDialog(

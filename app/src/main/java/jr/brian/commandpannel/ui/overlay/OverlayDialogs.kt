@@ -21,14 +21,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import jr.brian.commandpannel.BuildConfig
+import jr.brian.commandpannel.system.FanControl
+import jr.brian.commandpannel.ui.components.TccSliderRow
 import jr.brian.commandpannel.ui.components.rememberStockPainter
+import kotlinx.coroutines.flow.MutableStateFlow
 import jr.brian.commandpannel.ui.components.stockIconColorFilter
 import jr.brian.commandpannel.ui.theme.LocalTccColors
 
@@ -47,9 +60,50 @@ fun dialogForTile(id: String): OverlayDialogKind? = when (id) {
     else -> null
 }
 
+/**
+ * Debug builds only: lets scripts open a tile's dialog (`AssistantService.ACTION_DEBUG_OPEN_DIALOG`), and logs where
+ * the fan dialog's Custom row and slider sit on the bottom screen so a script can tap them (the overlay never takes
+ * focus, so key events can't reach it).
+ */
+object OverlayDebug {
+    const val TAG = "OverlayDebug"
+    internal val openDialog = MutableStateFlow<String?>(null)
+}
+
+/** Opens the dialog a script asked for through [OverlayDebug.openDialog]. A no-op outside debug builds. */
+@Composable
+fun DebugDialogRequests(onOpen: (OverlayDialogKind) -> Unit) {
+    if (!BuildConfig.DEBUG) return
+    LaunchedEffect(Unit) {
+        OverlayDebug.openDialog.collect { id ->
+            if (id == null) return@collect
+            dialogForTile(id)?.let(onOpen)
+            OverlayDebug.openDialog.value = null
+        }
+    }
+}
+
+/** Logs a node's bounds on screen (debug builds), once per change. */
+private fun Modifier.debugBounds(name: String): Modifier = if (!BuildConfig.DEBUG) this else composed {
+    var last by remember { mutableStateOf("") }
+    onGloballyPositioned { c ->
+        val b = c.boundsInWindow()
+        val text = "${b.left.toInt()},${b.top.toInt()},${b.right.toInt()},${b.bottom.toInt()}"
+        if (text != last) { last = text; android.util.Log.d(OverlayDebug.TAG, "bounds $name=$text") }
+    }
+}
+
 private data class DialogOption(@StringRes val labelRes: Int, val icon: String, val value: Int)
 
-private data class DialogSpec(val titleIcon: String, @StringRes val titleRes: Int, val options: List<DialogOption>, val selected: Int, val onSelect: (Int) -> Unit)
+private data class DialogSpec(
+    val titleIcon: String,
+    @StringRes val titleRes: Int,
+    val options: List<DialogOption>,
+    val selected: Int,
+    val onSelect: (Int) -> Unit,
+    /** An option that keeps the dialog open when picked (the fan's Custom, which shows its slider). */
+    val keepOpenValue: Int? = null,
+)
 
 @Composable
 fun OverlayDialogLayer(
@@ -86,21 +140,58 @@ fun OverlayDialogLayer(
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(spec.titleRes), color = colors.primary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             }
+            // Picked here until the settings observer catches up, so Custom's slider shows right away.
+            var selected by remember(kind, spec.selected) { mutableIntStateOf(spec.selected) }
             spec.options.forEach { opt ->
-                OptionRow(opt, selected = opt.value == spec.selected) {
+                OptionRow(opt, selected = opt.value == selected, modifier = Modifier.debugBounds("option_${opt.value}")) {
                     spec.onSelect(opt.value)
-                    onDismiss()
+                    selected = opt.value
+                    if (opt.value != spec.keepOpenValue) onDismiss()
+                }
+                // Like stock, Custom carries a fan speed slider while it's the selected mode.
+                if (kind == OverlayDialogKind.FAN && opt.value == FanControl.CUSTOM && selected == FanControl.CUSTOM) {
+                    FanSpeedSlider(state, actions)
                 }
             }
         }
     }
 }
 
+/**
+ * The Custom fan mode's speed slider, in the look's slider style. The label shows the duty the value asks for
+ * (`fan_speed` as a percent of the range's top, 50 % to 100 % on a Thor). `fan_speed` is written once the slider
+ * settles (drag released or tap), not on every step of a drag.
+ */
 @Composable
-private fun OptionRow(option: DialogOption, selected: Boolean, onClick: () -> Unit) {
+private fun FanSpeedSlider(state: OverlayUiState, actions: OverlayActions) {
+    val range = state.fanSpeedRange
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
+    // Holds the written value until the settings observer brings it back, so the bar doesn't jump back meanwhile.
+    var written by remember(state.fanSpeed) { mutableStateOf<Int?>(null) }
+    val fraction = dragFraction ?: FanControl.speedToFraction(written ?: state.fanSpeed, range)
+    val percent = FanControl.speedPercent(FanControl.fractionToSpeed(fraction, range), range)
+    TccSliderRow(
+        label = stringResource(R.string.dialog_fan_speed, percent),
+        fraction = fraction,
+        iconBase = "ic_fan_custom_mode",
+        modifier = Modifier.padding(top = 2.dp, bottom = 6.dp).debugBounds("fan_slider"),
+    ) { f, committed ->
+        if (committed) {
+            val speed = FanControl.fractionToSpeed(f, range)
+            written = speed
+            dragFraction = null
+            if (speed != state.fanSpeed) actions.setFanSpeed(speed)
+        } else {
+            dragFraction = f
+        }
+    }
+}
+
+@Composable
+private fun OptionRow(option: DialogOption, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = LocalTccColors.current
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .noRippleClickable(onClick = onClick)
             .padding(vertical = 8.dp),
@@ -152,15 +243,10 @@ private fun specFor(kind: OverlayDialogKind, state: OverlayUiState, actions: Ove
     )
     OverlayDialogKind.FAN -> DialogSpec(
         "ic_qs_fan_control", R.string.text_fan_control_title,
-        buildList {
-            // Stock: perf 1 hides Off; perf 2 hides Off + Quiet; perf 0 hides Custom.
-            if (state.performanceMode == 0) add(DialogOption(R.string.text_fan_control_off, "ic_ban_on_use", 0))
-            if (state.performanceMode < 2) add(DialogOption(R.string.text_fan_control_low_speed, "ic_fan_quiet_mode", 1))
-            add(DialogOption(R.string.text_fan_control_smart, "ic_fan_smart_mode", 4))
-            add(DialogOption(R.string.text_fan_control_medium_speed, "ic_fan_sport_mode", 5))
-            if (state.performanceMode != 0) add(DialogOption(R.string.text_fan_control_custom, "ic_fan_custom_mode", 6))
-        },
+        // Stock: perf 0 hides Custom; perf 1 hides Off + Custom; perf 2 hides Off + Quiet.
+        FanControl.options(state.performanceMode).map(::fanOption),
         state.fanMode, actions::setFanMode,
+        keepOpenValue = FanControl.CUSTOM,
     )
     OverlayDialogKind.CONTROLLER -> DialogSpec(
         "ic_qs_controller_style", R.string.text_handle_style_title,
@@ -199,4 +285,12 @@ private fun specFor(kind: OverlayDialogKind, state: OverlayUiState, actions: Ove
         selected = -1, onSelect = actions::takeScreenshot,
     )
     OverlayDialogKind.NONE -> error("no dialog")
+}
+
+private fun fanOption(mode: Int): DialogOption = when (mode) {
+    FanControl.OFF -> DialogOption(R.string.text_fan_control_off, "ic_ban_on_use", mode)
+    FanControl.QUIET -> DialogOption(R.string.text_fan_control_low_speed, "ic_fan_quiet_mode", mode)
+    FanControl.SMART -> DialogOption(R.string.text_fan_control_smart, "ic_fan_smart_mode", mode)
+    FanControl.SPORT -> DialogOption(R.string.text_fan_control_medium_speed, "ic_fan_sport_mode", mode)
+    else -> DialogOption(R.string.text_fan_control_custom, "ic_fan_custom_mode", mode)
 }

@@ -21,6 +21,8 @@ data class OverlayUiState(
     val performanceMode: Int = 0,
     val fanMode: Int = 1,            // 0/1/4/5/6
     val fanSpeed: Int = 25000,
+    /** The custom fan slider's `fan_speed` range, from FanProvider (fallback until it's read). */
+    val fanSpeedRange: IntRange = jr.brian.commandpannel.system.FanControl.FALLBACK_SPEED_RANGE,
     val controllerStyle: Int = 1,    // temp_abxy_layout_mode
     val triggerMode: Int = 2,        // trigger_input_mode: 0 digital, 1 analog, 2 both
 

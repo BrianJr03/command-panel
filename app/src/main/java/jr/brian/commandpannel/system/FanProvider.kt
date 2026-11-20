@@ -9,7 +9,9 @@ import android.util.Log
  * (`SettingsController` → `FanProvider`). The capability probe confirmed a user app may call it directly.
  *
  *  - `SettingsController` (`com.ro.settings.IExternalControlManager`) txn 1, writeString("FanProvider") → binder
- *  - `IFanControlProvider`: txn 3 → float live duty (×100 = %), txn 1/2 → int min/max, txn 10 → set manual speed
+ *  - `IFanControlProvider`: txn 3 → float live duty (×100 = %), txn 1 → int max and txn 2 → int min of the custom
+ *    `fan_speed` range (stock's seekbar does `setMax(txn 1)`, `setMin(txn 2)`; a Thor reports 50000 and 25000),
+ *    txn 10 → int (read by stock's fan ring callback, meaning unknown)
  */
 object FanProvider {
     private const val TAG = "FanProvider"
@@ -32,6 +34,30 @@ object FanProvider {
             reply.readStrongBinder()
         } catch (t: Throwable) {
             Log.w(TAG, "getProvider(FanProvider) failed", t); null
+        } finally {
+            data.recycle(); reply.recycle()
+        }
+    }
+
+    // The custom range doesn't change while running, so the first good read is kept.
+    @Volatile private var cachedRange: IntRange? = null
+
+    /** The custom `fan_speed` range (low..high, whichever bound comes back larger), or null if unavailable. */
+    fun speedRange(): IntRange? {
+        cachedRange?.let { return it }
+        val p = providerBinder() ?: return null
+        return FanControl.speedRange(readInt(p, 1), readInt(p, 2))?.also { cachedRange = it }
+    }
+
+    private fun readInt(p: IBinder, txn: Int): Int? {
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(PROVIDER)
+            p.transact(txn, data, reply, 0)
+            reply.readException()
+            reply.readInt()
+        } catch (t: Throwable) {
+            Log.w(TAG, "txn $txn failed", t); null
         } finally {
             data.recycle(); reply.recycle()
         }

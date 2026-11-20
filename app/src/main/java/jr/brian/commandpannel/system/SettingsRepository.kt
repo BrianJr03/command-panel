@@ -67,7 +67,7 @@ class SettingsRepository(
     val uiState: StateFlow<OverlayUiState> = _uiState.asStateFlow()
 
     private val observed = listOf(
-        Keys.DISPLAY_MODE, Keys.FOCUS_LOCK, Keys.PERFORMANCE_MODE, Keys.FAN_MODE, Keys.CONTROLLER_STYLE,
+        Keys.DISPLAY_MODE, Keys.FOCUS_LOCK, Keys.PERFORMANCE_MODE, Keys.FAN_MODE, Keys.FAN_SPEED, Keys.CONTROLLER_STYLE,
         Keys.CHARGING_SEPARATION, Keys.VIBRATE_ON, Keys.FORCE_LANDSCAPE, Keys.JOYSTICK_LIGHT, Keys.THEME_MODE,
         Keys.SECONDARY_VOLUME, Keys.DUAL_BRIGHTNESS, Keys.PEAK_REFRESH, Keys.SCREEN_BRIGHTNESS,
         jr.brian.commandpannel.privileged.ThorRgbController.PICKER_COLOR_KEY,
@@ -118,6 +118,10 @@ class SettingsRepository(
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
         refreshFromSettings()
         telemetry.start(scope)
+        // The custom fan slider's range comes from the vendor fan service (a binder call, so off the main thread).
+        scope.launch(Dispatchers.IO) {
+            FanProvider.speedRange()?.let { range -> _uiState.update { it.copy(fanSpeedRange = range) } }
+        }
         batteryEstimate.start(scope)
         scope.launch { batteryEstimate.text.collect { est -> _uiState.update { it.copy(batteryEstimate = est) } } }
         scope.launch { uiState.collect { OverlayOnboarding.activeStep.value = it.onboardingStep } }
@@ -564,8 +568,16 @@ class SettingsRepository(
 
     override fun setPerformance(value: Int) {
         settings.putInt(Keys.PERFORMANCE_MODE, value)
-        // Stock interlock: High performance (2) forces the fan out of Off (0) into Smart (4).
-        if (value == 2 && settings.getInt(Keys.FAN_MODE, 1) == 0) settings.putInt(Keys.FAN_MODE, 4)
+        // The firmware's FanTile resets fan_mode itself when performance_mode is written (when its "quick set
+        // performance and fan" option is on). Give it a moment, then only fix a mode the new level still hides
+        // (Custom below High, Off or Quiet at High), so we don't race its write.
+        scope?.launch(Dispatchers.IO) {
+            delay(FAN_FALLBACK_DELAY_MS)
+            if (settings.getInt(Keys.PERFORMANCE_MODE, 0) != value) return@launch
+            val fan = settings.getInt(Keys.FAN_MODE, 1)
+            val next = FanControl.modeAfterPerformanceChange(value, fan)
+            if (next != fan) settings.putInt(Keys.FAN_MODE, next)
+        }
     }
 
     override fun setFanMode(value: Int) = settings.putInt(Keys.FAN_MODE, value)
@@ -711,6 +723,8 @@ class SettingsRepository(
         const val BOTTOM_WRITE_INTERVAL_MS = 100L
         /** How long a slider keeps ignoring change notifications after its release or last write. */
         const val ECHO_HOLD_MS = 400L
+        /** How long after a performance change the firmware gets to reset fan_mode before we check it. */
+        const val FAN_FALLBACK_DELAY_MS = 1500L
         // AudioManager's hidden VOLUME_CHANGED_ACTION and its stream extra.
         const val ACTION_VOLUME_CHANGED = "android.media.VOLUME_CHANGED_ACTION"
         const val EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE"
