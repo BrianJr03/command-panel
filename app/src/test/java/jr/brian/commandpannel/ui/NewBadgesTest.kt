@@ -145,6 +145,11 @@ class NewBadgesTest {
         // Nothing older shows to someone on 0.10.1.
         assertFalse(s.sectionNew(KEYBOARD))
         s = s.copy(seen = s.seen + s.keysAt(studio))
+        // "Play on the recorded screen" (#47) is new in the same release; the section clears once both are seen.
+        val sourceScreen = NewPlace.Card(replay, NewItems.CARD_REPLAY_SOURCE_SCREEN)
+        assertTrue(s.cardNew(replay, NewItems.CARD_REPLAY_SOURCE_SCREEN))
+        assertTrue(s.sectionNew(replay))
+        s = s.copy(seen = s.seen + s.keysAt(sourceScreen))
         assertFalse(s.sectionNew(replay))
         assertFalse(s.groupNew(RailGroup.EXTRAS))
         // A fresh install of the Replay Studio release shows nothing.

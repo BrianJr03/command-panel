@@ -254,11 +254,14 @@ class PanelPluginSession(
         }
     }
 
-    private companion object {
-        const val TAG = "PanelPlugin"
-        /** Set while a session is busy: the plugin's component, for [clearStale]. */
-        const val PREF_SESSION = "panel_plugin_session"
+    companion object {
+        private const val TAG = "PanelPlugin"
+        /**
+         * Set while a session is busy: the plugin's component, for [clearStale]. Replay Studio's player reads it too, to
+         * keep a clip off the lower screen while a plugin has it (#47).
+         */
+        internal const val PREF_SESSION = "panel_plugin_session"
         /** The handback's `MSG_HIDE` goes out by now even if the panel never reports itself drawn (fade is 200 ms). */
-        const val HANDBACK_FALLBACK_MS = 1_000L
+        private const val HANDBACK_FALLBACK_MS = 1_000L
     }
 }

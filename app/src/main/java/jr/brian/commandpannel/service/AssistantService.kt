@@ -170,6 +170,13 @@ class AssistantService : Service() {
                 }
                 // Opens Replay Studio's player on a clip ([EXTRA_CLIP_PATH]), for scripts; the activity isn't exported.
                 ACTION_DEBUG_OPEN_PLAYER -> if (BuildConfig.DEBUG) {
+                    // Optional: set "Play on the recorded screen" (#47) first, so scripts can try both ways.
+                    if (intent.hasExtra(EXTRA_PLAY_ON_SOURCE_SCREEN)) {
+                        Prefs.of(applicationContext).edit().putBoolean(
+                            jr.brian.commandpannel.replay.studio.PREF_PLAY_ON_SOURCE_SCREEN,
+                            intent.getBooleanExtra(EXTRA_PLAY_ON_SOURCE_SCREEN, false),
+                        ).commit()
+                    }
                     intent.getStringExtra(EXTRA_CLIP_PATH)?.let {
                         ReplayPlayerActivity.launch(applicationContext, it)
                     }
@@ -751,6 +758,8 @@ class AssistantService : Service() {
         const val EXTRA_CLIP_PATH = "clip_path"
         /** Debug builds only: what a double press does (arm, or save a clip and announce it), for scripts (#48). */
         const val ACTION_DEBUG_SAVE_OR_ARM = "jr.brian.commandpannel.action.DEBUG_SAVE_OR_ARM"
+        /** On [ACTION_DEBUG_OPEN_PLAYER]: sets "Play on the recorded screen" (#47) before opening. */
+        const val EXTRA_PLAY_ON_SOURCE_SCREEN = "play_on_source_screen"
         /** On [ACTION_DEBUG_PLUGIN_START]: the plugin service, as `package/class`; the first listed one when missing. */
         const val EXTRA_PLUGIN_COMPONENT = "component"
         /** On [ACTION_DEBUG_PLUGIN_START]: also accept a plugin whose signing key isn't allowlisted. */

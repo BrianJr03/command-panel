@@ -276,6 +276,12 @@
     <string name="player_key_dpad" translatable="false">◀ ▶</string>
     <string name="player_key_shoulders" translatable="false">L1 R1</string>
 
+    <!-- Replay Studio: play on the screen a clip was recorded on (#47) -->
+    <string name="player_on_lower">Playing on the lower screen</string>
+    <string name="player_moved_to_top">The lower screen isn\'t available, so the clip plays here</string>
+    <string name="settings_replay_source_screen">Play on the recorded screen</string>
+    <string name="settings_replay_source_screen_desc">In Replay Studio, bottom-screen clips play on the lower screen, and clips of both screens are split across the two. The controls stay up here. If the lower screen is off, blanked or in use, the clip plays up here instead.</string>
+
     <!-- Companion: Replay Studio (clip grid, share, delete) -->
     <string name="settings_replay_studio">Replay Studio</string>
     <string name="settings_replay_studio_desc">Watch, share and delete your saved clips.</string>

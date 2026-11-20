@@ -29,6 +29,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,8 +42,12 @@ import javax.inject.Inject
  * Replay Studio's player (#46): plays a saved clip full screen on the top display, driven by the gamepad: B to
  * close, A play/pause, D-pad left/right seek 5 s, L1/R1 the previous/next clip in the library.
  *
- * Its own activity, not a companion route: [jr.brian.commandpannel.MainActivity] pins itself to display 0, and playing
- * a clip on the screen it was recorded on (#47) launches this on another display.
+ * Its own activity, not a companion route, so it has its own window and lifecycle for the Replay Buffer pause.
+ *
+ * With "Play clips on the screen they were recorded on" (#47), the video of a Bottom clip goes to the lower screen and
+ * a Both clip is split across both ([PlaybackRoute], [ReplayVideoOutput]). The activity itself, its controls and
+ * gamepad focus always stay on the top screen; the lower screen only gets a window that can't take focus or touches.
+ * If the lower screen goes away mid-clip, the video moves back to the top.
  *
  * While it's in front (started) the Replay Buffer is paused, so the clip's own video and sound aren't recorded; it
  * re-arms when the player stops. The service decides with [ReplayPauseGate] and also re-arms on its own if the player
@@ -55,8 +60,10 @@ class ReplayPlayerActivity : ComponentActivity() {
 
     private val clips by lazy { ClipRepository(applicationContext, privileged) }
     private val state = ReplayPlayerState()
-    /** Where the video goes; #47 swaps in an output that splits a Both clip across the two screens. */
-    private val output: ReplayVideoOutput = SingleSurfaceOutput
+    /** Whether the lower screen can take a clip, and the watch that moves playback back to the top when it can't (#47). */
+    private val lowerScreen by lazy { LowerScreenWatch(applicationContext, privileged) }
+    /** Where the current clip's video goes; [ReplayPlayerState.output] is its output. */
+    private var route = PlaybackRoute.TOP
 
     private var player: ExoPlayer? = null
     private lateinit var currentPath: String
@@ -88,7 +95,7 @@ class ReplayPlayerActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.systemBars())
         }
-        setContent { ReplayPlayerScreen(state, output, onTap = ::showControls) }
+        setContent { ReplayPlayerScreen(state, state.output, onTap = ::showControls) }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -126,6 +133,7 @@ class ReplayPlayerActivity : ComponentActivity() {
     override fun onStop() {
         if (!::currentPath.isInitialized) return super.onStop()
         heartbeatJob?.cancel()
+        lowerScreen.stop()
         releasePlayer()
         isStarted = false
         tellService(AssistantService.ACTION_REPLAY_PLAYER_CLOSED)
@@ -226,6 +234,9 @@ class ReplayPlayerActivity : ComponentActivity() {
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             if (videoSize.width > 0 && videoSize.height > 0) {
                 state.aspectRatio = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+                // A Both frame that doesn't match these screens' layout can't be split; it plays whole on top.
+                val split = state.output as? SplitScreenOutput
+                if (split != null && !split.setVideoSize(videoSize.width, videoSize.height)) fallBackToTop()
             }
         }
 
@@ -250,7 +261,8 @@ class ReplayPlayerActivity : ComponentActivity() {
             val index = lib.indexOfFirst { it.path == path }
             state.index = index + 1
             state.count = lib.size
-            val file = withContext(Dispatchers.IO) { readable(lib.getOrNull(index), path) }
+            val clip = lib.getOrNull(index)
+            val file = withContext(Dispatchers.IO) { readable(clip, path) }
             val p = player
             if (p == null) {
                 // The player couldn't be created; a stop cancels this job, so it never lands here.
@@ -264,6 +276,7 @@ class ReplayPlayerActivity : ComponentActivity() {
                 state.error = getString(R.string.player_error_open)
                 return@launch
             }
+            applyRoute(chooseRoute(clip, path), path)
             runCatching {
                 p.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)), startMs)
                 p.playWhenReady = play
@@ -274,6 +287,65 @@ class ReplayPlayerActivity : ComponentActivity() {
                 state.error = getString(R.string.player_error_playback)
             }
         }
+    }
+
+    /**
+     * Where [path] plays: its own screen when "Play clips on the screen they were recorded on" is on and the lower
+     * screen is free, else the top. The origin comes from the library, or from the file name for a clip outside it.
+     */
+    private suspend fun chooseRoute(clip: ReplayClip?, path: String): PlaybackRoute {
+        val file = File(path)
+        val origin = clip?.origin ?: parseReplayClip(file.name, file.parent.orEmpty())?.origin ?: ClipOrigin.TOP
+        val playOnOrigin = Prefs.of(this).getBoolean(PREF_PLAY_ON_SOURCE_SCREEN, false)
+        val blockers = if (playOnOrigin && origin != ClipOrigin.TOP) {
+            withContext(Dispatchers.IO) {
+                runCatching { lowerScreen.blockers() }.getOrDefault(LowerScreenBlockers(missing = true))
+            }
+        } else {
+            LowerScreenBlockers()
+        }
+        return routePlayback(origin, playOnOrigin, blockers.available).also {
+            // Read by verify-47.sh.
+            Log.i(TAG, "route $it origin=$origin setting=$playOnOrigin lower=${if (blockers.available) "free" else blockers}")
+        }
+    }
+
+    /**
+     * Points the video at [newRoute]. A split output is made fresh for each clip, since it measures the clip's frame;
+     * off the top screen, a watch moves playback back to the top if the lower screen goes away.
+     */
+    private fun applyRoute(newRoute: PlaybackRoute, path: String) {
+        lowerScreen.stop()
+        if (newRoute != route || newRoute == PlaybackRoute.SPLIT) {
+            route = newRoute
+            state.output = when (newRoute) {
+                PlaybackRoute.TOP -> SingleSurfaceOutput
+                PlaybackRoute.LOWER -> LowerScreenOutput(this, ::fallBackToTop)
+                PlaybackRoute.SPLIT -> SplitScreenOutput(this, ::fallBackToTop).also { split ->
+                    // The player only reports a size when it changes; a clip the same size as the last one gets
+                    // this one, and a different size corrects it in onVideoSizeChanged.
+                    player?.videoSize?.takeIf { it.width > 0 && it.height > 0 }?.let { split.setVideoSize(it.width, it.height) }
+                }
+            }
+            Log.i(TAG, "output $newRoute for ${File(path).name}")
+        }
+        if (newRoute != PlaybackRoute.TOP) lowerScreen.watch(lifecycleScope, ::onLowerScreenLost)
+    }
+
+    private fun onLowerScreenLost() {
+        if (route == PlaybackRoute.TOP) return
+        Log.i(TAG, "lower screen lost mid-clip; moving playback to the top screen")
+        fallBackToTop()
+    }
+
+    /** Moves playback to the top screen (the lower screen went away, or the clip can't be split). Never throws. */
+    private fun fallBackToTop() {
+        if (route == PlaybackRoute.TOP) return
+        lowerScreen.stop()
+        route = PlaybackRoute.TOP
+        state.output = SingleSurfaceOutput
+        notice(getString(R.string.player_moved_to_top))
+        Log.i(TAG, "output TOP (fallback)")
     }
 
     /**

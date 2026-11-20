@@ -51,6 +51,8 @@ import jr.brian.commandpannel.ui.settings.LocalCompanionPalette
 @Stable
 internal class ReplayPlayerState {
     var player by mutableStateOf<Player?>(null)
+    /** Where the video goes for the current clip (#47); the activity swaps it when the route changes. */
+    var output by mutableStateOf<ReplayVideoOutput>(SingleSurfaceOutput)
     var title by mutableStateOf("")
     /** 1-based place in the library, or 0 while unknown. */
     var index by mutableIntStateOf(0)

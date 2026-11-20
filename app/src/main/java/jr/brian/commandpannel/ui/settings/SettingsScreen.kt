@@ -936,6 +936,8 @@ private fun ReplayBufferCard(
 ) {
     // First: Replay Studio, with the newest clip, like the active look at the top of Themes.
     ReplayStudioCard(studioModifier, onOpenStudio)
+    // Replay Studio plays clips on the screen they were recorded on (#47).
+    ReplaySourceScreenCard()
     SwitchCard(
         stringResource(R.string.tile_name_replay_buffer),
         stringResource(R.string.settings_replay_desc),
