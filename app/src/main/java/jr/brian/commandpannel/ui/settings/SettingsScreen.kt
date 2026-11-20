@@ -1071,7 +1071,7 @@ private fun ReplayBufferCard(
         state.replayEnabled, vm::setReplayEnabled,
         Modifier.tourTarget(TourSpot.REPLAY),
     )
-    // First after the main switch: the way to save clips from Back Button Hero.
+    // First after the main switch: TCP SC, the shortcut that saves clips from other apps and launchers.
     SaveClipCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_options))
@@ -1213,7 +1213,7 @@ private fun ReplayAutoDeleteCard(
 }
 
 /**
- * TCP SC (TCP Save Clip), the trigger app Back Button Hero launches to save a clip: whether it's installed and paired
+ * TCP SC (TCP Save Clip), the Replay Buffer shortcut other apps and launchers open to save a clip: whether it's installed and paired
  * with this build. Install / Reinstall fetches the one from this version's release; once it's ready, its status pill
  * says it's already installed when pressed. Debug builds pair only with a locally built trigger (signature
  * permission), so they get a note instead.

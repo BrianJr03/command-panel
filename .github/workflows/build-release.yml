@@ -128,7 +128,7 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${APK_NAME}"
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
           echo "Renamed APK to: ${APK_NAME}"
-          # TCP SC (Back Button Hero trigger): same key, named for the release it ships with (the app installs that one).
+          # TCP SC (Replay Buffer shortcut): same key, named for the release it ships with (the app installs that one).
           SC_NAME="tcp-sc-${VERSION_NAME}.apk"
           mv trigger/build/outputs/apk/release/trigger-release.apk "trigger/build/outputs/apk/release/${SC_NAME}"
           echo "sc_name=${SC_NAME}" >> $GITHUB_OUTPUT

@@ -223,7 +223,7 @@
     <string name="settings_replay_sound_video_only">Sound couldn\'t start, so clips will have no sound. Turn the Replay Buffer off and on again to retry.</string>
     <string name="settings_replay_options">Clip options</string>
     <string name="settings_save_clip_title">TCP SC</string>
-    <string name="settings_save_clip_desc">TCP SC (TCP Save Clip) is a small app that saves a clip when another app opens it. In Back Button Hero, choose Launch app → TCP SC → bottom screen, so your game keeps focus.</string>
+    <string name="settings_save_clip_desc">TCP SC (TCP Save Clip) is a shortcut for Replay Buffer: opening it saves a clip, or turns the buffer on if it\'s off. Open it from anything that can launch an app, like a home screen shortcut, a gesture app or Back Button Hero. Launch it on the bottom screen so your game keeps focus.</string>
     <string name="settings_save_clip_ready">Installed (%1$s) and ready</string>
     <string name="settings_save_clip_missing">Not installed</string>
     <string name="settings_save_clip_no_permission">Installed, but it can\'t save clips yet. Reinstall it so Android lets it talk to Command Panel.</string>
@@ -817,9 +817,9 @@
     <string name="tour_backup_body">Save every companion setting to a JSON file, or restore your most recent backup after a reinstall.</string>
     <string name="tour_updates_body">See which version you\'re on, check for a new release and reopen the patch notes. Command Panel downloads and installs updates itself.</string>
     <string name="tour_replay_body">Keep the last few seconds in memory, then save a clip after something happens. Capture the top screen, the bottom one, or both stacked into one video, and pick how far back it reaches, the clip quality and where clips go. Auto-delete old clips can remove clips by age or total size so they don\'t fill your storage.</string>
-    <string name="tour_replay_section_body">Everything for your clips: Replay Studio to watch them, the buffer itself, TCP SC for Back Button Hero, the double press, audio, auto-delete and where clips go.</string>
+    <string name="tour_replay_section_body">Everything for your clips: Replay Studio to watch them, the buffer itself, TCP SC to save clips from a shortcut, the double press, audio, auto-delete and where clips go.</string>
     <string name="tour_replay_studio_body">Shows your newest clip and how many you have. Open Replay Studio to watch, trim, share and delete clips. Turn on Play on the recorded screen to play bottom-screen clips on the lower screen.</string>
-    <string name="tour_save_clip_body">Save clips from a shortcut in another app, like Back Button Hero. This shows whether TCP SC is installed, and installs the one that matches your version of Command Panel.</string>
+    <string name="tour_save_clip_body">TCP SC is a shortcut for Replay Buffer: open it from a home screen shortcut, a gesture or an app like Back Button Hero to save a clip. This shows whether TCP SC is installed, and installs the one that matches your version of Command Panel.</string>
     <string name="tour_preview_body">Open the overlay on the bottom screen to try your changes for real.</string>
     <string name="tour_nav_bar_body">Arrange the buttons along the bottom of the overlay and set up a Quick Launch shortcut.</string>
     <string name="tour_button_order_body">Put the nav bar buttons in the order you want. With a controller, press A to pick one up, move it with the D-pad, and press A again to drop it.</string>

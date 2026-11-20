@@ -8,7 +8,7 @@ import jr.brian.commandpannel.R
 import jr.brian.commandpannel.overlay.OverlayToast
 
 /**
- * Save-or-arm requests from other apps (TCP Save Clip, launched by Back Button Hero). Guarded in the manifest by the
+ * Save-or-arm requests from other apps (TCP Save Clip, the Replay Buffer shortcut). Guarded in the manifest by the
  * signature-level `<applicationId>.permission.TRIGGER`, so only apps signed with Command Panel's key get through.
  * Takes no extras. Forwards to [AssistantService] only while it's running; it never starts it from the background.
  */

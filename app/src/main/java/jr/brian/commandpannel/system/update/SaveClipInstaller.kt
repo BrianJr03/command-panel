@@ -19,7 +19,7 @@ sealed interface SaveClipStatus {
 data class SaveClipAsset(val url: String, val size: Long)
 
 /**
- * Installs TCP Save Clip (the Back Button Hero trigger) from the GitHub release matching this Command Panel version,
+ * Installs TCP Save Clip (the Replay Buffer shortcut) from the GitHub release matching this Command Panel version,
  * the way [UpdateInstaller] installs updates: through the root shell, or else Android's installer. Blocking calls; run
  * them off the main thread.
  */

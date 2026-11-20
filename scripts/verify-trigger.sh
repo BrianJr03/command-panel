@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies TCP Save Clip (the Back Button Hero trigger) end to end.
+# Verifies TCP Save Clip (the Replay Buffer shortcut) end to end.
 #   scripts/verify-trigger.sh [static|device|all] [--take-control] [--record]
 #
 # static  Builds, unit tests, lint (fails only on errors in files this branch changed), the merged manifest and the

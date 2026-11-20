@@ -136,7 +136,7 @@ data class SettingsState(
     val railExpanded: Set<RailGroup> = emptySet(),
     /** Which "new" bubbles show on the rail and in the panes. */
     val newBadges: NewBadgeState = NewBadgeState(),
-    /** TCP Save Clip (the Back Button Hero trigger): installed, and paired with this build. */
+    /** TCP Save Clip (the Replay Buffer shortcut): installed, and paired with this build. */
     val saveClip: jr.brian.commandpannel.system.update.SaveClipStatus = jr.brian.commandpannel.system.update.SaveClipStatus.Missing,
     /** A TCP Save Clip download or install is running. */
     val saveClipBusy: Boolean = false,

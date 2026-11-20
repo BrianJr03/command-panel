@@ -119,12 +119,12 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 
 ---
 
-## Save clips from Back Button Hero
+## Save clips with a shortcut (TCP SC)
 
-Thor Back Button Hero can save a Replay Buffer clip through **TCP SC** (TCP Save Clip, `tcp-sc-<version>.apk` in each release), a tiny app that opens invisibly, asks Command Panel to save, and closes.
+**TCP SC** (TCP Save Clip, `tcp-sc-<version>.apk` in each release) is a shortcut for the Replay Buffer: a tiny app that opens invisibly, asks Command Panel to save a clip, and closes. Anything that can launch an app can use it: a home screen shortcut, a gesture app, or Thor Back Button Hero.
 
-1. Install TCP SC **after** Command Panel, or press **Install** on the TCP SC card in General. If you installed it first, reinstall it: Android only grants the permission it needs if Command Panel is already installed.
-2. In Back Button Hero, pick a gesture or a Back + button combo, then **Launch app** → **TCP SC** → **bottom screen**, so the game on the top screen keeps focus.
+1. Install TCP SC **after** Command Panel, or press **Install** on the TCP SC card in Replay. If you installed it first, reinstall it: Android only grants the permission it needs if Command Panel is already installed.
+2. Point your shortcut at TCP SC and launch it on the bottom screen, so the game on the top screen keeps focus. In Back Button Hero, for example: pick a gesture or a Back + button combo, then **Launch app** → **TCP SC** → **bottom screen**.
 
 It works like an AYN double press: the first press turns the Replay Buffer on, later presses save a clip. It does nothing while Command Panel stands by, and shows a short message if Command Panel isn't running. Only a TCP SC signed with the same key as your Command Panel works, so the release trigger pairs with the release app, and a locally built debug trigger pairs with a debug build.
 
@@ -136,7 +136,7 @@ It works like an AYN double press: the first press turns the Replay Buffer on, l
 ./gradlew :app:assembleDebug        # build the debug APK
 ./gradlew :app:installDebug         # install on a connected Thor
 ./gradlew :app:testDebugUnitTest    # unit tests
-./gradlew :trigger:assembleDebug    # build TCP Save Clip (Back Button Hero trigger)
+./gradlew :trigger:assembleDebug    # build TCP Save Clip (the Replay Buffer shortcut)
 scripts/verify-trigger.sh           # verify TCP Save Clip (builds, lint, then on a connected Thor; see the script)
 ```
 
