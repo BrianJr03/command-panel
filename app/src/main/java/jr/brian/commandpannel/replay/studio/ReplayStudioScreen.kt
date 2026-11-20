@@ -94,8 +94,8 @@ import jr.brian.commandpannel.ui.theme.tccTextStyle
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Trim (#51) isn't built yet: its entry sits in the action sheet, disabled, until this flips. */
-internal const val STUDIO_TRIM_AVAILABLE = false
+/** Trim (#51): the action sheet's Trim entry opens the player in trim mode. False shows it disabled. */
+internal const val STUDIO_TRIM_AVAILABLE = true
 
 /** FileProvider authority suffix for shared clips (see `res/xml/clip_paths.xml`). */
 private const val CLIPS_AUTHORITY_SUFFIX = ".clips"
@@ -200,7 +200,12 @@ internal fun ReplayStudioScreen(onClose: () -> Unit, vm: ReplayStudioViewModel =
                     if (!shareClip(context, file)) vm.shareFailed()
                 }
             },
-            onTrim = { sheetFor = null; refocus(clip) },
+            onTrim = {
+                sheetFor = null
+                refocus(clip)
+                vm.clearMessage()
+                ReplayPlayerActivity.launch(context, clip.path, trim = true)
+            },
             onDelete = { sheetFor = null; confirmDelete = clip },
         )
     }
@@ -408,8 +413,8 @@ private fun DeleteClipDialog(clip: ReplayClip, onCancel: () -> Unit, onConfirm: 
 private fun studioDialogModifier(widthDp: Int): Modifier =
     Modifier.width(widthDp.dp).clip(cardShape()).background(p.bg).companionCard().padding(24.dp)
 
-/** Opens the share sheet for [file] as an MP4. False when it couldn't be offered. */
-private fun shareClip(context: Context, file: File): Boolean = runCatching {
+/** Opens the share sheet for [file] as an MP4. False when it couldn't be offered. Also the player's Share offer (#51). */
+internal fun shareClip(context: Context, file: File): Boolean = runCatching {
     val uri = FileProvider.getUriForFile(context, context.packageName + CLIPS_AUTHORITY_SUFFIX, file)
     val send = Intent(Intent.ACTION_SEND)
         .setType("video/mp4")

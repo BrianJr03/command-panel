@@ -71,18 +71,23 @@ internal class ReplayPlayerState {
      * A highlighted span of the progress bar, as fractions of the clip (trim in/out points, #51). Null shows none.
      */
     var selection by mutableStateOf<ClosedFloatingPointRange<Float>?>(null)
+    /** Trim mode (#51): the cut being set and what it's doing. Null when not trimming. */
+    var trim by mutableStateOf<TrimUi?>(null)
 }
 
 /**
  * The player: video full screen on black, with controls along the bottom that fade out while playing. Input is handled
  * by the activity (the screen has nothing focusable), so the D-pad never wanders. [extraControls] is room in the
- * control bar for more actions (trim in/out and Save copy in #51); [onTap] is a touch on the video.
+ * control bar for more actions and [extraInfo] a line above the progress bar (trim in/out and Save copy in #51). While
+ * [ReplayPlayerState.trim] is set, the bar's own key hints step aside for [extraControls]. [onTap] is a touch on the
+ * video.
  */
 @Composable
 internal fun ReplayPlayerScreen(
     state: ReplayPlayerState,
     output: ReplayVideoOutput,
     onTap: () -> Unit,
+    extraInfo: @Composable () -> Unit = {},
     extraControls: @Composable RowScope.() -> Unit = {},
 ) {
     val palette = LocalCompanionPalette.current
@@ -133,13 +138,18 @@ internal fun ReplayPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            ControlBar(state, showTimeline = error == null, extraControls = extraControls)
+            ControlBar(state, showTimeline = error == null, extraInfo = extraInfo, extraControls = extraControls)
         }
     }
 }
 
 @Composable
-private fun ControlBar(state: ReplayPlayerState, showTimeline: Boolean, extraControls: @Composable RowScope.() -> Unit) {
+private fun ControlBar(
+    state: ReplayPlayerState,
+    showTimeline: Boolean,
+    extraInfo: @Composable () -> Unit,
+    extraControls: @Composable RowScope.() -> Unit,
+) {
     val palette = LocalCompanionPalette.current
     Column(
         Modifier
@@ -161,6 +171,7 @@ private fun ControlBar(state: ReplayPlayerState, showTimeline: Boolean, extraCon
                 Text(stringResource(R.string.player_counter, state.index, state.count), color = palette.textSecondary, fontSize = 14.sp)
             }
         }
+        extraInfo()
         if (showTimeline) {
             Spacer(Modifier.height(10.dp))
             val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
@@ -177,12 +188,14 @@ private fun ControlBar(state: ReplayPlayerState, showTimeline: Boolean, extraCon
             }
             Spacer(Modifier.weight(1f))
             extraControls()
-            if (showTimeline) {
-                GlyphHint(GamepadButton.A, stringResource(if (state.playing) R.string.player_hint_pause else R.string.player_hint_play))
-                KeyHint(stringResource(R.string.player_key_dpad), stringResource(R.string.player_hint_seek))
+            if (state.trim == null) {
+                if (showTimeline) {
+                    GlyphHint(GamepadButton.A, stringResource(if (state.playing) R.string.player_hint_pause else R.string.player_hint_play))
+                    KeyHint(stringResource(R.string.player_key_dpad), stringResource(R.string.player_hint_seek))
+                }
+                KeyHint(stringResource(R.string.player_key_shoulders), stringResource(R.string.player_hint_clips))
+                GlyphHint(GamepadButton.B, stringResource(R.string.player_hint_close))
             }
-            KeyHint(stringResource(R.string.player_key_shoulders), stringResource(R.string.player_hint_clips))
-            GlyphHint(GamepadButton.B, stringResource(R.string.player_hint_close))
         }
     }
 }
@@ -205,7 +218,7 @@ private fun Timeline(fraction: Float, selection: ClosedFloatingPointRange<Float>
 }
 
 @Composable
-private fun GlyphHint(button: GamepadButton, label: String) {
+internal fun GlyphHint(button: GamepadButton, label: String) {
     val palette = LocalCompanionPalette.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         GamepadGlyph(button, palette.textPrimary)
@@ -215,7 +228,7 @@ private fun GlyphHint(button: GamepadButton, label: String) {
 }
 
 @Composable
-private fun KeyHint(keys: String, label: String) {
+internal fun KeyHint(keys: String, label: String) {
     val palette = LocalCompanionPalette.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -233,7 +246,7 @@ private fun KeyHint(keys: String, label: String) {
 }
 
 @Composable
-private fun clock(ms: Long): String {
+internal fun clock(ms: Long): String {
     val (minutes, seconds) = clockParts(ms)
     return stringResource(R.string.player_time, minutes.toInt(), seconds.toInt())
 }

@@ -47,7 +47,9 @@ object ScreenRecorderEngine {
     private const val REPLAY_HEADROOM = 1.25
     /** Highest `_n` tried for clips saved in the same second; nobody saves 99 clips a second. */
     const val MAX_REPLAY_NAME_ATTEMPTS = 99
-    private val REPLAY_CLIP_NAME_REGEX = Regex("^Replay_[0-9]{8}_[0-9]{6}(_[0-9]+)?_(Top|Bottom|Both)\\.mp4$")
+    /** `Replay_<ts>[_<n>]_<Top|Bottom|Both>[_trim].mp4`; groups: timestamp, `_n`, screen, `_trim`. */
+    private val REPLAY_CLIP_NAME_REGEX =
+        Regex("^(Replay_[0-9]{8}_[0-9]{6})(_[0-9]+)?_(Top|Bottom|Both)(_trim)?\\.mp4$")
 
     // Error / stop-reason codes shared with the app.
     const val REPLAY_ERR_ALREADY_ARMED = "already_armed"
@@ -179,22 +181,34 @@ object ScreenRecorderEngine {
     /**
      * The first free clip path for [basePath] (from [buildReplayClipPath]), given the file names already in its folder
      * ([taken]): [basePath] itself, else the same name with `_2`, `_3`, ... before the screen suffix
-     * (`Replay_<ts>_2_Top.mp4`), so two saves in the same second don't overwrite each other. `null` if
+     * (`Replay_<ts>_2_Top.mp4`, or `Replay_<ts>_2_Top_trim.mp4` for a trimmed copy), so two saves in the same second
+     * don't overwrite each other. A `_n` already in [basePath] is replaced, not stacked. `null` if
      * [MAX_REPLAY_NAME_ATTEMPTS] are all taken or [basePath] isn't a clip name. Pure.
      */
     fun pickFreeReplayClipPath(basePath: String, taken: Set<String>): String? {
         val dir = basePath.substringBeforeLast('/', missingDelimiterValue = "")
         val leaf = basePath.substringAfterLast('/')
-        if (!REPLAY_CLIP_NAME_REGEX.matches(leaf)) return null
+        val match = REPLAY_CLIP_NAME_REGEX.matchEntire(leaf) ?: return null
         if (leaf !in taken) return basePath
-        val stem = leaf.removeSuffix(".mp4")
-        val screen = stem.substringAfterLast('_')
-        val head = stem.substringBeforeLast('_')
+        val (head, _, screen, trim) = match.destructured
         for (n in 2..MAX_REPLAY_NAME_ATTEMPTS) {
-            val candidate = "${head}_${n}_$screen.mp4"
+            val candidate = "${head}_${n}_$screen$trim.mp4"
             if (candidate !in taken) return if (dir.isEmpty()) candidate else "$dir/$candidate"
         }
         return null
+    }
+
+    /**
+     * The base path for a trimmed copy of the clip at [sourcePath]: same folder, same timestamp and screen, with
+     * `_trim` (`Replay_<ts>_Top_trim.mp4`). The source's `_n` is dropped and a trim of a trim gets the same base, so
+     * pass the result to [pickFreeReplayClipPath] for a free name. `null` if [sourcePath] isn't a clip name. Pure.
+     */
+    fun replayTrimClipPath(sourcePath: String): String? {
+        val dir = sourcePath.substringBeforeLast('/', missingDelimiterValue = "")
+        val match = REPLAY_CLIP_NAME_REGEX.matchEntire(sourcePath.substringAfterLast('/')) ?: return null
+        val (head, _, screen) = match.destructured
+        val leaf = "${head}_${screen}_trim.mp4"
+        return if (dir.isEmpty()) leaf else "$dir/$leaf"
     }
 
     /** What a clip captured ("Top" / "Bottom" / "Both"): its subfolder under the clips folder and its file-name suffix. */

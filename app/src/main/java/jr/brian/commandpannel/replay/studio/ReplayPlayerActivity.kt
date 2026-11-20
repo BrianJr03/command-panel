@@ -25,6 +25,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.PlayerMessage
 import dagger.hilt.android.AndroidEntryPoint
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.privileged.PrivilegedAccess
@@ -41,6 +42,10 @@ import javax.inject.Inject
 /**
  * Replay Studio's player (#46): plays a saved clip full screen on the top display, driven by the gamepad: B to
  * close, A play/pause, D-pad left/right seek 5 s, L1/R1 the previous/next clip in the library.
+ *
+ * Y (or opening with [EXTRA_TRIM] from Studio's Trim action) enters trim mode (#51), with its own key map
+ * ([trimCommandFor]): D-pad seeks 1 s, L1/R1 set the in/out points, X previews the cut, Y saves a trimmed copy next to
+ * the clip ([ClipTrimmer]) and then offers Share (A), B leaves trim mode. The cut is shown on the progress bar.
  *
  * Its own activity, not a companion route, so it has its own window and lifecycle for the Replay Buffer pause.
  *
@@ -73,6 +78,12 @@ class ReplayPlayerActivity : ComponentActivity() {
     /** The library, newest first; loaded once. */
     private var library: List<ReplayClip>? = null
 
+    private val trimmer by lazy { ClipTrimmer(applicationContext, privileged, clips) }
+    /** The last trimmed copy saved, for the Share offer. */
+    private var savedTrim: ReplayClip? = null
+    /** Pauses a preview at the out point. */
+    private var previewStop: PlayerMessage? = null
+
     private var loadJob: Job? = null
     private var hideJob: Job? = null
     private var noticeJob: Job? = null
@@ -89,13 +100,30 @@ class ReplayPlayerActivity : ComponentActivity() {
         currentPath = path
         resumePositionMs = savedInstanceState?.getLong(KEY_POSITION) ?: 0L
         resumePlaying = savedInstanceState?.getBoolean(KEY_PLAYING) ?: true
+        val trimming = savedInstanceState?.getBoolean(KEY_TRIM) ?: intent?.getBooleanExtra(EXTRA_TRIM, false) ?: false
+        if (trimming) {
+            val inMs = savedInstanceState?.getLong(KEY_TRIM_IN) ?: 0L
+            val outMs = savedInstanceState?.getLong(KEY_TRIM_OUT, TrimPoints.END) ?: TrimPoints.END
+            state.trim = TrimUi(TrimPoints(inMs, outMs))
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.systemBars())
         }
-        setContent { ReplayPlayerScreen(state, state.output, onTap = ::showControls) }
+        setContent {
+            ReplayPlayerScreen(
+                state,
+                state.output,
+                onTap = ::showControls,
+                extraInfo = { TrimInfo(state) },
+                extraControls = {
+                    TrimControls(state)
+                    TrimEntryHint(state)
+                },
+            )
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -103,6 +131,7 @@ class ReplayPlayerActivity : ComponentActivity() {
                         state.positionMs = p.currentPosition.coerceAtLeast(0L)
                         state.durationMs = p.duration.takeIf { it != C.TIME_UNSET } ?: 0L
                     }
+                    syncSelection()
                     delay(POSITION_POLL_MS)
                 }
             }
@@ -112,6 +141,9 @@ class ReplayPlayerActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val path = intent.getStringExtra(EXTRA_CLIP_PATH)?.takeIf { it.isNotBlank() } ?: return
+        cancelPreview()
+        state.trim = if (intent.getBooleanExtra(EXTRA_TRIM, false)) TrimUi() else null
+        syncSelection()
         open(path)
     }
 
@@ -134,6 +166,8 @@ class ReplayPlayerActivity : ComponentActivity() {
         if (!::currentPath.isInitialized) return super.onStop()
         heartbeatJob?.cancel()
         lowerScreen.stop()
+        // The stop message belongs to the player being released.
+        cancelPreview()
         releasePlayer()
         isStarted = false
         tellService(AssistantService.ACTION_REPLAY_PLAYER_CLOSED)
@@ -150,9 +184,23 @@ class ReplayPlayerActivity : ComponentActivity() {
         outState.putString(EXTRA_CLIP_PATH, currentPath)
         outState.putLong(KEY_POSITION, resumePositionMs)
         outState.putBoolean(KEY_PLAYING, resumePlaying)
+        state.trim?.let {
+            outState.putBoolean(KEY_TRIM, true)
+            outState.putLong(KEY_TRIM_IN, it.points.inMs)
+            outState.putLong(KEY_TRIM_OUT, it.points.outMs)
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (state.trim != null) {
+            // Trim mode has its own map: the shoulders set the cut, so they can't change clips under it.
+            val trimCommand = trimCommandFor(event.keyCode)
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                showControls()
+                if (trimCommand != null && (event.repeatCount == 0 || trimCommand.repeats())) handleTrim(trimCommand)
+            }
+            return trimCommand != null || super.dispatchKeyEvent(event)
+        }
         val command = playerCommandFor(event.keyCode)
         if (event.action == KeyEvent.ACTION_DOWN) {
             showControls()
@@ -182,9 +230,146 @@ class ReplayPlayerActivity : ComponentActivity() {
             }
             PlayerCommand.PREVIOUS_CLIP -> step(-1)
             PlayerCommand.NEXT_CLIP -> step(+1)
+            PlayerCommand.TRIM -> if (state.error == null) {
+                state.trim = TrimUi()
+                syncSelection()
+            }
         }
         // Read by verify-46.sh.
         Log.i(TAG, "command $command playWhenReady=${p?.playWhenReady} pos=${p?.currentPosition}")
+    }
+
+    /** A key in trim mode (#51). While the copy saves, keys only bring the controls back. */
+    private fun handleTrim(command: TrimCommand) {
+        val trim = state.trim ?: return
+        val p = player
+        when (trim.phase) {
+            TrimPhase.SAVING -> return
+            TrimPhase.SAVED -> when (command) {
+                TrimCommand.TOGGLE_PLAY -> shareSavedTrim()
+                TrimCommand.EXIT -> exitTrim()
+                else -> return
+            }
+            TrimPhase.EDIT, TrimPhase.PREVIEW -> {
+                // Anything but another preview ends the one playing; the player stays where it is.
+                if (command != TrimCommand.PREVIEW) cancelPreview()
+                val duration = state.durationMs
+                when (command) {
+                    TrimCommand.TOGGLE_PLAY -> handle(PlayerCommand.TOGGLE_PLAY)
+                    TrimCommand.SEEK_BACK, TrimCommand.SEEK_FORWARD -> p?.takeIf { state.error == null }?.let {
+                        val delta = if (command == TrimCommand.SEEK_BACK) -PLAYER_TRIM_SEEK_STEP_MS else PLAYER_TRIM_SEEK_STEP_MS
+                        it.seekTo(seekTarget(it.currentPosition, if (duration > 0) duration else -1L, delta))
+                        state.positionMs = it.currentPosition
+                    }
+                    TrimCommand.SET_IN -> p?.let { setTrimPoints(trim.points.withIn(it.currentPosition, duration)) }
+                    TrimCommand.SET_OUT -> p?.let { setTrimPoints(trim.points.withOut(it.currentPosition, duration)) }
+                    TrimCommand.PREVIEW -> p?.let { startPreview(it, trim) }
+                    TrimCommand.SAVE -> saveTrim(trim)
+                    TrimCommand.EXIT -> exitTrim()
+                }
+            }
+        }
+        // Read by verify-51.sh.
+        Log.i(TAG, "trim $command phase=${state.trim?.phase} points=${state.trim?.points} pos=${p?.currentPosition}")
+    }
+
+    private fun setTrimPoints(points: TrimPoints) {
+        state.trim = state.trim?.copy(points = points, phase = TrimPhase.EDIT)
+        syncSelection()
+    }
+
+    /** Leaves trim mode; the clip keeps playing (or stays paused) where it is. */
+    private fun exitTrim() {
+        cancelPreview()
+        state.trim = null
+        syncSelection()
+    }
+
+    /** The progress bar's highlighted span follows the cut (and the clip's length, once known). */
+    private fun syncSelection() {
+        state.selection = state.trim?.points?.fractions(state.durationMs)
+    }
+
+    /** Plays the cut from the in point and pauses at the out point. */
+    private fun startPreview(p: ExoPlayer, trim: TrimUi) {
+        cancelPreview()
+        val outMs = trim.points.out(state.durationMs)
+        p.seekTo(trim.points.inMs)
+        if (outMs != TrimPoints.END) {
+            previewStop = runCatching {
+                p.createMessage { _, _ -> onPreviewEnd() }
+                    .setLooper(mainLooper)
+                    .setPosition(outMs)
+                    .setDeleteAfterDelivery(true)
+                    .send()
+            }.onFailure { Log.w(TAG, "preview stop couldn't be set", it) }.getOrNull()
+        }
+        p.play()
+        state.trim = trim.copy(phase = TrimPhase.PREVIEW)
+    }
+
+    private fun onPreviewEnd() {
+        previewStop = null
+        if (state.trim?.phase != TrimPhase.PREVIEW) return
+        player?.pause()
+        state.trim = state.trim?.copy(phase = TrimPhase.EDIT)
+        // Read by verify-51.sh.
+        Log.i(TAG, "trim preview stopped pos=${player?.currentPosition}")
+    }
+
+    private fun cancelPreview() {
+        previewStop?.let { runCatching { it.cancel() } }
+        previewStop = null
+        state.trim?.takeIf { it.phase == TrimPhase.PREVIEW }?.let { state.trim = it.copy(phase = TrimPhase.EDIT) }
+    }
+
+    /** Y in trim mode: cuts the copy ([ClipTrimmer]) and then offers Share. The source clip is never changed. */
+    private fun saveTrim(trim: TrimUi) {
+        val duration = state.durationMs
+        if (duration <= 0 || trim.points.isWholeClip(duration)) {
+            notice(getString(R.string.player_trim_whole))
+            return
+        }
+        player?.pause()
+        val path = currentPath
+        val inMs = trim.points.inMs
+        val outMs = trim.points.out(duration)
+        state.trim = trim.copy(phase = TrimPhase.SAVING)
+        lifecycleScope.launch {
+            val clip = library().firstOrNull { it.path == path }
+            val result = if (clip == null) null else trimmer.trim(clip, inMs, outMs)
+            // Read by verify-51.sh.
+            Log.i(TAG, "trim save in=$inMs out=$outMs clip=$path -> $result")
+            val current = state.trim?.takeIf { currentPath == path && it.phase == TrimPhase.SAVING }
+            when (result) {
+                is TrimResult.Saved -> {
+                    savedTrim = result.clip
+                    // The copy joins the library for L1 / R1.
+                    library = null
+                    if (current != null) {
+                        state.trim = current.copy(phase = TrimPhase.SAVED, savedName = result.clip.name, earlyMs = result.earlyMs)
+                    }
+                }
+                is TrimResult.Failed -> {
+                    notice(getString(result.error.messageRes))
+                    if (current != null) state.trim = current.copy(phase = TrimPhase.EDIT)
+                }
+                null -> {
+                    notice(getString(R.string.player_trim_unavailable))
+                    if (current != null) state.trim = current.copy(phase = TrimPhase.EDIT)
+                }
+            }
+        }
+    }
+
+    private fun shareSavedTrim() {
+        val clip = savedTrim ?: return
+        lifecycleScope.launch {
+            val file = runCatching { clips.readableFile(clip) }.getOrNull()
+            val shared = file != null && shareClip(this@ReplayPlayerActivity, file)
+            Log.i(TAG, "trim share ${clip.path} -> $shared")
+            if (!shared) notice(getString(R.string.studio_share_failed))
+        }
     }
 
     private fun createPlayer() {
@@ -228,7 +413,11 @@ class ReplayPlayerActivity : ComponentActivity() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED) state.loading = false
-            if (playbackState == Player.STATE_ENDED) showControls()
+            if (playbackState == Player.STATE_ENDED) {
+                // A preview whose out point is the clip's end stops here instead.
+                if (state.trim?.phase == TrimPhase.PREVIEW) onPreviewEnd()
+                showControls()
+            }
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -383,7 +572,8 @@ class ReplayPlayerActivity : ComponentActivity() {
         hideJob?.cancel()
         hideJob = lifecycleScope.launch {
             delay(CONTROLS_HIDE_MS)
-            if (player?.isPlaying == true && state.error == null) state.controlsVisible = false
+            // Trim mode keeps them up: its points and hints are the point.
+            if (player?.isPlaying == true && state.error == null && state.trim == null) state.controlsVisible = false
         }
     }
 
@@ -408,6 +598,11 @@ class ReplayPlayerActivity : ComponentActivity() {
         const val EXTRA_CLIP_PATH = "clip_path"
         private const val KEY_POSITION = "position_ms"
         private const val KEY_PLAYING = "playing"
+        /** Open straight into trim mode (#51), from Studio's Trim action. */
+        const val EXTRA_TRIM = "trim"
+        private const val KEY_TRIM = "trim"
+        private const val KEY_TRIM_IN = "trim_in_ms"
+        private const val KEY_TRIM_OUT = "trim_out_ms"
         private const val POSITION_POLL_MS = 250L
         private const val CONTROLS_HIDE_MS = 3_000L
         private const val NOTICE_MS = 2_000L
@@ -419,9 +614,11 @@ class ReplayPlayerActivity : ComponentActivity() {
         @Volatile var isStarted = false
             private set
 
-        /** Opens the player on [clipPath]; L1/R1 page through the folder's other clips. */
-        fun launch(context: Context, clipPath: String) {
-            val intent = Intent(context, ReplayPlayerActivity::class.java).putExtra(EXTRA_CLIP_PATH, clipPath)
+        /** Opens the player on [clipPath]; L1/R1 page through the folder's other clips. [trim] opens it in trim mode. */
+        fun launch(context: Context, clipPath: String, trim: Boolean = false) {
+            val intent = Intent(context, ReplayPlayerActivity::class.java)
+                .putExtra(EXTRA_CLIP_PATH, clipPath)
+                .putExtra(EXTRA_TRIM, trim)
             if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val options = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
             runCatching { context.startActivity(intent, options.toBundle()) }
