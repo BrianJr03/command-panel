@@ -62,9 +62,11 @@ class CompanionTourStepsTest {
 
     @Test
     fun `every pane spot is shown by some step`() {
-        // BUILTIN_SELECTED is lit by the overlay onboarding's look follow, not by a tour step.
+        // BUILTIN_SELECTED is lit by the overlay onboarding's look follow, and ANIMATED_BACKGROUNDS by Appearance's
+        // link to it (#61), not by a tour step.
         val shown = TOUR_STEPS.mapNotNull { it.spot }.toSet()
-        val missing = TourSpot.entries.filter { it.inPane && it != TourSpot.BUILTIN_SELECTED && it !in shown }
+        val notTour = setOf(TourSpot.BUILTIN_SELECTED, TourSpot.ANIMATED_BACKGROUNDS)
+        val missing = TourSpot.entries.filter { it.inPane && it !in notTour && it !in shown }
         assertEquals(emptyList<TourSpot>(), missing)
     }
 

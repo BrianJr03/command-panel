@@ -1,5 +1,9 @@
 package jr.brian.commandpannel.ui.settings
 
+import jr.brian.commandpannel.system.BackgroundImage
+import jr.brian.commandpannel.system.BackgroundImageSetting
+import jr.brian.commandpannel.system.BackgroundImageStore
+import jr.brian.commandpannel.system.BackgroundImportException
 import jr.brian.commandpannel.ui.overlay.OverlayOnboarding
 import android.app.Application
 import android.content.Intent
@@ -78,6 +82,12 @@ data class SettingsState(
     val backupMessage: String? = null,
     val themeMode: Int = 4,              // tcc_theme_mode
     val rgbAccentSync: Boolean = false,
+    /** The panel's background image for every look (Appearance, #61), or null. */
+    val backgroundImage: BackgroundImage? = null,
+    /** Experimental (#61): GIF and animated WebP backgrounds play; off, they're refused on import and show still. */
+    val animatedBackgrounds: Boolean = false,
+    /** The last background image change's outcome ("Background image set", or why it was refused). */
+    val backgroundMessage: String? = null,
     /** Ambient-LED accent (opaque ARGB) when [rgbAccentSync] is on; themes the companion when it follows the look. */
     val accentOverride: Int? = null,
     /** When on, the companion screen uses the overlay's look, theme mode and accent instead of its default style. */
@@ -206,6 +216,8 @@ class SettingsViewModel @Inject constructor(
         showNewDots = prefs.getBoolean(KEY_SHOW_NEW_DOTS, true),
         themeMode = settings.getInt(SystemSettings.Keys.THEME_MODE, 4),
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
+        backgroundImage = BackgroundImageSetting.read(prefs),
+        animatedBackgrounds = BackgroundImageSetting.animationsOn(prefs),
         accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
         companionFollowLook = prefs.getBoolean("companion_follow_look", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
@@ -419,24 +431,40 @@ class SettingsViewModel @Inject constructor(
     fun deleteCustomLook(id: String) {
         CustomLookStore.delete(prefs, id)
         refreshLooks()
-        pruneBackgroundImages()
-    }
-
-    /** Imports a background image picked with the system file picker; reports the outcome through [onResult]. */
-    fun importBackgroundImage(uri: android.net.Uri, onResult: (Result<jr.brian.commandpannel.ui.theme.BackgroundImage>) -> Unit) {
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { jr.brian.commandpannel.system.BackgroundImageStore.import(app, uri) }
-            onResult(result)
-        }
     }
 
     /**
-     * Deletes stored background images that no saved look (nor a kept Theme Studio draft) uses: images imported into a
-     * draft that was discarded, or left behind by a deleted look.
+     * Sets the panel's background image (Appearance, #61) from one picked with the system file picker, for every look.
+     * The previous file is deleted. The outcome shows as [SettingsState.backgroundMessage].
      */
-    fun pruneBackgroundImages() {
-        val keep = CustomLookStore.all(prefs) + listOfNotNull(readStudioDraft(), jr.brian.commandpannel.ui.theme.StudioDraft.look.value)
-        viewModelScope.launch(Dispatchers.IO) { jr.brian.commandpannel.system.BackgroundImageStore.prune(app, keep) }
+    fun importBackgroundImage(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { BackgroundImageStore.import(app, uri, _state.value.animatedBackgrounds) }
+            result.onSuccess { image ->
+                BackgroundImageSetting.write(prefs, image)
+                withContext(Dispatchers.IO) { BackgroundImageStore.prune(app, image) }
+            }
+            _state.value = _state.value.copy(
+                backgroundImage = BackgroundImageSetting.read(prefs),
+                backgroundMessage = result.fold(
+                    { app.getString(R.string.settings_background_image_set) },
+                    { e -> app.getString((e as? BackgroundImportException)?.messageRes ?: R.string.msg_background_invalid) },
+                ),
+            )
+        }
+    }
+
+    /** The overlay re-reads prefs on every change, so a playing GIF stops (or starts) as soon as this is saved. */
+    fun setAnimatedBackgrounds(enable: Boolean) {
+        prefs.edit().putBoolean(BackgroundImageSetting.KEY_ANIMATIONS_ON, enable).apply()
+        _state.value = _state.value.copy(animatedBackgrounds = enable)
+    }
+
+    /** Removes the background image; every look shows its own backdrop again. */
+    fun removeBackgroundImage() {
+        BackgroundImageSetting.write(prefs, null)
+        viewModelScope.launch(Dispatchers.IO) { BackgroundImageStore.prune(app, null) }
+        _state.value = _state.value.copy(backgroundImage = null, backgroundMessage = app.getString(R.string.settings_background_image_removed))
     }
 
     /** Imports a TTF/OTF picked with the system file picker; reports the outcome through [onResult]. */
@@ -476,7 +504,6 @@ class SettingsViewModel @Inject constructor(
     fun addPackLooks(pack: LookPack, looks: List<CustomLook> = pack.looks) {
         viewModelScope.launch {
             val needs = withContext(Dispatchers.IO) {
-                PackInstaller.prepareImages(app, privileged, looks)
                 PackInstaller.prepareFonts(app, privileged, pack, looks).also { PackInstaller.install(app, prefs, looks) }
             }
             refreshLooks()
@@ -487,10 +514,7 @@ class SettingsViewModel @Inject constructor(
     /** Prepares a pack look's fonts, then hands back an unsaved copy to open in Theme Studio ("start from this"). */
     fun startFromPackLook(pack: LookPack, look: CustomLook, onReady: (CustomLook) -> Unit) {
         viewModelScope.launch {
-            val needs = withContext(Dispatchers.IO) {
-                PackInstaller.prepareImages(app, privileged, listOf(look))
-                PackInstaller.prepareFonts(app, privileged, pack, listOf(look))
-            }
+            val needs = withContext(Dispatchers.IO) { PackInstaller.prepareFonts(app, privileged, pack, listOf(look)) }
             reportFonts(null, needs)
             onReady(PackInstaller.relinked(app, look).copy(id = java.util.UUID.randomUUID().toString(), source = null))
         }

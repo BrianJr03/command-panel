@@ -3,7 +3,6 @@ package jr.brian.commandpannel.system
 import android.content.Context
 import android.media.MediaScannerConnection
 import jr.brian.commandpannel.privileged.PrivilegedAccess
-import jr.brian.commandpannel.ui.theme.BackgroundImage
 import jr.brian.commandpannel.ui.theme.LookPack
 import jr.brian.commandpannel.ui.theme.LookPackJson
 import java.io.File
@@ -15,7 +14,6 @@ data class FolderPack(val path: String, val pack: LookPack?)
  * The shared `TCP Themes` folder on internal storage (`/sdcard/TCP Themes`):
  * - `themes/`: theme packs (`*.tcplooks.json`; synced repos keep theme packs in `themes/<repo>/`)
  * - `fonts/`: font files the packs reference by file name
- * - `images/`: background images the packs reference by file name
  *
  * It has the same layout as a theme repo made from the template, so the folder can be shared or pushed as-is. Like
  * [SettingsBackup], all access goes through the root shell, so the app needs no storage permission.
@@ -27,7 +25,6 @@ object ThemeFolder {
     /** [path] as the user's storage shows it: `/sdcard` is a shortcut for `/storage/emulated/0`. */
     fun displayPath(path: String): String = path.replaceFirst("/sdcard", "/storage/emulated/0")
     const val FONTS = "$ROOT/fonts"
-    const val IMAGES = "$ROOT/images"
     private const val README = "README.txt"
 
     /** Single-quotes [path] for the shell (the folder name has a space). */
@@ -35,7 +32,7 @@ object ThemeFolder {
 
     /** Creates the folder layout and its README if missing. Returns false when the root shell isn't available. */
     fun ensure(context: Context, privileged: PrivilegedAccess): Boolean {
-        val ok = privileged.shell("mkdir -p ${q(THEMES)} ${q(FONTS)} ${q(IMAGES)} && echo ok")?.trim() == "ok"
+        val ok = privileged.shell("mkdir -p ${q(THEMES)} ${q(FONTS)} && echo ok")?.trim() == "ok"
         if (ok && privileged.shell("[ -f ${q("$ROOT/$README")} ] && echo yes")?.trim() != "yes") {
             writeText(context, privileged, "$ROOT/$README", context.getString(jr.brian.commandpannel.R.string.theme_folder_readme))
         }
@@ -95,28 +92,6 @@ object ThemeFolder {
         return privileged.shell("mkdir -p ${q(FONTS)} && cp ${q(src)} ${q(dest)} && chmod 644 ${q(dest)} && echo ok")?.trim() == "ok"
     }
 
-    fun hasImage(privileged: PrivilegedAccess, fileName: String): Boolean =
-        privileged.shell("[ -f ${q("$IMAGES/${safeName(fileName)}")} ] && echo yes")?.trim() == "yes"
-
-    /** Imports `images/[fileName]` into the app's background store under the same name (root stages a readable copy). */
-    fun importImage(context: Context, privileged: PrivilegedAccess, fileName: String): Result<BackgroundImage> {
-        val staged = File(context.cacheDir, "image-stage-${System.nanoTime()}")
-        return runCatching {
-            val src = "$IMAGES/${safeName(fileName)}"
-            val ok = privileged.shell("cp ${q(src)} ${q(staged.absolutePath)} && chmod 644 ${q(staged.absolutePath)} && echo ok")?.trim() == "ok"
-            if (!ok) throw BackgroundImportException(jr.brian.commandpannel.R.string.msg_background_unreadable)
-            BackgroundImageStore.importFile(context, staged, fileName = safeName(fileName)).getOrThrow()
-        }.also { staged.delete() }
-    }
-
-    /** Copies a look's background image out to `images/<its file name>`, so exported packs travel with it. */
-    fun exportImage(context: Context, privileged: PrivilegedAccess, image: BackgroundImage): Boolean {
-        val src = BackgroundImageStore.file(context, image)
-        if (!src.isFile) return false
-        val dest = "$IMAGES/${safeName(image.fileName)}"
-        return privileged.shell("mkdir -p ${q(IMAGES)} && cp ${q(src.absolutePath)} ${q(dest)} && chmod 644 ${q(dest)} && echo ok")?.trim() == "ok"
-    }
-
-    /** Keeps a font or image file name inside its folder (no path separators or parent references). */
+    /** Keeps a font file name inside `fonts/` (no path separators or parent references). */
     internal fun safeName(fileName: String): String = fileName.substringAfterLast('/').replace("..", "_")
 }

@@ -8,7 +8,7 @@ import jr.brian.commandpannel.ui.theme.PinnedColors
 internal fun CustomLook.changedCategories(): Set<StudioCategory> = StudioCategory.entries.filter { changed(it) }.toSet()
 
 private fun CustomLook.changed(c: StudioCategory): Boolean = when (c) {
-    StudioCategory.PARTS -> listOf(card, tile, gauge, slider, nav, backdrop, backgroundImage, header).any { it != null }
+    StudioCategory.PARTS -> listOf(card, tile, gauge, slider, nav, backdrop, header).any { it != null }
     StudioCategory.CUSTOM -> custom != CustomRenderParams()
     StudioCategory.FONTS -> labelFont != null || displayFont != null
     StudioCategory.SHAPES -> listOf(panelCardShape, tileShape, sliderControlShape, sliderTrackShape, dialogShape, fpsBadgeShape).any { it != null }
@@ -20,7 +20,7 @@ private fun CustomLook.changed(c: StudioCategory): Boolean = when (c) {
 
 /** This look with one category back to the base look's values. */
 internal fun CustomLook.resetCategory(c: StudioCategory): CustomLook = when (c) {
-    StudioCategory.PARTS -> copy(card = null, tile = null, gauge = null, slider = null, nav = null, backdrop = null, backgroundImage = null, header = null)
+    StudioCategory.PARTS -> copy(card = null, tile = null, gauge = null, slider = null, nav = null, backdrop = null, header = null)
     StudioCategory.CUSTOM -> copy(custom = CustomRenderParams())
     StudioCategory.FONTS -> copy(labelFont = null, displayFont = null)
     StudioCategory.SHAPES -> copy(panelCardShape = null, tileShape = null, sliderControlShape = null, sliderTrackShape = null, dialogShape = null, fpsBadgeShape = null)

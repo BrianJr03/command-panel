@@ -111,10 +111,10 @@ fun OverlayRoot(
         }
         // Nav bar sits at the top or bottom per the user's arrangement (drag it in Arrange mode); default top.
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
-        // The look's picture sits over its backdrop, which stays as the backup: with the Background image tile off and
-        // under Aurora Blur the backdrop shows (and an animation isn't decoded at all).
+        // The background image (one for every look) sits over the look's backdrop, which stays as the backup: with the
+        // Background image tile off and under Aurora Blur the backdrop shows (and an animation isn't decoded at all).
         val image = jr.brian.commandpannel.system.BackgroundImageTile.shown(
-            spec.traits.backgroundImage, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
+            state.backgroundImage, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
         )
         val backdrop = Modifier.tccLookBackdrop(
             spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = image == null,
@@ -124,7 +124,9 @@ fun OverlayRoot(
                 // Backdrop, picture and panel each get a layer of their own; once the panel is shown, a GIF draws on its
                 // own surface under the panel (#60). The scanlines stay over the panel's content.
                 Box(Modifier.matchParentSize().graphicsLayer().then(backdrop))
-                LookBackgroundImageLayer(image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize())
+                LookBackgroundImageLayer(
+                    image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize(), animate = state.animatedBackgrounds,
+                )
             }
             Column(
                 modifier = Modifier.fillMaxSize()

@@ -263,6 +263,16 @@ internal fun SettingsContent(
     }
     val tourTargets = remember { TourTargets() }
     val touring = state.tourStep != null
+    // A link to a control in another section (Appearance's to Animated backgrounds, #61), and the spot it lights up.
+    val jumpTargets = remember { JumpTargets() }
+    var jump by remember { mutableStateOf<PaneJump?>(null) }
+    var jumpSpotlight by remember { mutableStateOf<TourSpot?>(null) }
+    JumpDriver(
+        jump, tourTargets, jumpTargets, scroll, viewport,
+        onSection = { cat -> nav = navItemOf(cat) },
+        onSpotlight = { jumpSpotlight = it },
+        onDone = { jump = null },
+    )
     TourDriver(state.tourStep, tourTargets, scroll, viewport, onSection = { cat -> nav = NavItem.entries.first { it.category == cat } })
     // While the overlay onboarding's theme step runs, the Themes section follows each preset tapped on the bottom screen.
     val overlayStep by jr.brian.commandpannel.ui.overlay.OverlayOnboarding.activeStep.collectAsState()
@@ -301,7 +311,8 @@ internal fun SettingsContent(
         ),
     ) {
     CompositionLocalProvider(
-        LocalTourTargets provides if (touring || followingLook) tourTargets else null,
+        LocalTourTargets provides if (touring || followingLook || jump != null) tourTargets else null,
+        LocalJumpTargets provides jumpTargets,
         LocalNewBadges provides NewBadgesHost(state.newBadges.shown(state.showNewDots), vm::markNewSeen),
     ) {
     Row(
@@ -350,7 +361,7 @@ internal fun SettingsContent(
                 SettingsCategory.GENERAL -> General(state, vm)
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
                 SettingsCategory.NAV_BAR -> NavBarSettings(state, vm, scroll) { viewport.value }
-                SettingsCategory.APPEARANCE -> Appearance(state, vm)
+                SettingsCategory.APPEARANCE -> Appearance(state, vm) { if (!touring) jump = it }
                 SettingsCategory.THEMES -> Themes(state, vm, openStudio, deckFocus) {
                     returnToDeck = true
                     openThemes(ThemeLibraryTab.LOCAL)
@@ -380,6 +391,7 @@ internal fun SettingsContent(
         onSkip = vm::endTour,
     )
     CompanionLookSpotlight(followingLook, tourTargets, paneBounds = { viewport.value })
+    CompanionSpotlight(jumpSpotlight, tourTargets, paneBounds = { viewport.value })
     }
 }
 
@@ -400,16 +412,8 @@ private fun LookFollowDriver(
     LaunchedEffect(active) { if (active) onThemes() }
     LaunchedEffect(active, look) {
         if (!active) return@LaunchedEffect
-        // Wait for the section (and the newly selected row) to lay out before measuring.
-        kotlinx.coroutines.withTimeoutOrNull(800) {
-            androidx.compose.runtime.snapshotFlow { targets.rectOf(TourSpot.BUILTIN_SELECTED) }.first { it != null }
-        } ?: return@LaunchedEffect
-        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
-        val rect = targets.rectOf(TourSpot.BUILTIN_SELECTED) ?: return@LaunchedEffect
-        val to = (scroll.value + rect.center.y - viewport.value.center.y).roundToInt().coerceIn(0, scroll.maxValue)
-        if (to == scroll.value) return@LaunchedEffect
-        if (motion) scroll.animateScrollTo(to, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-        else scroll.scrollTo(to)
+        // Waits for the section (and the newly selected row) to lay out before measuring.
+        scrollPaneTo(targets, TourSpot.BUILTIN_SELECTED, scroll, viewport, motion, PaneAlign.CENTER)
     }
 }
 
@@ -431,16 +435,8 @@ private fun TourDriver(
         val step = stepIndex?.let(TOUR_STEPS::get) ?: return@LaunchedEffect
         step.section?.let(onSection)
         val spot = step.spot?.takeIf { it.inPane } ?: return@LaunchedEffect
-        // Wait for the section to compose and lay out (and its scroll reset to land) before measuring.
-        kotlinx.coroutines.withTimeoutOrNull(800) {
-            androidx.compose.runtime.snapshotFlow { targets.rectOf(spot) }.first { it != null }
-        } ?: return@LaunchedEffect
-        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
-        val rect = targets.rectOf(spot) ?: return@LaunchedEffect
-        val to = (scroll.value + rect.top - viewport.value.top - topInset).roundToInt().coerceIn(0, scroll.maxValue)
-        if (to == scroll.value) return@LaunchedEffect
-        if (motion) scroll.animateScrollTo(to, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-        else scroll.scrollTo(to)
+        // Waits for the section to compose and lay out (and its scroll reset to land) before measuring.
+        scrollPaneTo(targets, spot, scroll, viewport, motion, PaneAlign.TOP, topInset)
     }
 }
 
@@ -1736,7 +1732,7 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
 // ---- Appearance ----
 
 @Composable
-private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
+private fun Appearance(state: SettingsState, vm: SettingsViewModel, onJump: (PaneJump) -> Unit) {
     Card(Modifier.tourTarget(TourSpot.OVERLAY_THEME)) {
         CardTitle(stringResource(R.string.settings_overlay_theme))
         Spacer(Modifier.height(6.dp))
@@ -1746,6 +1742,7 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
             RadioRow(stringResource(label), state.themeMode == mode) { vm.setThemeMode(mode) }
         }
     }
+    BackgroundImageCard(state, vm, onJump)
     SectionHeader(stringResource(R.string.settings_overlay_look))
     Card { CardDesc(stringResource(R.string.settings_overlay_look_moved)) }
     SwitchCard(
@@ -1762,6 +1759,51 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel) {
     )
 }
 
+/**
+ * The panel's background image (#61): one picture behind every look, built-in or custom, with each look's backdrop as
+ * its backup. Choose (or change) opens the system file picker; Remove goes back to the backdrop.
+ */
+@Composable
+private fun BackgroundImageCard(state: SettingsState, vm: SettingsViewModel, onJump: (PaneJump) -> Unit) {
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri -> if (uri != null) vm.importBackgroundImage(uri) }
+    val image = state.backgroundImage
+    // Remove disappears once pressed; focus goes to Choose instead of falling to the screen's first control.
+    val chooseFocus = remember { FocusRequester() }
+    Card {
+        CardTitle(stringResource(R.string.settings_background_image))
+        CardDesc(stringResource(R.string.settings_background_image_desc))
+        if (image != null) {
+            InfoLine(
+                stringResource(
+                    if (image.animated) R.string.settings_background_image_current_animated else R.string.settings_background_image_current,
+                    image.fileName,
+                ),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.focusRequester(chooseFocus)) {
+                Chip(stringResource(if (image == null) R.string.settings_background_image_choose else R.string.settings_background_image_change)) {
+                    launcher.launch(jr.brian.commandpannel.system.BackgroundImageRules.MIME_TYPES)
+                }
+            }
+            if (image != null) Chip(stringResource(R.string.settings_background_image_remove)) {
+                vm.removeBackgroundImage()
+                runCatching { chooseFocus.requestFocus() }
+            }
+        }
+        state.backgroundMessage?.let { InfoLine(it, p.accent) }
+        // GIFs and animated WebP are Experimental: the link opens that section on the switch, the tour's way.
+        if (!state.animatedBackgrounds) {
+            FocusRow(selected = false, onClick = { onJump(PaneJump(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS)) }) {
+                Text(stringResource(R.string.settings_background_image_animated_link), color = p.accent, fontSize = 14.sp, style = tccTextStyle())
+            }
+        }
+    }
+}
+
 // ---- Experimental ----
 
 @Composable
@@ -1770,6 +1812,13 @@ private fun Experimental(state: SettingsState, vm: SettingsViewModel) {
         stringResource(R.string.settings_task_fps),
         stringResource(R.string.settings_task_fps_desc),
         state.taskFps, vm::setTaskFps,
+    )
+    SwitchCard(
+        stringResource(R.string.settings_animated_backgrounds),
+        stringResource(R.string.settings_animated_backgrounds_desc),
+        state.animatedBackgrounds, vm::setAnimatedBackgrounds,
+        // Where Appearance's link lands.
+        Modifier.jumpTarget(TourSpot.ANIMATED_BACKGROUNDS),
     )
 }
 

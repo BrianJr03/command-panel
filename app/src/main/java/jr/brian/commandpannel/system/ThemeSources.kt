@@ -198,8 +198,6 @@ object ThemeSources {
         }
         // Fonts first, so the installed looks link to them.
         val needs = PackInstaller.prepareFonts(context, privileged, LookPack(source.name, fontLooks, fonts = fonts))
-        // Repos don't download images; a look whose image is in TCP Themes/images (copied by hand) still finds it.
-        PackInstaller.prepareImages(context, privileged, packs.flatMap { it.looks })
         packs.forEach { PackInstaller.install(context, prefs, it.looks, source.id) }
         // A sync the guard cut short isn't finished, so the next time Themes opens it carries on instead of waiting an hour.
         save(prefs, source.copy(lastSync = if (limitedUntil == null) System.currentTimeMillis() else source.lastSync, files = newFiles))

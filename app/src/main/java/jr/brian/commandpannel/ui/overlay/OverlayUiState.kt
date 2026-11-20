@@ -65,7 +65,11 @@ data class OverlayUiState(
     val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT,
     /** The active Theme Studio look (overrides on top of [look]), or null for a built-in look. */
     val customLook: jr.brian.commandpannel.ui.theme.CustomLook? = null,
-    /** The Background image tile (#58): false shows the look's backup backdrop instead of its image. */
+    /** The background image set in Appearance (#61), shown on any look; null for none. */
+    val backgroundImage: jr.brian.commandpannel.system.BackgroundImage? = null,
+    /** Experimental Animated backgrounds (#61): an animated image plays only while this is on (else its first frame). */
+    val animatedBackgrounds: Boolean = false,
+    /** The Background image tile (#58): false shows the look's backdrop instead of the image. */
     val backgroundImageOn: Boolean = true,
     /** When set, overrides the overlay palette accent with the Thor's ambient-LED color (fork feature, inverted). */
     val accentOverride: Int? = null,

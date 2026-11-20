@@ -196,6 +196,8 @@
     <string name="settings_battery_estimate">Battery Estimate</string>
     <string name="settings_task_fps">In-game FPS</string>
     <string name="settings_task_fps_desc">Count the frames the game itself draws, not everything both screens show. With no game reading, the counter says compositor FPS. Still being tested, so readings may be off.</string>
+    <string name="settings_animated_backgrounds">Animated backgrounds</string>
+    <string name="settings_animated_backgrounds_desc">Play GIF and animated WebP background images (set in Appearance). An animated background uses more battery while the panel is open. While this is off, one that\'s already set shows its first frame.</string>
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>
     <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>
@@ -415,6 +417,16 @@
     <string name="settings_companion_follow_look_desc">Apply the overlay\'s look, theme and accent to this settings screen. Off keeps the default companion style.</string>
     <string name="settings_rgb_accent">Accent from Ambient LED</string>
     <string name="settings_rgb_accent_desc">Use the color you set for the Thor\'s Ambient LED as the overlay\'s accent, even over a look\'s own accent, so the overlay theme follows your joystick LED color.</string>
+    <string name="settings_background_image">Background image</string>
+    <string name="settings_background_image_desc">A PNG, JPG or WebP shown behind the panel on any look. The look\'s backdrop shows instead when the tile is off or the image can\'t load.</string>
+    <string name="settings_background_image_choose">Choose image…</string>
+    <string name="settings_background_image_change">Change image…</string>
+    <string name="settings_background_image_remove">Remove image</string>
+    <string name="settings_background_image_current">Current: %1$s</string>
+    <string name="settings_background_image_current_animated">Current: %1$s (animated)</string>
+    <string name="settings_background_image_set">Background image set</string>
+    <string name="settings_background_image_removed">Background image removed</string>
+    <string name="settings_background_image_animated_link">Animated GIFs and WebP are in Experimental →</string>
 
     <!-- Overlay looks (proper names) -->
     <string name="look_auto">Auto (stock)</string>
@@ -482,15 +494,6 @@
     <string name="theme_backdrop_honeycomb">Honeycomb</string>
     <string name="theme_backdrop_starfield">Starfield</string>
     <string name="theme_part_header">Card headers</string>
-    <string name="theme_background_image">Background image</string>
-    <string name="theme_background_image_desc">A PNG, JPG, WebP or GIF behind the panel, cropped to fill the screen. Animated GIF and WebP files play while the panel is open. The Backdrop above stays as its backup: it shows while the Background Image tile is off, if the image can\'t load, and with Aurora Blur.</string>
-    <string name="theme_background_image_choose">Choose image…</string>
-    <string name="theme_background_image_change">Change image…</string>
-    <string name="theme_background_image_remove">Remove image</string>
-    <string name="theme_background_image_current">Current: %1$s</string>
-    <string name="theme_background_image_current_animated">Current: %1$s (animated)</string>
-    <string name="theme_background_image_blur_note">Aurora Blur is on, so the panel shows the backdrop instead of the image.</string>
-    <string name="theme_background_image_set">Background image set</string>
     <string name="theme_fonts_desc">Bundled fonts or your own TTF/OTF files. Imported fonts stay on this device.</string>
     <string name="theme_font_labels">Label font</string>
     <string name="theme_font_numbers">Number font</string>
@@ -666,7 +669,7 @@
     <string name="theme_license_unknown">license not stated</string>
     <string name="theme_fonts_download">Download</string>
     <string name="theme_fonts_skip">Skip</string>
-    <string name="theme_folder_readme">TCP Themes\n\nthemes/  Theme packs (.tcplooks.json). Each file can hold many looks.\nfonts/   Font files (.ttf / .otf) the packs use, matched by file name.\nimages/  Background images (.png / .jpg / .webp / .gif) the packs use, matched by file name.\n\nThe Themes section of Thor Command Panel lists the packs here and exports your looks here. This folder has the same layout as a theme repo made from the TCP theme template, so you can share it as-is.\n</string>
+    <string name="theme_folder_readme">TCP Themes\n\nthemes/  Theme packs (.tcplooks.json). Each file can hold many looks.\nfonts/   Font files (.ttf / .otf) the packs use, matched by file name.\n\nThe Themes section of Thor Command Panel lists the packs here and exports your looks here. This folder has the same layout as a theme repo made from the TCP theme template, so you can share it as-is.\n</string>
     <string name="settings_update_title">Updates</string>
     <string name="settings_update_desc">Version %1$s · %2$s</string>
     <string name="settings_update_never_checked">not checked yet</string>
@@ -809,6 +812,7 @@
     <string name="msg_background_animation_too_big">This animation is more than twice the screen\'s size. Pick a smaller one.</string>
     <string name="msg_background_unsupported">Pick a PNG, JPG, WebP or GIF image</string>
     <string name="msg_background_invalid">Not a valid image</string>
+    <string name="msg_background_animated_off">Animated GIF and WebP images need Animated backgrounds, in Experimental.</string>
     <string name="font_default_name">Font</string>
     <!-- Companion tour -->
     <string name="tour_next">Next</string>

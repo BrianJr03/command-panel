@@ -113,6 +113,8 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     /** The selected row in the built-in list (followed while the overlay onboarding's theme step runs). */
     BUILTIN_SELECTED,
     PRIVILEGED,
+    /** Experimental's Animated backgrounds switch, where Appearance's link lands (#61). */
+    ANIMATED_BACKGROUNDS,
     TOUR_REPLAY;
 
     companion object {
@@ -454,17 +456,28 @@ private fun Spotlight(hole: Rect?, layerSize: IntSize, motion: Boolean) {
  * built-in look and glides to each preset the user taps on the bottom screen. Touches and keys pass through.
  */
 @Composable
-internal fun CompanionLookSpotlight(active: Boolean, targets: TourTargets, paneBounds: () -> Rect) {
+internal fun CompanionLookSpotlight(active: Boolean, targets: TourTargets, paneBounds: () -> Rect) =
+    CompanionSpotlight(if (active) TourSpot.BUILTIN_SELECTED else null, targets, paneBounds)
+
+/**
+ * The tour's spotlight outside the tour: on [spot] while it's set (gliding as it moves), fading out when it's cleared
+ * (the onboarding's look follower, and [PaneJump]s). Touches and keys pass through.
+ */
+@Composable
+internal fun CompanionSpotlight(spot: TourSpot?, targets: TourTargets, paneBounds: () -> Rect) {
     val motion = LocalTccLookSpec.current.traits.animate
+    // The last spot, so the hole stays put while the layer fades out.
+    var shown by remember { mutableStateOf(spot) }
+    if (spot != null) shown = spot
     AnimatedVisibility(
-        visible = active,
+        visible = spot != null,
         enter = if (motion) fadeIn(tween(380)) else EnterTransition.None,
         exit = if (motion) fadeOut(tween(260)) else ExitTransition.None,
     ) {
         val pad = with(LocalDensity.current) { 8.dp.toPx() }
         var origin by remember { mutableStateOf(Offset.Zero) }
         var layerSize by remember { mutableStateOf(IntSize.Zero) }
-        val hole = targets.rectOf(TourSpot.BUILTIN_SELECTED)?.intersectOrNull(paneBounds())?.translate(-origin)?.inflate(pad)
+        val hole = shown?.let { targets.rectOf(it) }?.intersectOrNull(paneBounds())?.translate(-origin)?.inflate(pad)
         Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot(); layerSize = it.size }) {
             Spotlight(hole, layerSize, motion)
         }

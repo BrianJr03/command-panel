@@ -19,7 +19,7 @@ sealed interface ImportPlan {
     data class Reject(val reason: RejectReason) : ImportPlan
 }
 
-enum class RejectReason { TOO_LARGE_FILE, TOO_LARGE_ANIMATION, NOT_AN_IMAGE, UNSUPPORTED_TYPE }
+enum class RejectReason { TOO_LARGE_FILE, TOO_LARGE_ANIMATION, NOT_AN_IMAGE, UNSUPPORTED_TYPE, ANIMATION_OFF }
 
 /** Limits and geometry for background images (#57). Pure, so it is unit-tested. */
 object BackgroundImageRules {
@@ -30,16 +30,20 @@ object BackgroundImageRules {
     /** The fastest an animation is drawn (30 fps). */
     const val MIN_FRAME_MS = 33L
 
-    /** The types Theme Studio imports: PNG, JPG, WebP (still or animated) and GIF. */
+    /** The types Appearance imports: PNG, JPG, WebP (still or animated) and GIF. */
     val MIME_TYPES = arrayOf("image/png", "image/jpeg", "image/webp", "image/gif")
 
     fun isSupportedMime(mime: String?): Boolean = mime != null && mime.lowercase() in MIME_TYPES.toSet()
 
-    /** Decides how to import a file of [bytes] whose (EXIF-rotated) size is [image], for a bottom screen of [screen]. */
-    fun plan(bytes: Long, image: PxSize, animated: Boolean, screen: PxSize, mime: String?): ImportPlan {
+    /**
+     * Decides how to import a file of [bytes] whose (EXIF-rotated) size is [image], for a bottom screen of [screen].
+     * Animations are refused unless [allowAnimated] (the Experimental Animated backgrounds switch, #61).
+     */
+    fun plan(bytes: Long, image: PxSize, animated: Boolean, screen: PxSize, mime: String?, allowAnimated: Boolean = true): ImportPlan {
         if (bytes > MAX_BYTES) return ImportPlan.Reject(RejectReason.TOO_LARGE_FILE)
         if (image.width <= 0 || image.height <= 0) return ImportPlan.Reject(RejectReason.NOT_AN_IMAGE)
         if (!isSupportedMime(mime)) return ImportPlan.Reject(RejectReason.UNSUPPORTED_TYPE)
+        if (animated && !allowAnimated) return ImportPlan.Reject(RejectReason.ANIMATION_OFF)
         val maxW = screen.width * MAX_SCREENS
         val maxH = screen.height * MAX_SCREENS
         if (image.width <= maxW && image.height <= maxH) return ImportPlan.Keep
@@ -90,11 +94,21 @@ object BackgroundImageRules {
     fun drawsOnSurface(playing: Boolean, settled: Boolean?, hasFirstFrame: Boolean): Boolean =
         playing && settled == true && hasFirstFrame
 
+    /**
+     * Whether [image] plays as an animation: only an animated file with the Animated backgrounds switch on
+     * ([animationsOn]). Otherwise an animated file shows its first frame as a still image (no player, no surface).
+     */
+    fun plays(image: BackgroundImage?, animationsOn: Boolean): Boolean = image?.animated == true && animationsOn
+
+    /** A stored image's file name kept inside its folder (no path separators or parent references), or `null`. */
+    fun safeName(name: String?): String? =
+        name?.substringAfterLast('/')?.replace("..", "_")?.trim()?.take(120)?.ifBlank { null }
+
     /** When the next frame may be drawn: no sooner than [MIN_FRAME_MS] after the last one, nor in the past. */
     fun nextFrameAt(requestedAt: Long, lastFrameAt: Long, now: Long): Long =
         maxOf(requestedAt, lastFrameAt + MIN_FRAME_MS, now)
 
-    /** `<name>-<tag>.<ext>`: unique per import, safe in a folder, and still recognizable in `TCP Themes/images`. */
+    /** `<name>-<tag>.<ext>`: unique per import, safe in a folder, and still recognizable. */
     fun storedName(displayName: String?, tag: String, mime: String?): String {
         val stem = displayName?.substringAfterLast('/')?.substringBeforeLast('.')
             ?.replace(Regex("[^A-Za-z0-9 _-]"), "_")?.trim()?.take(40)?.ifBlank { null } ?: "background"

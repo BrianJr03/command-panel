@@ -110,14 +110,6 @@ class ThemePackTest {
     }
 
     @Test
-    fun `packs carry background image file names`() {
-        val withImage = plain.copy(backgroundImage = jr.brian.commandpannel.ui.theme.BackgroundImage("Sky-0f0f0f0f.jpg"))
-        val pack = LookPackJson.decode(LookPackJson.encode(LookPack(name = "Sky", looks = listOf(withImage, neon))))!!
-        assertEquals(withImage.backgroundImage, pack.looks.first { it.id == "plain" }.backgroundImage)
-        assertEquals(setOf("Sky-0f0f0f0f.jpg"), LookPackJson.imageFiles(pack.looks))
-    }
-
-    @Test
     fun `git blob sha matches git's object id`() {
         // `printf 'hello\n' | git hash-object --stdin`
         assertEquals("ce013625030ba8dba906f756967f9e9ca394464a", ThemeSources.gitBlobSha("hello\n".toByteArray()))

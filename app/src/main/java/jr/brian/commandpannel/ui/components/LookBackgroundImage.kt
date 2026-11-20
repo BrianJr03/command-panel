@@ -45,10 +45,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import jr.brian.commandpannel.overlay.LocalOverlayPanelSettled
+import jr.brian.commandpannel.system.BackgroundImage
 import jr.brian.commandpannel.system.BackgroundImageRules
 import jr.brian.commandpannel.system.BackgroundImageStore
 import jr.brian.commandpannel.system.PxSize
-import jr.brian.commandpannel.ui.theme.BackgroundImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -73,9 +73,10 @@ private val renderedFrames = java.util.concurrent.atomic.AtomicInteger()
  * and the display hardware scales it up, so the panel window doesn't repaint per frame. During the show and hide
  * animations (a surface doesn't follow the window's fade and slide) and in previews, frames are drawn in the window.
  * [fillColor] fills the surface under the frame's transparent pixels, since the backdrop can't show through it.
+ * [animate] false (the Experimental Animated backgrounds switch off, #61) shows an animated file's first frame instead.
  */
 @Composable
-fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier: Modifier = Modifier) {
+fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier: Modifier = Modifier, animate: Boolean = true) {
     if (image == null) return
     val context = LocalContext.current.applicationContext
     var layoutSize by remember { mutableStateOf(IntSize.Zero) }
@@ -84,7 +85,8 @@ fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier
     var hasFrame by remember(image) { mutableStateOf(false) }
     var player by remember(image) { mutableStateOf<AnimatedBackgroundPlayer?>(null) }
     val target = PxSize(layoutSize.width, layoutSize.height)
-    if (image.animated) {
+    // With Animated backgrounds off (#61) an animated file shows its first frame, decoded like a still image.
+    if (BackgroundImageRules.plays(image, animate)) {
         val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
         val displayOn = rememberDisplayOn()
         val play = layoutSize != IntSize.Zero && displayOn && lifecycleState.isAtLeast(Lifecycle.State.STARTED)
@@ -104,6 +106,7 @@ fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier
     } else {
         LaunchedEffect(image, target) {
             if (layoutSize == IntSize.Zero) return@LaunchedEffect
+            // A first frame left from playing stays until the still one lands.
             frame.value = withContext(Dispatchers.IO) { StillBackgroundCache.load(context, image, target) }
         }
     }
@@ -190,7 +193,7 @@ private fun decodeCover(
     return if (asDrawable) ImageDecoder.decodeDrawable(source, listener) else ImageDecoder.decodeBitmap(source, listener)
 }
 
-/** Still images by file and size: the overlay's and Theme Studio preview's, so reopening the panel doesn't decode again. */
+/** Still images by file and size, so reopening the panel doesn't decode again. */
 private object StillBackgroundCache {
     private val cache = LruCache<String, ImageBitmap>(2)
 

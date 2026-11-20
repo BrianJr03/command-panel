@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Verifies #57 (image and GIF backgrounds for custom looks) and #58 (the Background image tile) on the debug build.
+# Verifies the panel's background image on the debug build: #57 (images and GIFs), #58 (the Background image tile),
+# #60 (GIFs on their own surface) and #61 (one image for any look, set in Appearance; GIFs behind Experimental's
+# Animated backgrounds switch; Appearance's animated link to that switch).
 #   scripts/verify-image-background.sh [--no-build] [--sleep]
 #
-# Debug build only (jr.brian.commandpannel.debug). It sends no D-pad, A, B or Back keys: images are seeded with the
-# debug-only DEBUG_BACKGROUND broadcast (the same import checks as Theme Studio's picker, then a "Background test" look
-# is applied), the panel is shown and hidden with SHOW_OVERLAY / HIDE_OVERLAY, and the tile is pressed through
-# DEBUG_BACKGROUND --ez press_tile true (the tile's own onTileClick path). With --sleep it also puts the screen to sleep
-# and wakes it (KEYCODE_SLEEP / KEYCODE_WAKEUP, never the power key), after checking the focused app on the top screen
-# isn't the release Command Panel; it never gets past a lock screen.
+# Debug build only (jr.brian.commandpannel.debug). Images are set with the debug-only DEBUG_BACKGROUND broadcast (the
+# same import checks as Appearance's picker, including the Animated backgrounds gate), the look and the switch are set
+# through it too, the panel is shown and hidden with SHOW_OVERLAY / HIDE_OVERLAY, and the tile is pressed through
+# DEBUG_BACKGROUND --ez press_tile true (the tile's own onTileClick path). Gamepad keys are sent only for the link
+# check, on the top screen, and only after checking that the debug companion has focus there (never the release
+# app's). With --sleep it also puts the screen to sleep and wakes it (KEYCODE_SLEEP / KEYCODE_WAKEUP, never the power
+# key), after the same check; it never gets past a lock screen.
 #
 # Test images are made here with ffmpeg: a red PNG, a JPG stored sideways with EXIF orientation 6 (blue on top, yellow
 # below, so upright it is yellow on the left and blue on the right), a 50 fps animated GIF, and two oversized files.
@@ -23,9 +26,15 @@
 #   - limits: an animation over twice the screen is refused; a still photo over it is downscaled on import, to the
 #     smallest size that still covers twice the screen;
 #   - tile (#58): off shows the backdrop (red gone) and stops a GIF; on brings the image back; the pref flips;
-#     on a built-in look (no image) the press does nothing;
+#     with no image set the press does nothing;
+#   - #61: every check runs on a built-in look (Aurora Glass); with Animated backgrounds off a GIF is refused on
+#     import, and one already set shows still (no "animation started", no surface, image visible); turning the switch
+#     on while the panel is open starts it, off stops it at once;
+#   - #61 link: with the switch off, the companion opens on Appearance, D-pad walks to the "in Experimental" link and A
+#     follows it: focus lands on the Animated backgrounds switch in Experimental, and the spotlight dims the rest of
+#     the screen (the rail gets darker), then fades (it's back about 2.5 s later);
 #   - --sleep: the GIF stops when the screen sleeps and starts again on wake.
-# At the end the user's look comes back, the test look and its images are deleted, and the prefs file is restored.
+# At the end the user's look comes back, the image is removed and its files deleted, and the prefs file is restored.
 # Screenshots and the numbers go to $OUT_DIR; looks, smoothness, battery and heat need a person.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -99,12 +108,45 @@ panel_windows() {
 show_panel() { broadcast SHOW_OVERLAY; wait_for 8 '[ "$(panel_windows)" -ge 1 ]' && sleep 1.5; }
 hide_panel() { broadcast HIDE_OVERLAY; wait_for 8 '[ "$(panel_windows)" -eq 0 ]'; sleep 1; }
 
-# Seeds the test look with the device file $1 and waits for the outcome; prints the stored file name.
+# Sets the device file $1 as the background image (Animated backgrounds on, or $2 = off) and waits for the outcome;
+# prints the stored file name (empty when refused).
 seed() {
   log_clear
-  broadcast DEBUG_BACKGROUND --es path "$DEV_DIR/$1"
+  broadcast DEBUG_BACKGROUND --ez animations "$([ "${2:-on}" = off ] && echo false || echo true)" --es path "$DEV_DIR/$1"
   wait_for 10 'log_has "debug background (set|failed)"' || return 1
   echo "$LOG" | grep -o "debug background set [^ ]*" | tail -1 | awk '{print $4}'
+}
+animations() { broadcast DEBUG_BACKGROUND --ez animations "$1"; sleep 1.5; }
+anim_pref() { local v; v="$(pref animated_backgrounds)"; echo "${v:-false}"; }
+
+# --- the companion on the top screen (the #61 link check) ---
+TOP_PHYSICAL=""
+top_shot() { adb exec-out screencap -d "$TOP_PHYSICAL" -p > "$OUT_DIR/$1.png" 2>/dev/null; echo "  screenshot: $OUT_DIR/$1.png"; }
+# Mean "R G B" of the top screen's left 12% (the rail), which the spotlight dims.
+rail_rgb() { "$FFMPEG" -v error -i "$OUT_DIR/$1.png" -vf "crop=iw*0.12:ih*0.8:0:ih*0.1,scale=1:1:flags=area" -f rawvideo -pix_fmt rgb24 - | od -An -tu1 | xargs; }
+luma() { local r g b; read -r r g b <<< "$1"; echo $(( (r * 3 + g * 6 + b) / 10 )); }
+dump_ui() { sh_dev uiautomator dump /sdcard/verify-bg-ui.xml >/dev/null; adb pull /sdcard/verify-bg-ui.xml "$OUT_DIR/ui.xml" >/dev/null 2>&1; }
+# Text inside the focused node (Compose reports focus on the focusable row or card).
+focused_text() {
+  dump_ui
+  python3 -I - "$OUT_DIR/ui.xml" <<'PY'
+import sys, xml.etree.ElementTree as ET
+for n in ET.parse(sys.argv[1]).getroot().iter("node"):
+    if n.get("focused") == "true":
+        print(" | ".join(d.get("text") or d.get("content-desc") or "" for d in n.iter("node")))
+        break
+PY
+}
+focus_has() { focused_text | grep -q "$1"; }
+# The debug companion is the resumed activity on the top screen (display 0), and not the release app.
+companion_in_front() {
+  local d; d="$(sh_dev dumpsys activity activities)"
+  echo "$d" | awk '/^Display #/{d=$2} d == "#0" && /topResumedActivity=/ && !p {print; p=1}' | grep -q "$PKG/"
+}
+# One gamepad key on the top screen, only while the debug companion has focus there.
+key() {
+  if ! companion_in_front; then fail "the debug companion isn't in front on the top screen: no key sent, stopping"; exit 1; fi
+  sh_dev input -d 0 keyevent "$1" >/dev/null; sleep 0.6
 }
 press_tile() { broadcast DEBUG_BACKGROUND --ez press_tile true; sleep 1.5; }
 
@@ -209,8 +251,8 @@ echo "  look before: ${saved_look:-<default>}, tile pref before: $(tile_pref)"
 cleanup() {
   step "Restore"
   broadcast HIDE_OVERLAY
-  # Deletes the test look and prunes its images, then puts the whole prefs file back with the app stopped.
-  broadcast DEBUG_BACKGROUND --es restore_look "$saved_look"
+  # Removes the image and deletes its files, then puts the whole prefs file back (the look, the tile, the switch).
+  broadcast DEBUG_BACKGROUND --ez clear true --es look "$saved_look"
   sleep 2
   sh_dev am force-stop "$PKG"
   adb push "$saved_prefs" /data/local/tmp/verify-bg-prefs.xml >/dev/null 2>&1
@@ -223,6 +265,12 @@ cleanup() {
 trap cleanup EXIT
 hide_panel
 check "test images made and pushed" make_images
+top="$(sh_dev dumpsys display | grep -oE "type=INTERNAL, valid=true, isActive=true, displayId=0, uniqueId='local:[0-9]+'" | head -1)"
+TOP_PHYSICAL="$(echo "$top" | grep -oE "local:[0-9]+" | cut -d: -f2)"
+# The image is the same for every look (#61): all checks run on a built-in one.
+broadcast DEBUG_BACKGROUND --es look AURORA_GLASS
+sleep 1
+check "a built-in look is applied" test "$(pref overlay_look)" = AURORA_GLASS
 
 # --- #57: still PNG --------------------------------------------------------------------------------------------------
 
@@ -371,9 +419,38 @@ press_tile
 check "tile on starts it again" wait_for 5 'log_has "animation started"'
 hide_panel
 
-step "Tile on a look without an image"
-# A built-in look has no image (the user's own look comes back at the end).
-broadcast DEBUG_BACKGROUND --es restore_look AURORA_GLASS
+# --- #61: Animated backgrounds switch ---------------------------------------------------------------------------------
+
+step "Animated backgrounds off (#61)"
+name="$(seed anim.gif off)"
+refused_off() { [ -z "$name" ] && log_has "debug background failed: .*Experimental"; }
+check "a GIF is refused while the switch is off, pointing to Experimental" refused_off
+check "the switch is off" test "$(anim_pref)" = false
+# A GIF set while it was on, then the switch turned off: it shows still.
+seed anim.gif >/dev/null
+animations false
+log_clear
+show_panel
+sleep 2
+no_start() { ! log_has "animation started"; }
+check "off: no player (no \"animation started\")" no_start
+check "off: no surface layer" test "$(surface_layers)" -eq 0
+shot gif-still
+rgb="$(edge_rgb gif-still left)"
+bright() { local r g b; read -r r g b <<< "$1"; [ $((r + g + b)) -ge 150 ]; }
+check "off: the first frame shows (left edge RGB $rgb, not the dark backdrop)" bright "$rgb"
+measure "GIF set, switch off"
+check "off: the panel window is idle (${LAST_FRAMES:-?} frames in 5 s)" test "${LAST_FRAMES:-999}" -le 20
+log_clear
+animations true
+check "turning it on plays the GIF with the panel open" wait_for 5 'log_has "animation started"'
+log_clear
+animations false
+check "turning it off stops it at once" wait_for 3 'log_has "animation stopped"'
+hide_panel
+
+step "Tile with no image set"
+broadcast DEBUG_BACKGROUND --ez clear true
 sleep 2
 before="$(tile_pref)"
 show_panel
@@ -382,3 +459,39 @@ check "press does nothing (pref stays $before)" test "$(tile_pref)" = "$before"
 shot tile-unavailable
 echo "  (the tile shows grayed out only when it's enabled in Tiles settings: check $OUT_DIR/tile-unavailable.png by eye)"
 hide_panel
+
+# --- #61: the link from Appearance to the switch -----------------------------------------------------------------------
+
+step "Link to Animated backgrounds (gamepad, top screen)"
+check "the switch is off (the link only shows then)" test "$(anim_pref)" = false
+sh_dev am start -W -n "$COMPANION" --display 0 --es section appearance >/dev/null
+sleep 2
+if ! companion_in_front; then
+  fail "the debug companion didn't come to the front on the top screen: skipping the link check"
+else
+  # From the rail into the pane, then down until the link has focus.
+  key KEYCODE_DPAD_RIGHT
+  found=false
+  for i in $(seq 1 16); do
+    if focus_has "in Experimental"; then found=true; break; fi
+    key KEYCODE_DPAD_DOWN
+  done
+  check "the link has focus in Appearance's Background image card" $found
+  if $found; then
+    top_shot link-before
+    key KEYCODE_BUTTON_A
+    # Section switch, 520 ms scroll and the spotlight's glide; it holds 1.5 s.
+    sleep 0.8
+    top_shot link-spotlight
+    check "focus landed on the Animated backgrounds switch" focus_has "Animated backgrounds"
+    before_l="$(luma "$(rail_rgb link-before)")"; during_l="$(luma "$(rail_rgb link-spotlight)")"
+    note "link: rail brightness before $before_l, during the spotlight $during_l"
+    check "the spotlight dims the rest of the screen ($before_l -> $during_l)" test "$during_l" -lt $((before_l * 3 / 4 + 1))
+    sleep 2.5
+    top_shot link-after
+    after_l="$(luma "$(rail_rgb link-after)")"
+    note "link: rail brightness after the fade $after_l"
+    check "then it fades ($after_l, back near $before_l)" test "$after_l" -ge $((before_l * 3 / 4))
+    check "focus is still on the switch" focus_has "Animated backgrounds"
+  fi
+fi

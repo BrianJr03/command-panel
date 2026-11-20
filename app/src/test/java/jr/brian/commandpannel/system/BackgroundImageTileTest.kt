@@ -1,7 +1,5 @@
 package jr.brian.commandpannel.system
 
-import jr.brian.commandpannel.ui.theme.BackgroundImage
-import jr.brian.commandpannel.ui.theme.CustomLook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -10,21 +8,20 @@ import org.junit.Test
 
 class BackgroundImageTileTest {
     private val gif = BackgroundImage("cat-1.gif", animated = true)
-    private val withImage = CustomLook(id = "a", name = "a", backgroundImage = gif)
-    private val plain = CustomLook(id = "b", name = "b")
 
     @Test
-    fun `available only when the current look has an image`() {
-        assertTrue(BackgroundImageTile.available(withImage))
-        assertFalse(BackgroundImageTile.available(plain))
-        assertFalse(BackgroundImageTile.available(null)) // a built-in look
+    fun `available whenever an image is set, whatever the look`() {
+        // The image is app-wide (#61), so the tile no longer depends on the look being a custom one.
+        assertTrue(BackgroundImageTile.available(gif))
+        assertTrue(BackgroundImageTile.available(BackgroundImage("still.png")))
+        assertFalse(BackgroundImageTile.available(null))
     }
 
     @Test
     fun `lit only when available and on`() {
-        assertTrue(BackgroundImageTile.active(withImage, on = true))
-        assertFalse(BackgroundImageTile.active(withImage, on = false))
-        assertFalse(BackgroundImageTile.active(plain, on = true))
+        assertTrue(BackgroundImageTile.active(gif, on = true))
+        assertFalse(BackgroundImageTile.active(gif, on = false))
+        assertFalse(BackgroundImageTile.active(null, on = true))
     }
 
     @Test

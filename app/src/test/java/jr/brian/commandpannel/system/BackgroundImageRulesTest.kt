@@ -33,6 +33,26 @@ class BackgroundImageRulesTest {
     }
 
     @Test
+    fun `animations are refused while Animated backgrounds is off`() {
+        assertEquals(
+            ImportPlan.Reject(RejectReason.ANIMATION_OFF),
+            BackgroundImageRules.plan(10, PxSize(320, 240), true, screen, "image/gif", allowAnimated = false),
+        )
+        assertEquals(ImportPlan.Keep, BackgroundImageRules.plan(10, PxSize(320, 240), true, screen, "image/gif", allowAnimated = true))
+        // Still images don't care, and a still WebP is fine either way.
+        assertEquals(ImportPlan.Keep, BackgroundImageRules.plan(10, PxSize(320, 240), false, screen, "image/webp", allowAnimated = false))
+    }
+
+    @Test
+    fun `an animated image plays only with Animated backgrounds on`() {
+        val gif = BackgroundImage("a.gif", animated = true)
+        assertTrue(BackgroundImageRules.plays(gif, animationsOn = true))
+        assertTrue(!BackgroundImageRules.plays(gif, animationsOn = false)) // first frame, no player or surface
+        assertTrue(!BackgroundImageRules.plays(BackgroundImage("a.png"), animationsOn = true))
+        assertTrue(!BackgroundImageRules.plays(null, animationsOn = true))
+    }
+
+    @Test
     fun `big animations are refused`() {
         assertEquals(ImportPlan.Reject(RejectReason.TOO_LARGE_ANIMATION), BackgroundImageRules.plan(10, PxSize(2481, 100), true, screen, "image/webp"))
     }
@@ -102,6 +122,14 @@ class BackgroundImageRulesTest {
         // Nothing to show yet: the backdrop stays.
         assertTrue(!BackgroundImageRules.drawsOnSurface(playing = true, settled = true, hasFirstFrame = false))
         assertTrue(!BackgroundImageRules.drawsOnSurface(playing = false, settled = true, hasFirstFrame = true))
+    }
+
+    @Test
+    fun `stored image names stay inside their folder`() {
+        assertEquals("x.png", BackgroundImageRules.safeName("../../data/x.png"))
+        assertEquals("a_b.png", BackgroundImageRules.safeName("a..b.png"))
+        assertEquals(null, BackgroundImageRules.safeName(" "))
+        assertEquals(null, BackgroundImageRules.safeName(null))
     }
 
     @Test

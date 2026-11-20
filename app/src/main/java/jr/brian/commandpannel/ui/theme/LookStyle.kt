@@ -147,9 +147,4 @@ data class LookTraits(
     val blurRadiusDp: Float = 32f,
     /** Opacity of the backdrop fill over the blurred screen ([blurBehind]); lower shows more of what's behind. */
     val blurTint: Float = 0.45f,
-    /**
-     * A user picture over the backdrop (Theme Studio looks only). [backdrop] is its backup: it shows while the
-     * Background image tile is off, when the file is missing or can't be decoded, and under [blurBehind].
-     */
-    val backgroundImage: BackgroundImage? = null,
 )

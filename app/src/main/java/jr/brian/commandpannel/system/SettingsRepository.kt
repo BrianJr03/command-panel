@@ -254,10 +254,12 @@ class SettingsRepository(
                 topBrightness = settings.getInt(Keys.SCREEN_BRIGHTNESS, 128) / 255f,
                 bottomBrightness = (privileged.getDisplayBrightness(4) ?: it.bottomBrightness).coerceIn(0f, 1f),
                 topVolume = topVolumeFor(it.topVolume),
-                tiles = buildTiles(mode, focus, activeLook.second),
+                tiles = buildTiles(mode, focus, BackgroundImageSetting.read(prefs)),
                 layout = OverlayLayout.decode(prefs.getString("overlay_layout", null)),
                 look = activeLook.first,
                 customLook = activeLook.second,
+                backgroundImage = BackgroundImageSetting.read(prefs),
+                animatedBackgrounds = BackgroundImageSetting.animationsOn(prefs),
                 backgroundImageOn = prefs.getBoolean(BackgroundImageTile.PREF, true),
                 navTab = readNavTab(),
                 // Starts on its own until finished or skipped; keeps its step across refreshes.
@@ -313,7 +315,7 @@ class SettingsRepository(
     private fun enabledTileKeys(): List<String> =
         QuickSettingTileId.enabledKeys(prefs.getString("qs_enabled_tiles", null), prefs.getString("qs_tile_order", null))
 
-    private fun buildTiles(mode: Int, focus: Int, look: jr.brian.commandpannel.ui.theme.CustomLook?): List<QuickTile> {
+    private fun buildTiles(mode: Int, focus: Int, image: BackgroundImage?): List<QuickTile> {
         val perf = settings.getInt(Keys.PERFORMANCE_MODE, 0)
         val fan = settings.getInt(Keys.FAN_MODE, 1)
         val style = settings.getInt(Keys.CONTROLLER_STYLE, 1)
@@ -350,9 +352,9 @@ class SettingsRepository(
                 QuickSettingTileId.STICK_LED -> str(R.string.text_joystick_lights) to light
                 QuickSettingTileId.KEYBOARD -> str(R.string.virtual_keyboard_text) to false
                 QuickSettingTileId.BACKGROUND_IMAGE ->
-                    str(R.string.tile_background_image) to BackgroundImageTile.active(look, prefs.getBoolean(BackgroundImageTile.PREF, true))
+                    str(R.string.tile_background_image) to BackgroundImageTile.active(image, prefs.getBoolean(BackgroundImageTile.PREF, true))
             }
-            val unavailable = id == QuickSettingTileId.BACKGROUND_IMAGE && !BackgroundImageTile.available(look)
+            val unavailable = id == QuickSettingTileId.BACKGROUND_IMAGE && !BackgroundImageTile.available(image)
             QuickTile(key, id.icon, title, active, unavailable)
         }
     }
@@ -537,7 +539,7 @@ class SettingsRepository(
             "gamepad_mouse_mode" -> toggleIntKey("global_gamepad_to_mouse_mode", 0)
             "clear_all_tasks" -> clearAllTasks()
             // Only while the current look has an image (the tile is grayed out otherwise).
-            "background_image" -> if (BackgroundImageTile.available(CustomLookStore.resolve(prefs).second)) {
+            "background_image" -> if (BackgroundImageTile.available(BackgroundImageSetting.read(prefs))) {
                 prefs.edit().putBoolean(BackgroundImageTile.PREF, !prefs.getBoolean(BackgroundImageTile.PREF, true)).apply()
             }
             "replay_buffer" -> {

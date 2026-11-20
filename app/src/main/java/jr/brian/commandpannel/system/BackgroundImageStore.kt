@@ -8,8 +8,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.annotation.StringRes
 import jr.brian.commandpannel.R
-import jr.brian.commandpannel.ui.theme.BackgroundImage
-import jr.brian.commandpannel.ui.theme.CustomLook
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.UUID
@@ -18,8 +16,8 @@ import java.util.UUID
 class BackgroundImportException(@StringRes val messageRes: Int) : Exception()
 
 /**
- * Background images for Theme Studio looks (#57). Files live in `filesDir/backgrounds/<fileName>` (app-private, like
- * [UserFontStore]); a look points at one by file name. Imports are checked against [BackgroundImageRules]: big still
+ * The panel's background image (#57, #61). Files live in `filesDir/backgrounds/<fileName>` (app-private, like
+ * [UserFontStore]); [BackgroundImageSetting] points at the one in use by file name. Imports are checked against [BackgroundImageRules]: big still
  * photos are downscaled (and turned upright from their EXIF rotation, which [ImageDecoder] applies), animations over
  * the size limit are refused. The overlay decodes them again at its own size when it draws them.
  */
@@ -40,28 +38,28 @@ object BackgroundImageStore {
         return PxSize(m.widthPixels, m.heightPixels)
     }
 
-    /** Imports the image at [uri] (from the system file picker). Blocking; call off the main thread. */
-    fun import(context: Context, uri: Uri): Result<BackgroundImage> = runCatching {
+    /**
+     * Imports the image at [uri] (from the system file picker). Animations are refused unless [allowAnimated] (the
+     * Animated backgrounds switch). Blocking; call off the main thread.
+     */
+    fun import(context: Context, uri: Uri, allowAnimated: Boolean): Result<BackgroundImage> = runCatching {
         val resolver = context.contentResolver
         val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0) else null
         }
         val bytes = resolver.openInputStream(uri)?.use { readLimited(it) }
             ?: throw BackgroundImportException(R.string.msg_background_unreadable)
-        register(context, bytes, name).getOrThrow()
+        register(context, bytes, name, allowAnimated).getOrThrow()
     }
 
-    /** Imports [source] (a file the app can read, e.g. staged from `TCP Themes/images`), keeping [fileName] if given. */
-    fun importFile(context: Context, source: File, fileName: String? = null): Result<BackgroundImage> = runCatching {
+    /** Imports [source] (a file the app can read, e.g. one staged by the debug hook), as [import] does. */
+    fun importFile(context: Context, source: File, allowAnimated: Boolean): Result<BackgroundImage> = runCatching {
         if (source.length() > BackgroundImageRules.MAX_BYTES) throw BackgroundImportException(R.string.msg_background_too_large)
-        register(context, source.readBytes(), source.name, keepName = fileName).getOrThrow()
+        register(context, source.readBytes(), source.name, allowAnimated).getOrThrow()
     }
 
-    /**
-     * Checks [bytes] and stores them. [keepName] stores under that exact name (a theme pack's file, so the pack's looks
-     * find it); otherwise the name is made unique from [displayName].
-     */
-    fun register(context: Context, bytes: ByteArray, displayName: String?, keepName: String? = null): Result<BackgroundImage> = runCatching {
+    /** Checks [bytes] and stores them under a unique name made from [displayName]. */
+    fun register(context: Context, bytes: ByteArray, displayName: String?, allowAnimated: Boolean): Result<BackgroundImage> = runCatching {
         var mime: String? = null
         var size = PxSize(0, 0)
         var animated = false
@@ -75,12 +73,12 @@ object BackgroundImageStore {
             }
         }.getOrNull() ?: throw BackgroundImportException(R.string.msg_background_invalid)
         (probe as? AnimatedImageDrawable)?.let { animated = true }
-        val plan = BackgroundImageRules.plan(bytes.size.toLong(), size, animated, screenSize(context), mime)
+        val plan = BackgroundImageRules.plan(bytes.size.toLong(), size, animated, screenSize(context), mime, allowAnimated)
         val tag = UUID.randomUUID().toString().take(8)
         val image = when (plan) {
             is ImportPlan.Reject -> throw BackgroundImportException(messageFor(plan.reason))
             ImportPlan.Keep -> {
-                val stored = keepName ?: BackgroundImageRules.storedName(displayName, tag, mime)
+                val stored = BackgroundImageRules.storedName(displayName, tag, mime)
                 File(dir(context), stored).writeBytes(bytes)
                 BackgroundImage(stored, animated)
             }
@@ -88,7 +86,7 @@ object BackgroundImageStore {
                 // Photos stay JPEG; anything else (it may have transparency) becomes WebP.
                 val jpeg = mime == "image/jpeg"
                 val outMime = if (jpeg) "image/jpeg" else "image/webp"
-                val stored = keepName ?: BackgroundImageRules.storedName(displayName, tag, outMime)
+                val stored = BackgroundImageRules.storedName(displayName, tag, outMime)
                 val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, _, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     decoder.setTargetSize(plan.size.width, plan.size.height)
@@ -109,6 +107,7 @@ object BackgroundImageStore {
         RejectReason.TOO_LARGE_ANIMATION -> R.string.msg_background_animation_too_big
         RejectReason.UNSUPPORTED_TYPE -> R.string.msg_background_unsupported
         RejectReason.NOT_AN_IMAGE -> R.string.msg_background_invalid
+        RejectReason.ANIMATION_OFF -> R.string.msg_background_animated_off
     }
 
     private fun readLimited(input: java.io.InputStream): ByteArray {
@@ -123,9 +122,8 @@ object BackgroundImageStore {
         return out.toByteArray()
     }
 
-    /** Deletes stored images no look in [keep] uses (after a look is deleted or Theme Studio closes). */
-    fun prune(context: Context, keep: Collection<CustomLook>) {
-        val used = keep.mapNotNull { it.backgroundImage?.fileName }.toSet()
-        dir(context).listFiles()?.filter { it.name !in used }?.forEach { it.delete() }
+    /** Deletes every stored image but [keep] (the one set in Appearance), after it's changed or removed. */
+    fun prune(context: Context, keep: BackgroundImage?) {
+        dir(context).listFiles()?.filter { it.name != keep?.fileName }?.forEach { it.delete() }
     }
 }

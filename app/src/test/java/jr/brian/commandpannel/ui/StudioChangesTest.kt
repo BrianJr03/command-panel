@@ -42,14 +42,6 @@ class StudioChangesTest {
     }
 
     @Test
-    fun `a background image belongs to parts and resets with them`() {
-        val look = base.copy(backgroundImage = jr.brian.commandpannel.ui.theme.BackgroundImage("bg-1.png"))
-        assertEquals(setOf(StudioCategory.PARTS), look.changedCategories())
-        assertNull(look.resetCategory(StudioCategory.PARTS).backgroundImage)
-        assertNull(look.resetAll().backgroundImage)
-    }
-
-    @Test
     fun `blur settings belong to effects`() {
         val look = base.copy(blurBehind = true, blurRadius = 24f, blurTint = 0.2f)
         assertEquals(setOf(StudioCategory.EFFECTS), look.changedCategories())
