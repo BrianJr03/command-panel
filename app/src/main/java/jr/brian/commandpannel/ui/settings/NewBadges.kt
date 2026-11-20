@@ -21,6 +21,7 @@ object NewItems {
     const val CARD_THORKBM_TILE = "thorkbm_tile"
     const val CARD_REPLAY_STUDIO = "replay_studio"
     const val CARD_REPLAY_SOURCE_SCREEN = "replay_source_screen"
+    const val CARD_REPLAY_AUTO_DELETE = "replay_auto_delete"
 
     /** Tile rows in Tiles settings that can carry a bubble: tile key to card key. */
     val TILE_CARDS: Map<String, String> = mapOf("keyboard" to CARD_KEYBOARD_TILE)
@@ -29,7 +30,7 @@ object NewItems {
     val CARDS: Map<SettingsCategory, Set<String>> = mapOf(
         KEYBOARD to setOf(CARD_THORKBM, CARD_THORKBM_NAV, CARD_THORKBM_TILE),
         SettingsCategory.QUICK_TOGGLES to setOf(CARD_KEYBOARD_TILE),
-        SettingsCategory.REPLAY to setOf(CARD_REPLAY_STUDIO, CARD_REPLAY_SOURCE_SCREEN),
+        SettingsCategory.REPLAY to setOf(CARD_REPLAY_STUDIO, CARD_REPLAY_SOURCE_SCREEN, CARD_REPLAY_AUTO_DELETE),
     )
 
     /** versionCode of the release that brings the grouped rail, Keyboard, ThorKBM and the Keyboard tile (0.9.1 is 14). */
@@ -51,6 +52,7 @@ object NewItems {
         add(NewItem("card:thorkbm_tile", V_KEYBOARD_TOGGLES, NewPlace.Card(KEYBOARD, CARD_THORKBM_TILE)))
         add(NewItem("card:replay_studio", V_REPLAY_STUDIO, NewPlace.Card(SettingsCategory.REPLAY, CARD_REPLAY_STUDIO)))
         add(NewItem("card:replay_source_screen", V_REPLAY_STUDIO, NewPlace.Card(SettingsCategory.REPLAY, CARD_REPLAY_SOURCE_SCREEN)))
+        add(NewItem("card:replay_auto_delete", V_REPLAY_STUDIO, NewPlace.Card(SettingsCategory.REPLAY, CARD_REPLAY_AUTO_DELETE)))
     }
 }
 

@@ -1037,12 +1037,20 @@ private fun ReplayAutoDeleteCard(
     onChange: (jr.brian.commandpannel.replay.studio.AutoDeleteRules) -> Unit,
 ) {
     val presets = jr.brian.commandpannel.replay.studio.AutoDeleteRules
-    Card {
-        SwitchRow(
-            stringResource(R.string.settings_replay_autodelete),
-            stringResource(R.string.settings_replay_autodelete_desc),
-            rules.enabled,
-        ) { onChange(rules.copy(enabled = it)) }
+    val isNew = LocalNewBadges.current.state.cardNew(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_AUTO_DELETE)
+    val title = stringResource(R.string.settings_replay_autodelete)
+    Card(
+        Modifier.newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_AUTO_DELETE).newCornerDot(isNew, p.accent, p.bg),
+    ) {
+        // In a Box, so the zero-size label (the corner dot, described for TalkBack) adds no gap to the card's column.
+        Box {
+            SwitchRow(
+                title,
+                stringResource(R.string.settings_replay_autodelete_desc),
+                rules.enabled,
+            ) { onChange(rules.copy(enabled = it)) }
+            if (isNew) NewBadgeLabel(title)
+        }
         if (!rules.enabled) return@Card
         SwitchRow(
             stringResource(R.string.settings_replay_autodelete_age),

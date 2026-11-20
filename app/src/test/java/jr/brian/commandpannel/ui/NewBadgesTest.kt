@@ -150,6 +150,12 @@ class NewBadgesTest {
         assertTrue(s.cardNew(replay, NewItems.CARD_REPLAY_SOURCE_SCREEN))
         assertTrue(s.sectionNew(replay))
         s = s.copy(seen = s.seen + s.keysAt(sourceScreen))
+        // Clip auto-delete (#50) is new in the same release too; the section clears once it is seen as well.
+        val autoDelete = NewPlace.Card(replay, NewItems.CARD_REPLAY_AUTO_DELETE)
+        assertEquals(17, NewItems.ALL.single { it.place == autoDelete }.since)
+        assertTrue(s.cardNew(replay, NewItems.CARD_REPLAY_AUTO_DELETE))
+        assertTrue(s.sectionNew(replay))
+        s = s.copy(seen = s.seen + s.keysAt(autoDelete))
         assertFalse(s.sectionNew(replay))
         assertFalse(s.groupNew(RailGroup.EXTRAS))
         // A fresh install of the Replay Studio release shows nothing.
