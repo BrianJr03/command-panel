@@ -21,8 +21,7 @@ import org.junit.Test
 class WhatsNewTourTest {
 
     @Test
-    fun `this build's version has a what's new tour`() {
-        assertEquals(jr.brian.commandpannel.BuildConfig.VERSION_NAME.substringBefore('-'), WHATS_NEW_TOUR_VERSION)
+    fun `the pinned version has a what's new tour`() {
         assertNotNull(whatsNewTourFor(WHATS_NEW_TOUR_VERSION))
     }
 

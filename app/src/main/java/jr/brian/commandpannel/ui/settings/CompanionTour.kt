@@ -228,11 +228,10 @@ internal val TOUR_STEPS: List<TourStep> = run {
 // ---- what's new tours ----
 
 /**
- * The version the newest what's-new tour belongs to. Until the next release's number is decided it follows this
- * build's `versionName`, so the tour shows on whatever version ships next. At "ship it", pin it to that version
- * (for example `"0.12.0"`) so the steps stay tied to the release that brought those changes.
+ * The version the newest what's-new tour belongs to, pinned at "ship it" to the release that brought those changes.
+ * The next release's tour goes under its own key.
  */
-internal val WHATS_NEW_TOUR_VERSION: String = jr.brian.commandpannel.BuildConfig.VERSION_NAME.substringBefore('-')
+internal const val WHATS_NEW_TOUR_VERSION = "0.12.0"
 
 /** The opening step of a what's-new tour: "What's new in <version>", with no section or spotlight. */
 private fun whatsNewIntro(version: String) =
