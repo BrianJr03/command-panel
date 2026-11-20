@@ -8,10 +8,15 @@ import android.util.Log
 import jr.brian.commandpannel.BuildConfig
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.service.AssistantService
+import jr.brian.commandpannel.system.Prefs
+import jr.brian.commandpannel.system.ReplayBufferController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileInputStream
 
@@ -29,6 +34,11 @@ import java.io.FileInputStream
  * - `am broadcast -a <pkg>.action.STUDIO_AUTO_DELETE_RUN [--ei age_days N] [--el max_bytes N]` runs auto-delete now,
  *   with the given limits or, with neither, the saved rules. Logs `AUTODELETE removed=<n>`, one `GONE|<path>` per
  *   removed clip, then `END`.
+ * - `am broadcast -a <pkg>.action.STUDIO_FORCE_SAVE [--ei seconds N] [--ei count 2]` saves without the service, so it
+ *   works while this build is on standby: arms its own [ReplayBufferController], waits N s (default 6) for footage,
+ *   saves `count` clips back to back (2 for the same-second `_2` check), then disarms. Logs `FORCE_SAVE <path>` or
+ *   `FORCE_SAVE error:<code>` per save, then `END`. Refuses with `FORCE_SAVE error:service_armed` while this build's
+ *   own Replay Buffer is on: the root helper has one display mirror, so a second capture would take it over.
  */
 class ReplayStudioDebugReceiver private constructor(
     private val repo: ClipRepository,
@@ -54,7 +64,7 @@ class ReplayStudioDebugReceiver private constructor(
                     sizeOn = sizeGb > 0,
                     sizeGb = if (sizeGb > 0) sizeGb else AutoDeleteRules.DEFAULT_SIZE_GB,
                 )
-                rules.save(jr.brian.commandpannel.system.Prefs.of(context))
+                rules.save(Prefs.of(context))
                 Log.i(TAG, "AUTODELETE_RULES $rules")
             }
             context.packageName + ACTION_AUTO_DELETE_RUN -> {
@@ -73,6 +83,19 @@ class ReplayStudioDebugReceiver private constructor(
                     }
                 }
             }
+            context.packageName + ACTION_FORCE_SAVE -> {
+                val seconds = intent.getIntExtra(EXTRA_SECONDS, DEFAULT_FORCE_SECONDS).coerceIn(1, MAX_FORCE_SECONDS)
+                val count = intent.getIntExtra(EXTRA_COUNT, 1).coerceIn(1, MAX_FORCE_COUNT)
+                val app = context.applicationContext ?: context
+                val pending = goAsync()
+                scope.launch {
+                    try {
+                        forceSave(app, seconds, count)
+                    } finally {
+                        pending.finish()
+                    }
+                }
+            }
             context.packageName + ACTION_LIST -> {
                 val details = intent.getBooleanExtra(EXTRA_DETAILS, false)
                 val pending = goAsync()
@@ -84,6 +107,33 @@ class ReplayStudioDebugReceiver private constructor(
                     }
                 }
             }
+        }
+    }
+
+    /** See STUDIO_FORCE_SAVE in the class docs. One run at a time, on [scope]'s IO threads. */
+    private suspend fun forceSave(app: Context, seconds: Int, count: Int) = forceLock.withLock {
+        // The service arms its own controller from this pref at startup (standby or not), and the helper mirrors one
+        // capture at a time, so never start a second one next to it.
+        if (Prefs.of(app).getBoolean("replay_enabled", false)) {
+            Log.i(TAG, "FORCE_SAVE error:service_armed")
+            Log.i(TAG, "END")
+            return@withLock
+        }
+        val controller = ReplayBufferController(app, PrivilegedAccess())
+        try {
+            if (!controller.arm()) {
+                Log.i(TAG, "FORCE_SAVE error:arm_failed")
+                return@withLock
+            }
+            Log.i(TAG, "FORCE_SAVE armed, waiting ${seconds}s")
+            delay(seconds * 1000L)
+            repeat(count) {
+                val result = runCatching { controller.save() }.getOrElse { "error:${it.javaClass.simpleName}" }
+                Log.i(TAG, "FORCE_SAVE $result")
+            }
+        } finally {
+            runCatching { controller.disarm() }
+            Log.i(TAG, "END")
         }
     }
 
@@ -118,6 +168,15 @@ class ReplayStudioDebugReceiver private constructor(
         private const val EXTRA_DETAILS = "details"
         private const val ACTION_AUTO_DELETE_SET = ".action.STUDIO_AUTO_DELETE_SET"
         private const val ACTION_AUTO_DELETE_RUN = ".action.STUDIO_AUTO_DELETE_RUN"
+        private const val ACTION_FORCE_SAVE = ".action.STUDIO_FORCE_SAVE"
+        private const val EXTRA_SECONDS = "seconds"
+        private const val EXTRA_COUNT = "count"
+        private const val DEFAULT_FORCE_SECONDS = 6
+
+        /** Keeps the whole run well inside a background broadcast's 60 s goAsync limit. */
+        private const val MAX_FORCE_SECONDS = 40
+        private const val MAX_FORCE_COUNT = 3
+        private val forceLock = Mutex()
         private const val EXTRA_ENABLE = "enable"
         private const val EXTRA_AGE_DAYS = "age_days"
         private const val EXTRA_SIZE_GB = "size_gb"
@@ -132,6 +191,7 @@ class ReplayStudioDebugReceiver private constructor(
                 addAction(app.packageName + ACTION_LIST)
                 addAction(app.packageName + ACTION_AUTO_DELETE_SET)
                 addAction(app.packageName + ACTION_AUTO_DELETE_RUN)
+                addAction(app.packageName + ACTION_FORCE_SAVE)
             }
             app.registerReceiver(
                 PrivilegedAccess().let { ReplayStudioDebugReceiver(ClipRepository(app, it), ClipAutoDelete(app, it)) },
