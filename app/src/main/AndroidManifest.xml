@@ -67,6 +67,18 @@
                 android:resource="@xml/update_paths" />
         </provider>
 
+        <!-- Replay Studio's Share: hands a clip to another app with a one-time read grant. Its own subclass, since
+             the manifest can't list the same provider class twice. -->
+        <provider
+            android:name=".replay.studio.ClipFileProvider"
+            android:authorities="${applicationId}.clips"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clip_paths" />
+        </provider>
+
 
         <activity
             android:name=".MainActivity"

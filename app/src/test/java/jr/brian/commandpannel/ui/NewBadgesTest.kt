@@ -132,4 +132,23 @@ class NewBadgesTest {
         // A fresh install of 16 shows neither.
         assertFalse(NewBadgeState(baseline = 16).sectionNew(KEYBOARD))
     }
+
+    @Test
+    fun `0_10_1 users see the Replay Studio card, which rolls up to Replay Buffer and Extras and clears bottom-up`() {
+        val replay = SettingsCategory.REPLAY
+        val studio = NewPlace.Card(replay, NewItems.CARD_REPLAY_STUDIO)
+        assertEquals(17, NewItems.ALL.single { it.place == studio }.since)
+        var s = NewBadgeState(baseline = 16)
+        assertTrue(s.cardNew(replay, NewItems.CARD_REPLAY_STUDIO))
+        assertTrue(s.sectionNew(replay))
+        assertTrue(s.groupNew(RailGroup.EXTRAS))
+        // Nothing older shows to someone on 0.10.1.
+        assertFalse(s.sectionNew(KEYBOARD))
+        s = s.copy(seen = s.seen + s.keysAt(studio))
+        assertFalse(s.sectionNew(replay))
+        assertFalse(s.groupNew(RailGroup.EXTRAS))
+        // A fresh install of the Replay Studio release shows nothing.
+        assertEquals(17, NewBadgeState.firstBaseline(versionCode = 16, upgraded = false))
+        assertFalse(NewBadgeState(baseline = 17).sectionNew(replay))
+    }
 }

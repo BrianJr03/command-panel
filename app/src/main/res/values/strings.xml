@@ -56,6 +56,7 @@
     <!-- Gamepad button badges on the onboarding controls -->
     <string name="gamepad_button_a" translatable="false">A</string>
     <string name="gamepad_button_b" translatable="false">B</string>
+    <string name="gamepad_button_x" translatable="false">X</string>
     <string name="gamepad_button_y" translatable="false">Y</string>
     <string name="gamepad_button_select" translatable="false">−</string>
     <string name="gamepad_button_start" translatable="false">+</string>

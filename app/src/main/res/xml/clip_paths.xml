@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Replay clips shared from Replay Studio: the clips folders on shared storage (any folder the user picked), and
+     the readable copies ClipRepository makes in the cache when only root can read a clip. -->
+<paths>
+    <external-path name="storage" path="." />
+    <cache-path name="clip_copies" path="." />
+</paths>

@@ -82,6 +82,7 @@ fun OnboardingBackHandler(enabled: Boolean = true, onBack: () -> Unit) {
 enum class GamepadButton(@StringRes val letterRes: Int) {
     A(R.string.gamepad_button_a),
     B(R.string.gamepad_button_b),
+    X(R.string.gamepad_button_x),
     Y(R.string.gamepad_button_y),
     SELECT(R.string.gamepad_button_select),
     START(R.string.gamepad_button_start),

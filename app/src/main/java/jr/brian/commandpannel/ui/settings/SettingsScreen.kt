@@ -179,6 +179,7 @@ internal fun SettingsContent(
     vm: SettingsViewModel,
     openStudio: (jr.brian.commandpannel.ui.theme.CustomLook) -> Unit,
     openThemes: (ThemeLibraryTab) -> Unit,
+    openReplayStudio: () -> Unit,
 ) {
     // Saveable, so coming back from Theme Studio or the Themes library lands on the same section (and scroll).
     var nav by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavItem.GENERAL) }
@@ -240,6 +241,15 @@ internal fun SettingsContent(
         // After the rail's own first-focus request.
         repeat(2) { androidx.compose.runtime.withFrameNanos { } }
         runCatching { deckFocus.requestFocus() }
+    }
+    // Back from Replay Studio, focus goes back to the row that opened it.
+    val replayStudioFocus = remember { FocusRequester() }
+    var returnToReplayStudio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!returnToReplayStudio) return@LaunchedEffect
+        returnToReplayStudio = false
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        runCatching { replayStudioFocus.requestFocus() }
     }
     val tourTargets = remember { TourTargets() }
     val touring = state.tourStep != null
@@ -335,7 +345,10 @@ internal fun SettingsContent(
                     returnToDeck = true
                     openThemes(ThemeLibraryTab.LOCAL)
                 }
-                SettingsCategory.REPLAY -> ReplayBufferCard(state, vm)
+                SettingsCategory.REPLAY -> ReplayBufferCard(state, vm, Modifier.focusRequester(replayStudioFocus)) {
+                    returnToReplayStudio = true
+                    openReplayStudio()
+                }
                 SettingsCategory.KEYBOARD -> {
                     ThorKbmCard(state, vm)
                     ThorKbmPanelToggles(state, vm)
@@ -915,7 +928,12 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
 }
 
 @Composable
-private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
+private fun ReplayBufferCard(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    studioModifier: Modifier,
+    onOpenStudio: () -> Unit,
+) {
     SwitchCard(
         stringResource(R.string.tile_name_replay_buffer),
         stringResource(R.string.settings_replay_desc),
@@ -924,6 +942,23 @@ private fun ReplayBufferCard(state: SettingsState, vm: SettingsViewModel) {
     )
     // First after the main switch: the way to save clips from Back Button Hero.
     SaveClipCard(state, vm)
+    // Opens Replay Studio, where saved clips are watched, shared and deleted.
+    val studioNew = LocalNewBadges.current.state.cardNew(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO)
+    val studioTitle = stringResource(R.string.settings_replay_studio)
+    FocusCard(
+        onActivate = onOpenStudio,
+        modifier = studioModifier
+            .newCard(SettingsCategory.REPLAY, NewItems.CARD_REPLAY_STUDIO)
+            .newCornerDot(studioNew, p.accent, p.bg)
+            .noRippleClickable(onClick = onOpenStudio),
+    ) {
+        Row {
+            CardTitle(studioTitle)
+            // Zero-size: the card's corner dot, described for TalkBack.
+            if (studioNew) NewBadgeLabel(studioTitle)
+        }
+        CardDesc(stringResource(R.string.settings_replay_studio_desc))
+    }
     Card(Modifier.tourTarget(TourSpot.REPLAY)) {
         CardTitle(stringResource(R.string.settings_replay_options))
         Spacer(Modifier.height(6.dp))
