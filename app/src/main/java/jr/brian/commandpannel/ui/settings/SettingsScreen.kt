@@ -273,7 +273,8 @@ internal fun SettingsContent(
         onSpotlight = { jumpSpotlight = it },
         onDone = { jump = null },
     )
-    TourDriver(state.tourStep, tourTargets, scroll, viewport, onSection = { cat -> nav = NavItem.entries.first { it.category == cat } })
+    val tourSteps = tourStepsFor(state.tourWhatsNew)
+    TourDriver(tourSteps, state.tourStep, tourTargets, scroll, viewport, onSection = { cat -> nav = NavItem.entries.first { it.category == cat } })
     // While the overlay onboarding's theme step runs, the Themes section follows each preset tapped on the bottom screen.
     val overlayStep by jr.brian.commandpannel.ui.overlay.OverlayOnboarding.activeStep.collectAsState()
     val followingLook = overlayStep == jr.brian.commandpannel.ui.overlay.OverlayOnboardingStep.THEME && !touring
@@ -383,6 +384,7 @@ internal fun SettingsContent(
     }
     }
     CompanionTourOverlay(
+        steps = tourSteps,
         stepIndex = state.tourStep,
         targets = tourTargets,
         paneBounds = { viewport.value },
@@ -423,6 +425,7 @@ private fun LookFollowDriver(
  */
 @Composable
 private fun TourDriver(
+    steps: List<TourStep>,
     stepIndex: Int?,
     targets: TourTargets,
     scroll: ScrollState,
@@ -431,8 +434,8 @@ private fun TourDriver(
 ) {
     val motion = LocalTccLookSpec.current.traits.animate
     val topInset = with(LocalDensity.current) { FOCUS_SCROLL_MARGIN.toPx() }
-    LaunchedEffect(stepIndex) {
-        val step = stepIndex?.let(TOUR_STEPS::get) ?: return@LaunchedEffect
+    LaunchedEffect(steps, stepIndex) {
+        val step = stepIndex?.let(steps::getOrNull) ?: return@LaunchedEffect
         step.section?.let(onSection)
         val spot = step.spot?.takeIf { it.inPane } ?: return@LaunchedEffect
         // Waits for the section to compose and lay out (and its scroll reset to land) before measuring.
@@ -1771,7 +1774,7 @@ private fun BackgroundImageCard(state: SettingsState, vm: SettingsViewModel, onJ
     val image = state.backgroundImage
     // Remove disappears once pressed; focus goes to Choose instead of falling to the screen's first control.
     val chooseFocus = remember { FocusRequester() }
-    Card {
+    Card(Modifier.tourTarget(TourSpot.BACKGROUND_IMAGE)) {
         CardTitle(stringResource(R.string.settings_background_image))
         CardDesc(stringResource(R.string.settings_background_image_desc))
         if (image != null) {

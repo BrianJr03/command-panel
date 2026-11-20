@@ -29,6 +29,9 @@ object CompanionPresence {
 
     /** A screen to open on top of settings, from [MainActivity.EXTRA_SCREEN] (for example [MainActivity.SCREEN_REPLAY_STUDIO]). */
     val requestedScreen = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** Debug builds only: open the What's new dialog, from [MainActivity.EXTRA_DEBUG_WHATS_NEW] (scripts, #62). */
+    val requestedWhatsNew = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
 
 @AndroidEntryPoint
@@ -54,6 +57,10 @@ class MainActivity : ComponentActivity() {
         intent?.removeExtra(EXTRA_SECTION)
         intent?.getStringExtra(EXTRA_SCREEN)?.let { CompanionPresence.requestedScreen.value = it }
         intent?.removeExtra(EXTRA_SCREEN)
+        if (jr.brian.commandpannel.BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_DEBUG_WHATS_NEW, false) == true) {
+            CompanionPresence.requestedWhatsNew.value = true
+        }
+        intent?.removeExtra(EXTRA_DEBUG_WHATS_NEW)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,5 +111,8 @@ class MainActivity : ComponentActivity() {
         /** Opens the companion on this screen, over settings; see [jr.brian.commandpannel.ui.settings.CompanionRoutes.forScreen]. */
         const val EXTRA_SCREEN = "screen"
         const val SCREEN_REPLAY_STUDIO = "replay_studio"
+
+        /** Debug builds only: `--ez debug_whats_new true` opens the What's new dialog (scripts, #62). */
+        const val EXTRA_DEBUG_WHATS_NEW = "debug_whats_new"
     }
 }

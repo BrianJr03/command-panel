@@ -115,6 +115,8 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     PRIVILEGED,
     /** Experimental's Animated backgrounds switch, where Appearance's link lands (#61). */
     ANIMATED_BACKGROUNDS,
+    /** Appearance's Background image card (#57, #61). */
+    BACKGROUND_IMAGE,
     TOUR_REPLAY;
 
     companion object {
@@ -137,7 +139,8 @@ internal class TourControl(val button: GamepadButton, @StringRes val labelRes: I
 
 /**
  * One stop on the tour: the [section] to show (null keeps the current one) and the [spot] to light (null: none).
- * [controls] lists buttons to teach, drawn under the body with the same badges as the tour's own buttons.
+ * [controls] lists buttons to teach, drawn under the body with the same badges as the tour's own buttons. [titleArg]
+ * fills a `%1$s` in the title (the version in a what's-new tour's opening step).
  */
 internal class TourStep(
     val section: SettingsCategory?,
@@ -145,6 +148,7 @@ internal class TourStep(
     @StringRes val titleRes: Int,
     @StringRes val bodyRes: Int,
     val controls: List<TourControl> = emptyList(),
+    val titleArg: String? = null,
 )
 
 private fun sectionIntro(category: SettingsCategory, @StringRes body: Int) =
@@ -221,6 +225,51 @@ internal val TOUR_STEPS: List<TourStep> = run {
     )
 }
 
+// ---- what's new tours ----
+
+/**
+ * The version the newest what's-new tour belongs to. Until the next release's number is decided it follows this
+ * build's `versionName`, so the tour shows on whatever version ships next. At "ship it", pin it to that version
+ * (for example `"0.12.0"`) so the steps stay tied to the release that brought those changes.
+ */
+internal val WHATS_NEW_TOUR_VERSION: String = jr.brian.commandpannel.BuildConfig.VERSION_NAME.substringBefore('-')
+
+/** The opening step of a what's-new tour: "What's new in <version>", with no section or spotlight. */
+private fun whatsNewIntro(version: String) =
+    TourStep(null, null, R.string.whats_new_title, R.string.tour_whats_new_intro_body, titleArg = version)
+
+/** The last step of a what's-new tour, which points at the full tour. */
+private val whatsNewDone = TourStep(null, null, R.string.tour_whats_new_done_title, R.string.tour_whats_new_done_body)
+
+/**
+ * Short tours of a release's changes, keyed by version, started from the What's new dialog's Tour button. Each opens
+ * with [whatsNewIntro] and ends with [whatsNewDone]. Built from `docs/whats-new-tour.md`; panel-only changes are text
+ * steps (no spot), since the companion can't spotlight the panel.
+ */
+internal val WHATS_NEW_TOURS: Map<String, List<TourStep>> = mapOf(
+    WHATS_NEW_TOUR_VERSION to listOf(
+        whatsNewIntro(WHATS_NEW_TOUR_VERSION),
+        TourStep(null, null, R.string.tour_new_fan_speed_title, R.string.tour_new_fan_speed_body),
+        TourStep(SettingsCategory.APPEARANCE, TourSpot.BACKGROUND_IMAGE, R.string.settings_background_image, R.string.tour_new_background_image_body),
+        TourStep(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS, R.string.settings_animated_backgrounds, R.string.tour_new_animated_backgrounds_body),
+        TourStep(SettingsCategory.QUICK_TOGGLES, TourSpot.TILE_PICKER, R.string.tour_new_background_tile_title, R.string.tour_new_background_tile_body),
+        whatsNewDone,
+    ),
+)
+
+/** The what's-new tour for [version], or null when that version has none (the dialog then shows no Tour button). */
+internal fun whatsNewTourFor(version: String): List<TourStep>? = WHATS_NEW_TOURS[version]?.takeIf { it.isNotEmpty() }
+
+/** The steps of the running tour: [whatsNewVersion]'s what's-new tour, or the full tour when it's null. */
+internal fun tourStepsFor(whatsNewVersion: String?): List<TourStep> =
+    whatsNewVersion?.let(::whatsNewTourFor) ?: TOUR_STEPS
+
+/** The step after [step] in a tour of [count] steps, or null when the tour ends there. */
+internal fun tourNextStep(step: Int, count: Int): Int? = (step + 1).takeIf { it < count }
+
+/** The step before [step], or null when Back leaves the tour (on its first step). */
+internal fun tourBackStep(step: Int): Int? = (step - 1).takeIf { it >= 0 }
+
 // ---- target registry ----
 
 /**
@@ -274,6 +323,7 @@ internal fun Modifier.tourTarget(spot: TourSpot): Modifier {
  */
 @Composable
 internal fun CompanionTourOverlay(
+    steps: List<TourStep>,
     stepIndex: Int?,
     targets: TourTargets,
     paneBounds: () -> Rect,
@@ -290,12 +340,13 @@ internal fun CompanionTourOverlay(
         enter = if (motion) fadeIn(tween(380)) else EnterTransition.None,
         exit = if (motion) fadeOut(tween(260)) else ExitTransition.None,
     ) {
-        TourLayer(index, targets, paneBounds, motion, onNext, onBack, onSkip)
+        TourLayer(steps, index.coerceIn(0, steps.lastIndex), targets, paneBounds, motion, onNext, onBack, onSkip)
     }
 }
 
 @Composable
 private fun TourLayer(
+    steps: List<TourStep>,
     index: Int,
     targets: TourTargets,
     paneBounds: () -> Rect,
@@ -304,7 +355,7 @@ private fun TourLayer(
     onBack: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    val step = TOUR_STEPS[index]
+    val step = steps[index]
     val density = LocalDensity.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     var layerSize by remember { mutableStateOf(IntSize.Zero) }
@@ -387,6 +438,7 @@ private fun TourLayer(
     ) {
         Spotlight(hole, layerSize, motion)
         TourCallout(
+            steps = steps,
             index = index,
             motion = motion,
             modifier = Modifier
@@ -486,6 +538,7 @@ internal fun CompanionSpotlight(spot: TourSpot?, targets: TourTargets, paneBound
 
 @Composable
 private fun TourCallout(
+    steps: List<TourStep>,
     index: Int,
     motion: Boolean,
     modifier: Modifier,
@@ -493,7 +546,7 @@ private fun TourCallout(
     onBack: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    val count = TOUR_STEPS.size
+    val count = steps.size
     val lastStep = index == count - 1
     val progress by animateFloatAsState(
         (index + 1f) / count, if (motion) spring(stiffness = 300f) else snap(), label = "tourProgress",
@@ -519,7 +572,7 @@ private fun TourCallout(
                 }
             },
             label = "tourStep",
-        ) { i -> TourStepText(TOUR_STEPS[i]) }
+        ) { i -> TourStepText(steps[i.coerceIn(0, steps.lastIndex)]) }
 
         // Progress through the whole tour.
         Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(p.surfaceHigh)) {
@@ -552,10 +605,10 @@ private fun TourStepText(step: TourStep) {
                 color = p.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, style = tccTextStyle(),
             )
         }
-        val title = if (step.titleRes == R.string.tour_welcome_title) {
-            stringResource(step.titleRes, stringResource(R.string.app_full_name))
-        } else {
-            stringResource(step.titleRes)
+        val title = when {
+            step.titleArg != null -> stringResource(step.titleRes, step.titleArg)
+            step.titleRes == R.string.tour_welcome_title -> stringResource(step.titleRes, stringResource(R.string.app_full_name))
+            else -> stringResource(step.titleRes)
         }
         Text(lookLabel(title), color = p.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, style = tccDisplayTextStyle())
         Text(stringResource(step.bodyRes), color = p.textSecondary, fontSize = 14.sp, lineHeight = 20.sp)

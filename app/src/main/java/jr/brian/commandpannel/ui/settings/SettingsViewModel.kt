@@ -182,8 +182,13 @@ data class SettingsState(
     val apps: List<QuickLaunchApp> = emptyList(),
     val diagnostics: List<Pair<String, Boolean?>> = emptyList(),
     val diagnosticsRunning: Boolean = false,
-    /** The companion tour's current step (an index into [TOUR_STEPS]), or null when the tour isn't running. */
+    /** The companion tour's current step (an index into [tourStepsFor] of [tourWhatsNew]), or null when it isn't running. */
     val tourStep: Int? = null,
+    /**
+     * The version whose what's-new tour is running (or last ran), or null for the full tour. Kept after the tour ends
+     * so its last step stays on screen while the layer fades out.
+     */
+    val tourWhatsNew: String? = null,
     /** The look Theme Studio is editing (possibly not saved yet), or null when it isn't open. */
     val studioDraft: jr.brian.commandpannel.ui.theme.CustomLook? = null,
     /** Studio was opened on [unsavedDraft] (Resume), so it starts with unsaved changes. */
@@ -1080,6 +1085,8 @@ class SettingsViewModel @Inject constructor(
 
     /** The companion tour step paused while the overlay's onboarding is on screen; it carries on from here after. */
     private var pausedTourStep: Int? = null
+    /** Which tour [pausedTourStep] belongs to ([SettingsState.tourWhatsNew]). */
+    private var pausedTourWhatsNew: String? = null
 
     /** Gives the overlay a moment to come up with its onboarding (it's shown as the companion opens). */
     private suspend fun awaitOverlayOnboarding() {
@@ -1102,13 +1109,32 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             OverlayOnboarding.commands.subscriptionCount.map { it > 0 }.distinctUntilChanged().collect { onScreen ->
                 if (onScreen) {
-                    _state.value.tourStep?.let { pausedTourStep = it; _state.value = _state.value.copy(tourStep = null) }
+                    _state.value.tourStep?.let {
+                        pausedTourStep = it
+                        pausedTourWhatsNew = _state.value.tourWhatsNew
+                        _state.value = _state.value.copy(tourStep = null)
+                    }
                 } else {
                     pausedTourStep?.let { step ->
                         pausedTourStep = null
-                        if (_state.value.updateDialog == null) _state.value = _state.value.copy(tourStep = step) else tourPending = true
+                        val whatsNew = pausedTourWhatsNew
+                        if (whatsNew != null) {
+                            // A what's-new tour was started from the dialog, so no dialog is in the way.
+                            _state.value = _state.value.copy(tourStep = step, tourWhatsNew = whatsNew)
+                        } else if (_state.value.updateDialog == null) {
+                            _state.value = _state.value.copy(tourStep = step, tourWhatsNew = null)
+                        } else {
+                            tourPending = true
+                        }
                     }
                 }
+            }
+        }
+        if (jr.brian.commandpannel.BuildConfig.DEBUG) viewModelScope.launch {
+            jr.brian.commandpannel.CompanionPresence.requestedWhatsNew.collect { requested ->
+                if (!requested) return@collect
+                jr.brian.commandpannel.CompanionPresence.requestedWhatsNew.value = false
+                showWhatsNew()
             }
         }
         viewModelScope.launch {
@@ -1430,27 +1456,57 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Starts the companion tour from its first step (also General → Updates → "Take the tour"). */
-    fun startTour() {
+    fun startTour() = beginTour(whatsNew = null)
+
+    /** Whether [version] has a what's-new tour, so the What's new dialog shows its Tour button. */
+    fun hasWhatsNewTour(version: String): Boolean = whatsNewTourFor(version) != null
+
+    /**
+     * The What's new dialog's Tour button: closes the dialog (What's new counts as seen) and runs this version's short
+     * tour. It doesn't count as the full tour, which still runs on its own afterwards if it hasn't been seen.
+     */
+    fun startWhatsNewTour() {
+        val phase = _state.value.updateDialog as? UpdatePhase.WhatsNew ?: return
+        if (whatsNewTourFor(phase.version) == null) return
+        updatePrefs.whatsNewSeen = currentVersion
+        _state.value = _state.value.copy(updateDialog = null)
+        beginTour(whatsNew = phase.version)
+    }
+
+    private fun beginTour(whatsNew: String?) {
         // Waits (paused at its first step) while the overlay's onboarding is on screen.
-        if (overlayOnboardingOnScreen) { pausedTourStep = 0; return }
+        if (overlayOnboardingOnScreen) { pausedTourStep = 0; pausedTourWhatsNew = whatsNew; return }
         // The Nav Bar section's cards are hidden while its app picker is open.
-        _state.value = _state.value.copy(tourStep = 0, appPickerOpen = false)
+        _state.value = _state.value.copy(tourStep = 0, tourWhatsNew = whatsNew, appPickerOpen = false)
     }
 
     fun tourNext() {
         val step = _state.value.tourStep ?: return
-        if (step >= TOUR_STEPS.lastIndex) endTour() else _state.value = _state.value.copy(tourStep = step + 1)
+        val next = tourNextStep(step, tourStepsFor(_state.value.tourWhatsNew).size)
+        if (next == null) endTour() else _state.value = _state.value.copy(tourStep = next)
     }
 
     fun tourBack() {
         val step = _state.value.tourStep ?: return
         // Back on the first step leaves the tour.
-        if (step > 0) _state.value = _state.value.copy(tourStep = step - 1) else endTour()
+        val back = tourBackStep(step)
+        if (back == null) endTour() else _state.value = _state.value.copy(tourStep = back)
     }
 
-    /** Finishes or skips the tour; either way it doesn't start on its own again. */
+    /**
+     * Finishes or skips the tour; either way it doesn't start on its own again. A what's-new tour leaves the full
+     * tour's seen flag alone, and hands over to the full tour if that was waiting behind the dialog.
+     */
     fun endTour() {
         if (_state.value.tourStep == null) return
+        if (_state.value.tourWhatsNew != null) {
+            _state.value = _state.value.copy(tourStep = null)
+            if (tourPending) {
+                tourPending = false
+                startTour()
+            }
+            return
+        }
         val firstRun = !prefs.getBoolean(KEY_TOUR_SEEN, false)
         prefs.edit().putBoolean(KEY_TOUR_SEEN, true).apply()
         _state.value = _state.value.copy(tourStep = null)

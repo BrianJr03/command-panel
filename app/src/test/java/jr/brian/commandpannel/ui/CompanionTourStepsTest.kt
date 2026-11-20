@@ -63,8 +63,8 @@ class CompanionTourStepsTest {
     @Test
     fun `every pane spot is shown by some step`() {
         // BUILTIN_SELECTED is lit by the overlay onboarding's look follow, and ANIMATED_BACKGROUNDS by Appearance's
-        // link to it (#61), not by a tour step.
-        val shown = TOUR_STEPS.mapNotNull { it.spot }.toSet()
+        // link to it (#61), not by a tour step. A spot a what's-new tour shows (#62) counts too.
+        val shown = (TOUR_STEPS + jr.brian.commandpannel.ui.settings.WHATS_NEW_TOURS.values.flatten()).mapNotNull { it.spot }.toSet()
         val notTour = setOf(TourSpot.BUILTIN_SELECTED, TourSpot.ANIMATED_BACKGROUNDS)
         val missing = TourSpot.entries.filter { it.inPane && it !in notTour && it !in shown }
         assertEquals(emptyList<TourSpot>(), missing)

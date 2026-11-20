@@ -135,8 +135,14 @@ internal fun UpdateDialog(phase: UpdatePhase, vm: SettingsViewModel) {
                         if (phase.release.pageUrl.isNotBlank()) Chip(stringResource(R.string.update_open_page), onClick = vm::openReleasePage)
                         Chip(stringResource(R.string.update_close), onClick = vm::dismissUpdate)
                     }
-                    is UpdatePhase.WhatsNew -> Box(Modifier.focusRequester(primary)) {
-                        AccentButton(stringResource(R.string.whats_new_done), onClick = vm::dismissUpdate)
+                    is UpdatePhase.WhatsNew -> {
+                        // Got it keeps the default focus; Tour (when this version has one) sits beside it.
+                        Box(Modifier.focusRequester(primary)) {
+                            AccentButton(stringResource(R.string.whats_new_done), onClick = vm::dismissUpdate)
+                        }
+                        if (vm.hasWhatsNewTour(phase.version)) {
+                            Chip(stringResource(R.string.whats_new_tour), onClick = vm::startWhatsNewTour)
+                        }
                     }
                     // Nothing to press while downloading / installing; focus stays in the dialog.
                     else -> Box(Modifier.focusRequester(primary).padding(1.dp)) {}

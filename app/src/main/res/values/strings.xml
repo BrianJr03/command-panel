@@ -697,6 +697,7 @@
     <string name="update_close">Close</string>
     <string name="whats_new_title">What\'s new in %1$s</string>
     <string name="whats_new_done">Got it</string>
+    <string name="whats_new_tour">Tour</string>
     <string name="font_system">System</string>
     <string name="font_condensed">Barlow Condensed</string>
     <string name="font_condensed_display">Barlow Condensed ExtraBold</string>
@@ -871,6 +872,15 @@
     <string name="tour_experimental_body">Features still being tested, like In-game FPS. They may change, or not work perfectly yet.</string>
     <string name="tour_finish_title">You\'re all set</string>
     <string name="tour_finish_body">That\'s the tour. Take it again any time from General → Updates.</string>
+    <string name="tour_whats_new_intro_body">A quick tour of this version\'s changes, one stop each.</string>
+    <string name="tour_whats_new_done_title">That\'s what\'s new</string>
+    <string name="tour_whats_new_done_body">For a tour of everything, go to General → Updates and choose Take the tour.</string>
+    <string name="tour_new_fan_speed_title">Custom fan speed</string>
+    <string name="tour_new_fan_speed_body" formatted="false">At High performance, pick Custom in the panel\'s Fan Control tile and a slider sets the fan from 50% to 100%.</string>
+    <string name="tour_new_background_image_body">Pick a PNG, JPG or WebP to show behind the panel on any look.</string>
+    <string name="tour_new_animated_backgrounds_body">Turn this on to use GIF and animated WebP backgrounds. They play only while the panel is open.</string>
+    <string name="tour_new_background_tile_title">Background Image tile</string>
+    <string name="tour_new_background_tile_body">Add the Background Image tile to switch between your image and the look\'s backdrop from the panel.</string>
     <plurals name="msg_restored_settings">
         <item quantity="one">Restored %1$d setting</item>
         <item quantity="other">Restored %1$d settings</item>

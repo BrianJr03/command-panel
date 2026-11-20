@@ -2,6 +2,8 @@
 
 User-facing changes, noted as they land on `main`, so each release's "what's new" tour can be generated quickly. See "What's new tour notes" in `CLAUDE.md` for the format and when to add entries. At "ship it", `## Unreleased` becomes `## v<version>`.
 
+The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `WHATS_NEW_TOUR_VERSION`. That constant follows the build's `versionName` until the release is cut; at "ship it", pin it to the shipped version (for example `"0.12.0"`) and start the next release's list under a new key.
+
 ## Unreleased
 
 - **Custom fan speed** (#59)
