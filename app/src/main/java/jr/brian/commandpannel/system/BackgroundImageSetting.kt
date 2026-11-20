@@ -23,14 +23,23 @@ object BackgroundImageSetting {
 
     fun animationsOn(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_ANIMATIONS_ON, false)
 
+    /** The stored image, whether or not it's the active background (see [BackgroundSetting.read] for that). */
     fun read(prefs: SharedPreferences): BackgroundImage? =
         BackgroundImageRules.safeName(prefs.getString(KEY_FILE, null))?.let { BackgroundImage(it, prefs.getBoolean(KEY_ANIMATED, false)) }
 
-    /** Saves [image], or clears it with `null`. */
+    /**
+     * Saves [image] and makes it the active background ([BackgroundSetting], #64: picking an image shows it), or clears
+     * it with `null` (an active gradient stays; otherwise the panel goes back to the backdrop).
+     */
     fun write(prefs: SharedPreferences, image: BackgroundImage?) {
         val edit = prefs.edit()
-        if (image == null) edit.remove(KEY_FILE).remove(KEY_ANIMATED)
-        else edit.putString(KEY_FILE, image.fileName).putBoolean(KEY_ANIMATED, image.animated)
+        if (image == null) {
+            edit.remove(KEY_FILE).remove(KEY_ANIMATED)
+            if (prefs.getString(BackgroundSetting.KEY_SOURCE, null) == BackgroundSetting.SOURCE_IMAGE) edit.remove(BackgroundSetting.KEY_SOURCE)
+        } else {
+            edit.putString(KEY_FILE, image.fileName).putBoolean(KEY_ANIMATED, image.animated)
+                .putString(BackgroundSetting.KEY_SOURCE, BackgroundSetting.SOURCE_IMAGE)
+        }
         edit.apply()
     }
 }

@@ -65,9 +65,12 @@ data class OverlayUiState(
     val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT,
     /** The active Theme Studio look (overrides on top of [look]), or null for a built-in look. */
     val customLook: jr.brian.commandpannel.ui.theme.CustomLook? = null,
-    /** The background image set in Appearance (#61), shown on any look; null for none. */
-    val backgroundImage: jr.brian.commandpannel.system.BackgroundImage? = null,
-    /** Experimental Animated backgrounds (#61): an animated image plays only while this is on (else its first frame). */
+    /** The active background (#61 image, or #64 gradient), shown on any look; null for the look's backdrop. */
+    val background: jr.brian.commandpannel.system.PanelBackground? = null,
+    /**
+     * Experimental Animated backgrounds (#61): an animated image plays only while this is on (else its first frame);
+     * a gradient moves only while it's on (else it's still, #64).
+     */
     val animatedBackgrounds: Boolean = false,
     /** The Background image tile (#58): false shows the look's backdrop instead of the image. */
     val backgroundImageOn: Boolean = true,

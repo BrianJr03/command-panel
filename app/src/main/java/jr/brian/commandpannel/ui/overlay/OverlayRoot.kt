@@ -111,26 +111,33 @@ fun OverlayRoot(
         }
         // Nav bar sits at the top or bottom per the user's arrangement (drag it in Arrange mode); default top.
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
-        // The background image (one for every look) sits over the look's backdrop, which stays as the backup: with the
-        // Background image tile off and under Aurora Blur the backdrop shows (and an animation isn't decoded at all).
-        val image = jr.brian.commandpannel.system.BackgroundImageTile.shown(
-            state.backgroundImage, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
+        // The background (an image or, since #64, a gradient; one for every look) sits over the look's backdrop, which
+        // stays as the backup: with the Background image tile off and under Aurora Blur the backdrop shows (and an
+        // animation isn't decoded at all).
+        val background = jr.brian.commandpannel.system.BackgroundImageTile.shown(
+            state.background, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
         )
         val backdrop = Modifier.tccLookBackdrop(
-            spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = image == null,
+            spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = background == null,
         )
         Box(Modifier.fillMaxSize()) {
-            if (image != null) {
-                // Backdrop, picture and panel each get a layer of their own; once the panel is shown, a GIF draws on its
-                // own surface under the panel (#60). The scanlines stay over the panel's content.
+            if (background != null) {
+                // Backdrop, background and panel each get a layer of their own; once the panel is shown, a GIF draws on
+                // its own surface under the panel (#60). The scanlines stay over the panel's content.
                 Box(Modifier.matchParentSize().graphicsLayer().then(backdrop))
-                LookBackgroundImageLayer(
-                    image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize(), animate = state.animatedBackgrounds,
-                )
+                when (background) {
+                    is jr.brian.commandpannel.system.PanelBackground.Image -> LookBackgroundImageLayer(
+                        background.image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize(),
+                        animate = state.animatedBackgrounds,
+                    )
+                    // #66: GradientBackgroundLayer(background.spec, Modifier.matchParentSize(), animate = state.animatedBackgrounds)
+                    // goes here. Until then a gradient source shows the backdrop.
+                    is jr.brian.commandpannel.system.PanelBackground.Gradient -> Unit
+                }
             }
             Column(
                 modifier = Modifier.fillMaxSize()
-                    .then(if (image != null) Modifier.graphicsLayer().tccLookScanlines(spec, LocalTccColors.current) else backdrop)
+                    .then(if (background != null) Modifier.graphicsLayer().tccLookScanlines(spec, LocalTccColors.current) else backdrop)
                     .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))

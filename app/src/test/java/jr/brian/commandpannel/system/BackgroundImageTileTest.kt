@@ -7,13 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackgroundImageTileTest {
-    private val gif = BackgroundImage("cat-1.gif", animated = true)
+    private val gif = PanelBackground.Image(BackgroundImage("cat-1.gif", animated = true))
+    private val gradient = PanelBackground.Gradient(
+        GradientSpec("g1", "Aurora", listOf(GradientStop(0xFF00FF88.toInt(), 0f), GradientStop(0xFF2200FF.toInt(), 1f))),
+    )
 
     @Test
     fun `available whenever an image is set, whatever the look`() {
         // The image is app-wide (#61), so the tile no longer depends on the look being a custom one.
         assertTrue(BackgroundImageTile.available(gif))
-        assertTrue(BackgroundImageTile.available(BackgroundImage("still.png")))
+        assertTrue(BackgroundImageTile.available(PanelBackground.Image(BackgroundImage("still.png"))))
         assertFalse(BackgroundImageTile.available(null))
     }
 
@@ -41,5 +44,15 @@ class BackgroundImageTileTest {
         assertTrue("background_image" !in QuickSettingTileId.enabledKeys(null))
         val savedOrder = QuickSettingTileId.entries.filter { it != id }.joinToString(",") { it.key }
         assertEquals("background_image", QuickSettingTileId.orderedKeys(savedOrder).last())
+    }
+
+    @Test
+    fun `a gradient source works the tile like an image, and Aurora Blur hides it too`() {
+        assertTrue(BackgroundImageTile.available(gradient))
+        assertTrue(BackgroundImageTile.active(gradient, on = true))
+        assertFalse(BackgroundImageTile.active(gradient, on = false))
+        assertEquals(gradient, BackgroundImageTile.shown(gradient, on = true, blurBehind = false))
+        assertNull(BackgroundImageTile.shown(gradient, on = false, blurBehind = false))
+        assertNull(BackgroundImageTile.shown(gradient, on = true, blurBehind = true))
     }
 }

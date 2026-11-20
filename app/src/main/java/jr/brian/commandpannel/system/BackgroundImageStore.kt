@@ -1,6 +1,7 @@
 package jr.brian.commandpannel.system
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.graphics.drawable.AnimatedImageDrawable
@@ -122,8 +123,16 @@ object BackgroundImageStore {
         return out.toByteArray()
     }
 
-    /** Deletes every stored image but [keep] (the one set in Appearance), after it's changed or removed. */
+    /**
+     * Deletes every stored image but [keep] and the one set in Appearance, after it's changed or removed. The stored
+     * image is kept even while a gradient is the active background (#64), so the user can switch back to it.
+     */
     fun prune(context: Context, keep: BackgroundImage?) {
-        dir(context).listFiles()?.filter { it.name != keep?.fileName }?.forEach { it.delete() }
+        val names = keptNames(Prefs.of(context), keep)
+        dir(context).listFiles()?.filter { it.name !in names }?.forEach { it.delete() }
     }
+
+    /** The file names [prune] keeps: [keep] and the stored image, whatever the active source. Pure, for tests. */
+    fun keptNames(prefs: SharedPreferences, keep: BackgroundImage?): Set<String> =
+        setOfNotNull(keep?.fileName, BackgroundImageSetting.read(prefs)?.fileName)
 }
