@@ -834,7 +834,7 @@
     <string name="tour_groups_open">Open or close a group. D-pad Right and Left work too.</string>
     <string name="tour_groups_move_group">On a group: pick it up, move it with the D-pad, then press A, Y or B to drop it.</string>
     <string name="tour_groups_move_section">On a section: pick it up, move it within its group, then press A, Y or B to drop it.</string>
-    <string name="tour_general_body">Core behavior: taking over the AYN button, status bar extras, new dots, backups and updates.</string>
+    <string name="tour_general_body">Core behavior: updates, taking over the AYN button, status bar extras, new dots and backups.</string>
     <string name="tour_replace_stock_body">Turn this on so the AYN button opens Command Panel\'s overlay instead of the built-in dual-screen assistant. Turning it off gives the button back.</string>
     <string name="tour_overlay_extras_title">Overlay extras</string>
     <string name="tour_overlay_extras_body">Fine-tune the overlay: show a battery time estimate, hide the network speed readout, and choose which apps Clear All Tasks leaves running.</string>

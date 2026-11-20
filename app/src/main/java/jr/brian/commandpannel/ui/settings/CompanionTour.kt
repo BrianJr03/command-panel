@@ -169,11 +169,11 @@ internal val TOUR_STEPS: List<TourStep> = run {
         TourStep(general, TourSpot.RAIL, R.string.tour_rail_title, R.string.tour_rail_body),
 
         sectionIntro(general, R.string.tour_general_body),
+        TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
         TourStep(general, TourSpot.REPLACE_STOCK, R.string.settings_replace_stock, R.string.tour_replace_stock_body),
         TourStep(general, TourSpot.OVERLAY_EXTRAS, R.string.tour_overlay_extras_title, R.string.tour_overlay_extras_body),
         TourStep(general, TourSpot.SHOW_NEW_DOTS, R.string.settings_show_new_dots, R.string.tour_show_new_dots_body),
         TourStep(general, TourSpot.BACKUP, R.string.settings_backup_title, R.string.tour_backup_body),
-        TourStep(general, TourSpot.UPDATES, R.string.settings_update_title, R.string.tour_updates_body),
         TourStep(general, TourSpot.PREVIEW, R.string.settings_preview_title, R.string.tour_preview_body),
 
         // The rail's groups and how to open and move them, on the group holding Nav Bar (it opens with it).

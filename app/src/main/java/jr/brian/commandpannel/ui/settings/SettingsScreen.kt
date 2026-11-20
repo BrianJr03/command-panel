@@ -1000,6 +1000,8 @@ internal fun AppIconBadge(shape: Shape) {
 @Composable
 private fun General(state: SettingsState, vm: SettingsViewModel) {
     BdsaInactiveNote(state, vm)
+    // First: updates, so a new version and What's new are one press away.
+    UpdatesCard(state, vm)
     SwitchCard(
         stringResource(R.string.settings_replace_stock),
         when {
@@ -1044,7 +1046,6 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         }
         state.backupMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
     }
-    UpdatesCard(state, vm)
     Card(Modifier.tourTarget(TourSpot.PREVIEW)) {
         CardTitle(stringResource(R.string.settings_preview_title))
         CardDesc(stringResource(R.string.settings_preview_desc))
