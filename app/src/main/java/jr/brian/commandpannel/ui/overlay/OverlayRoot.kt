@@ -111,8 +111,11 @@ fun OverlayRoot(
         }
         // Nav bar sits at the top or bottom per the user's arrangement (drag it in Arrange mode); default top.
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
-        // The look's picture sits over its backdrop, which stays as the backup (Aurora Blur always shows the backdrop).
-        val image = spec.traits.backgroundImage?.takeUnless { spec.traits.blurBehind }
+        // The look's picture sits over its backdrop, which stays as the backup: with the Background image tile off and
+        // under Aurora Blur the backdrop shows (and an animation isn't decoded at all).
+        val image = jr.brian.commandpannel.system.BackgroundImageTile.shown(
+            spec.traits.backgroundImage, on = state.backgroundImageOn, blurBehind = spec.traits.blurBehind,
+        )
         val imageLayer = rememberLookBackgroundImage(image)
         val backdrop = Modifier.tccLookBackdrop(
             spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = image == null,

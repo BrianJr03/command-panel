@@ -25,6 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -104,6 +105,8 @@ internal fun FrameRatePanel(state: OverlayUiState, actions: OverlayActions, modi
     }
 }
 
+private const val UNAVAILABLE_ALPHA = 0.38f
+
 @Composable
 internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, modifier: Modifier) {
     val colors = LocalTccColors.current
@@ -139,11 +142,13 @@ internal fun QuickTilesPanel(state: OverlayUiState, onTile: (String) -> Unit, mo
                                 icon = tile.icon,
                                 label = tile.title,
                                 circleSize = circleSize,
+                                // An unavailable tile is grayed out and ignores presses.
+                                modifier = if (tile.unavailable) Modifier.alpha(UNAVAILABLE_ALPHA) else Modifier,
                                 active = tile.active,
                                 labelSize = labelSize,
                                 showLabel = !state.hideTileLabels,
                                 pressAnimation = true,
-                                onClick = { onTile(tile.id) },
+                                onClick = if (tile.unavailable) null else { { onTile(tile.id) } },
                             )
                         }
                     }

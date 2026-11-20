@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Wifi
 import androidx.annotation.StringRes
 import jr.brian.commandpannel.R
@@ -64,7 +65,9 @@ enum class QuickSettingTileId(
     REPLAY_STUDIO("replay_studio", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.VideoLibrary), TileInteraction.ACTION),
     STICK_LED("stick_led", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.SportsEsports), TileInteraction.TOGGLE),
     /** Opens ThorKBM: a plugin swap, its app, or the companion's Keyboard section ([KeyboardTile]). */
-    KEYBOARD("keyboard", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Keyboard), TileInteraction.ACTION);
+    KEYBOARD("keyboard", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Keyboard), TileInteraction.ACTION),
+    /** Shows or hides the look's background image ([BackgroundImageTile], #58); grayed out when the look has none. */
+    BACKGROUND_IMAGE("background_image", TileCategory.TOOLS, false, TileIcon.Vector(Icons.Filled.Wallpaper), TileInteraction.TOGGLE);
 
     /** Display name for the companion app's enable/disable list. */
     @get:StringRes
@@ -94,6 +97,7 @@ enum class QuickSettingTileId(
         REPLAY_STUDIO -> R.string.tile_name_replay_studio
         STICK_LED -> R.string.text_joystick_lights
         KEYBOARD -> R.string.virtual_keyboard_text
+        BACKGROUND_IMAGE -> R.string.tile_name_background_image
     }
 
     companion object {

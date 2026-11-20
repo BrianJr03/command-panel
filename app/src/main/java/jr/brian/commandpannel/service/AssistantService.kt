@@ -191,9 +191,15 @@ class AssistantService : Service() {
                     showPanel(auto = false)
                     jr.brian.commandpannel.ui.overlay.OverlayDebug.openDialog.value = intent.getStringExtra(EXTRA_TILE)
                 }
-                // Seeds (or removes) a look with a background image, for scripts (#57).
-                ACTION_DEBUG_BACKGROUND -> if (BuildConfig.DEBUG) scope.launch(Dispatchers.IO) {
-                    jr.brian.commandpannel.system.BackgroundImageDebug.handle(applicationContext, privileged, intent)
+                // Seeds (or removes) a look with a background image, or presses the Background image tile, for scripts (#57, #58).
+                ACTION_DEBUG_BACKGROUND -> if (BuildConfig.DEBUG) {
+                    if (intent.getBooleanExtra(jr.brian.commandpannel.system.BackgroundImageDebug.EXTRA_PRESS_TILE, false)) {
+                        repository.onTileClick(QuickSettingTileId.BACKGROUND_IMAGE.key)
+                    } else {
+                        scope.launch(Dispatchers.IO) {
+                            jr.brian.commandpannel.system.BackgroundImageDebug.handle(applicationContext, privileged, intent)
+                        }
+                    }
                 }
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))

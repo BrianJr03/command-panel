@@ -15,12 +15,14 @@ import java.io.File
  * - `--es path <file>`: imports the file (root copies it somewhere the app can read) through the normal import checks,
  *   saves it on the "Background test" look and applies that look. Logs the outcome.
  * - `--es restore_look <overlay_look value>`: deletes the test look, applies that look again and prunes its image.
+ * - `--ez press_tile true`: presses the Background image tile (#58), the same path as a tap on it (the service does it).
  */
 object BackgroundImageDebug {
     private const val TAG = "LookBackground"
     const val LOOK_ID = "debug-background"
     const val EXTRA_PATH = "path"
     const val EXTRA_RESTORE_LOOK = "restore_look"
+    const val EXTRA_PRESS_TILE = "press_tile"
 
     fun handle(context: Context, privileged: PrivilegedAccess, intent: Intent) {
         val prefs = Prefs.of(context)
@@ -33,8 +35,9 @@ object BackgroundImageDebug {
         }
         val path = intent.getStringExtra(EXTRA_PATH) ?: return
         val staged = File(context.cacheDir, File(path).name)
-        val q = ThemeFolder::q
-        val copied = privileged.shell("cp ${q(path)} ${q(staged.absolutePath)} && chmod 644 ${q(staged.absolutePath)} && echo ok")?.trim() == "ok"
+        val src = ThemeFolder.q(path)
+        val dest = ThemeFolder.q(staged.absolutePath)
+        val copied = privileged.shell("cp $src $dest && chmod 644 $dest && echo ok")?.trim() == "ok"
         val result = if (copied) BackgroundImageStore.importFile(context, staged) else Result.failure(IllegalStateException("copy failed"))
         staged.delete()
         result.onSuccess { image ->

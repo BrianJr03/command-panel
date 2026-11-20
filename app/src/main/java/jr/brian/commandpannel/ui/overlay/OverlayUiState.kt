@@ -65,6 +65,8 @@ data class OverlayUiState(
     val look: jr.brian.commandpannel.ui.theme.TccUiLook = jr.brian.commandpannel.ui.theme.TccUiLook.DEFAULT,
     /** The active Theme Studio look (overrides on top of [look]), or null for a built-in look. */
     val customLook: jr.brian.commandpannel.ui.theme.CustomLook? = null,
+    /** The Background image tile (#58): false shows the look's backup backdrop instead of its image. */
+    val backgroundImageOn: Boolean = true,
     /** When set, overrides the overlay palette accent with the Thor's ambient-LED color (fork feature, inverted). */
     val accentOverride: Int? = null,
     /** The nav tab to open on (persisted across overlay open/close, like the stock `current_navigation_interface_name`). */
@@ -79,6 +81,8 @@ data class QuickTile(
     val icon: jr.brian.commandpannel.ui.components.TileIcon,
     val title: String,
     val active: Boolean = false,
+    /** Grayed out and does nothing when pressed (the Background image tile on a look without an image). */
+    val unavailable: Boolean = false,
 ) {
     companion object {
         private fun stock(name: String) = jr.brian.commandpannel.ui.components.TileIcon.Stock(name)
