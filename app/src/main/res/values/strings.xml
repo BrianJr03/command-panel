@@ -166,6 +166,9 @@
     <string name="settings_group_advanced">Advanced</string>
     <string name="settings_rail_expand">Expand %1$s</string>
     <string name="settings_rail_collapse">Collapse %1$s</string>
+    <string name="settings_rail_moving">Moving %1$s</string>
+    <string name="settings_rail_move_hint_gamepad">D-pad to move · A or B to drop</string>
+    <string name="settings_rail_move_hint_touch">Release to drop</string>
     <string name="settings_new_badge_desc">%1$s is new since the last update</string>
 
     <!-- Companion: General -->
@@ -802,10 +805,10 @@
     <string name="tour_rail_title">Sections</string>
     <string name="tour_rail_body">Settings are split into sections here. General sits on top, and the rest are gathered into groups you can open and close. Moving through the list switches the pane on the right, and D-pad Right jumps into that section\'s settings.\n\nYou can rearrange the list too: a later step shows how.</string>
     <string name="tour_groups_title">Groups</string>
-    <string name="tour_groups_body">Related sections share a group. Moving onto a group doesn\'t change the pane: open it to reach its sections. With touch, tap a group to open or close it, and drag a handle to move a group or a section.</string>
+    <string name="tour_groups_body">Related sections share a group. Moving onto a group doesn\'t change the pane: open it to reach its sections, and press A on a section to go into it. With touch, tap a group to open or close it, and drag a handle to move a group or a section.</string>
     <string name="tour_groups_open">Open or close a group. D-pad Right and Left work too.</string>
     <string name="tour_groups_move_group">On a group: pick it up, move it with the D-pad, then press A, Y or B to drop it.</string>
-    <string name="tour_groups_move_section">On a section: pick it up and move it within its group, like Button Order.</string>
+    <string name="tour_groups_move_section">On a section: pick it up, move it within its group, then press A, Y or B to drop it.</string>
     <string name="tour_general_body">Core behavior: taking over the AYN button, status bar extras, new dots, backups and updates.</string>
     <string name="tour_replace_stock_body">Turn this on so the AYN button opens Command Panel\'s overlay instead of the built-in dual-screen assistant. Turning it off gives the button back.</string>
     <string name="tour_overlay_extras_title">Overlay extras</string>

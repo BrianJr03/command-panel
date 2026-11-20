@@ -1,6 +1,16 @@
 package jr.brian.commandpannel.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
@@ -476,6 +486,17 @@ private fun NavRail(
         r
     }
     val moving = movingGroup || reorders.values.any { it.grabbed != null }
+    // The group whose section is picked up (gamepad or touch): rows outside it are dimmed, since it can't move there.
+    val sectionGroup = reorders.entries.firstOrNull { (_, r) -> r.grabbed != null || r.dragged != null }?.key
+    val hint = railMoveHint(
+        grabbed = groupReorder.grabbed ?: reorders.values.firstNotNullOfOrNull { it.grabbed },
+        dragged = groupReorder.dragged ?: reorders.values.firstNotNullOfOrNull { it.dragged },
+    )
+    val focusManager = LocalFocusManager.current
+    // A on a section goes into the pane: the control you left there, else the nearest one to the right.
+    val openPane: () -> Unit = {
+        if (focusedBounds?.returnToPane() != true) focusManager.moveFocus(FocusDirection.Right)
+    }
     val rows = layout.visibleRows(shown)
     val motion = LocalTccLookSpec.current.traits.animate
     // The focused row's own bring-into-view stops it flush with the padded edge, which leaves the app header scrolled
@@ -492,7 +513,7 @@ private fun NavRail(
     }
     Column(
         // Themed rails are translucent so pattern backdrops (aurora, grids) read across the whole screen.
-        modifier = Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
+        Modifier.width(248.dp).fillMaxHeight().background(if (themed) p.rail.copy(alpha = 0.6f) else p.rail)
             .tourTarget(TourSpot.RAIL)
             // Coming back from the content pane (D-pad Left) lands on the selected section (or its collapsed group's
             // header), not the geometrically nearest rail item.
@@ -501,7 +522,11 @@ private fun NavRail(
             // D-pad Right returns to the control you left in the content pane, not just the nearest one.
             .onKeyEvent { e ->
                 e.key == Key.DirectionRight && e.type == KeyEventType.KeyDown && focusedBounds?.returnToPane() == true
-            }
+            },
+    ) {
+    Column(
+        // The scrolling part; the move hint under it takes its own room, so it never covers the last row.
+        modifier = Modifier.weight(1f).fillMaxWidth()
             .onGloballyPositioned { railBounds.value = it.boundsInRoot() }
             .verticalScroll(railScroll)
             .padding(16.dp),
@@ -518,13 +543,63 @@ private fun NavRail(
         }
         val pinned = navItemOf(RailGroup.PINNED)
         key(pinned.category.key) {
-            RailItem(pinned, pinned == selected, requesters.getValue(pinned), null, navShape, onSelect) { edgeScroll(pinned.category.key) }
+            RailItem(
+                pinned, pinned == selected, requesters.getValue(pinned), null, navShape, onSelect, openPane,
+                dimmed = movingGroup || sectionGroup != null,
+            ) { edgeScroll(pinned.category.key) }
         }
         groupReorder.items.forEach { gk ->
             val g = RailGroup.fromKey(gk) ?: return@forEach
             // The whole group (header and its sections) is keyed, so it moves as one block. Keying only the header let
             // a reopened group's sections take its slot, which recreated the header and threw away its focus.
-            key(gk) { RailGroupBlock(g, g in shown, selected, headerRequesters, requesters, reorders.getValue(g), groupReorder, navShape, onToggle, onSelect, edgeScroll) }
+            key(gk) {
+                RailGroupBlock(
+                    g, g in shown, selected, headerRequesters, requesters, reorders.getValue(g), groupReorder, navShape,
+                    dimmed = sectionGroup != null && sectionGroup != g, onToggle, onSelect, openPane, edgeScroll,
+                )
+            }
+        }
+    }
+    RailMoveHintBar(hint)
+    }
+}
+
+/**
+ * Pinned under the rail's scrolling rows while a group or section is picked up, so it's clear the D-pad now moves it:
+ * "Moving Replay Buffer" over its controls (or "Release to drop" for a touch drag).
+ */
+@Composable
+private fun RailMoveHintBar(hint: RailMoveHint?) {
+    val motion = LocalTccLookSpec.current.traits.animate
+    // Keeps showing the last hint while it animates out.
+    val last = remember { arrayOfNulls<RailMoveHint>(1) }
+    if (hint != null) last[0] = hint
+    AnimatedVisibility(
+        visible = hint != null,
+        enter = if (motion) fadeIn() + expandVertically() else EnterTransition.None,
+        exit = if (motion) fadeOut() + shrinkVertically() else ExitTransition.None,
+    ) {
+        val shown = hint ?: last[0] ?: return@AnimatedVisibility
+        val shape = controlShape(13.dp)
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                .clip(shape).background(p.accent.copy(alpha = 0.22f)).border(1.dp, p.accent, shape)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.SwapVert, null, tint = p.accent, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    lookLabel(stringResource(R.string.settings_rail_moving, stringResource(shown.nameRes))),
+                    color = p.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(),
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(shown.controlsRes),
+                    color = p.textSecondary, fontSize = 12.sp, style = tccTextStyle(),
+                )
+            }
         }
     }
 }
@@ -539,22 +614,24 @@ private fun RailGroupBlock(
     reorder: ReorderListState,
     groupReorder: ReorderListState,
     navShape: Shape,
+    dimmed: Boolean,
     onToggle: (RailGroup, Boolean) -> Unit,
     onSelect: (NavItem) -> Unit,
+    openPane: () -> Unit,
     edgeScroll: (String) -> Unit,
 ) {
     val header = RailRow.Header(g).id
     RailGroupHeader(
         g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
-        groupReorder, onToggle = { onToggle(g, it) },
+        groupReorder, dimmed, onToggle = { onToggle(g, it) },
     ) { edgeScroll(header) }
     if (!open) return
     reorder.items.forEach { k ->
         val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
         key(k) {
             RailItem(
-                item, item == selected, requesters.getValue(item), reorder, navShape, onSelect,
-                indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
+                item, item == selected, requesters.getValue(item), reorder, navShape, onSelect, openPane,
+                dimmed = dimmed, indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
             ) { edgeScroll(k) }
         }
     }
@@ -564,7 +641,7 @@ private fun RailGroupBlock(
  * A rail group's header. A, a tap, or D-pad Right (while collapsed) opens it; A, a tap, or D-pad Left (while open)
  * closes it. D-pad Right on an open header goes to the pane, like a section. Focusing it doesn't change the pane.
  * Moving the group: Y picks it up (A is open / close here), the D-pad moves it, and A, Y or B drops it. Touch: drag the
- * trailing handle.
+ * trailing handle. [dimmed] while a section of another group is picked up, since that section can't move here.
  */
 @Composable
 private fun RailGroupHeader(
@@ -574,6 +651,7 @@ private fun RailGroupHeader(
     requester: FocusRequester,
     shape: Shape,
     reorder: ReorderListState,
+    dimmed: Boolean,
     onToggle: (Boolean) -> Unit,
     onFocused: () -> Unit,
 ) {
@@ -582,11 +660,13 @@ private fun RailGroupHeader(
     val lifted = reorder.isLifted(key)
     val grabbed = reorder.grabbed == key
     val scale by focusScale(f.value || lifted, if (lifted) 1.06f else 1.04f, "navScale")
+    val alpha by railDimAlpha(dimmed)
     val spacingPx = with(LocalDensity.current) { RAIL_ITEM_SPACING.toPx() }
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val bring = remember { BringIntoViewRequester() }
     val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    LiftFeedback(grabbed, bring)
     // Losing focus while picked up (e.g. a tap elsewhere) drops the group where it is.
     LaunchedEffect(f.value) { if (!f.value && reorder.grabbed == key) reorder.drop() }
     // Moving the header row to its new place drops its focus, so once the group is put down (gamepad or touch), focus
@@ -607,7 +687,7 @@ private fun RailGroupHeader(
     val headerTop = remember { floatArrayOf(0f) }
     // A collapsed group holding the selected section keeps its highlight, so you can see where you are.
     val bg by focusColor(
-        when { f.value || lifted -> p.surfaceHigh; holdsSelected && !open -> p.accentSoft; else -> Color.Transparent },
+        when { lifted -> railLiftedFill(); f.value -> p.surfaceHigh; holdsSelected && !open -> p.accentSoft; else -> Color.Transparent },
         "navBg",
     )
     val motion = LocalTccLookSpec.current.traits.animate
@@ -639,6 +719,7 @@ private fun RailGroupHeader(
             .graphicsLayer {
                 translationY = reorder.translationOf(key)
                 scaleX = scale; scaleY = scale
+                this.alpha = alpha
                 shadowElevation = if (lifted) 10.dp.toPx() else 0f
                 this.shape = shape
             }
@@ -707,7 +788,7 @@ private fun RailGroupHeader(
             modifier = Modifier.size(30.dp).rotate(turn).padding(5.dp),
         )
         Icon(
-            Icons.Rounded.DragHandle,
+            if (lifted) Icons.Rounded.SwapVert else Icons.Rounded.DragHandle,
             contentDescription = stringResource(R.string.settings_rail_move, label),
             tint = if (lifted || f.value) p.accent else p.textTertiary,
             modifier = Modifier.size(30.dp)
@@ -723,7 +804,7 @@ private fun RailGroupHeader(
                             reorder.startDrag(key, handleCoords[0]?.localToRoot(it)?.y ?: 0f)
                         },
                         onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
-                        onDragEnd = { dragStart[0] = Float.NaN; reorder.endDrag() },
+                        onDragEnd = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); dragStart[0] = Float.NaN; reorder.endDrag() },
                         onDragCancel = { dragStart[0] = Float.NaN; reorder.endDrag() },
                     )
                 }
@@ -733,9 +814,10 @@ private fun RailGroupHeader(
 }
 
 /**
- * One rail section. Focus selects it; A picks it up, the D-pad moves it (within its group), and A (or B) drops it,
- * like Button Order. Touch: tap selects, and dragging the trailing handle moves it. With no [reorder] (General, which
- * is pinned) it can't be moved. [onLeft] is where D-pad Left goes (a grouped section's header).
+ * One rail section. Focus selects it and A goes into the pane ([onOpen]). Y picks it up (like a group header), the
+ * D-pad moves it (within its group), and A, Y or B drops it. Touch: tap selects, and dragging the trailing handle moves
+ * it. With no [reorder] (General, which is pinned) it can't be moved. [onLeft] is where D-pad Left goes (a grouped
+ * section's header). [dimmed] while something it can't sit beside is picked up.
  */
 @Composable
 private fun RailItem(
@@ -745,6 +827,8 @@ private fun RailItem(
     reorder: ReorderListState?,
     shape: Shape,
     onSelect: (NavItem) -> Unit,
+    onOpen: () -> Unit,
+    dimmed: Boolean = false,
     indent: Boolean = false,
     onLeft: (() -> Unit)? = null,
     onFocused: () -> Unit,
@@ -755,8 +839,9 @@ private fun RailItem(
     val lifted = reorder?.isLifted(key) == true
     val grabbed = reorder?.grabbed == key
     val scale by focusScale(f.value || lifted, if (lifted) 1.06f else 1.04f, "navScale")
+    val alpha by railDimAlpha(dimmed)
     val bg by focusColor(
-        when { f.value || lifted -> p.surfaceHigh; on -> p.accentSoft; else -> Color.Transparent },
+        when { lifted -> railLiftedFill(); f.value -> p.surfaceHigh; on -> p.accentSoft; else -> Color.Transparent },
         "navBg",
     )
     val spacingPx = with(LocalDensity.current) { RAIL_ITEM_SPACING.toPx() }
@@ -764,6 +849,7 @@ private fun RailItem(
     val scope = rememberCoroutineScope()
     val bring = remember { BringIntoViewRequester() }
     val handleCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    LiftFeedback(grabbed, bring)
     // During the tour, the section it's on scrolls into view on the rail, so its spotlight isn't off screen.
     val touring = LocalTourTargets.current != null
     LaunchedEffect(on, touring) {
@@ -781,6 +867,7 @@ private fun RailItem(
             .graphicsLayer {
                 translationY = reorder?.translationOf(key) ?: 0f
                 scaleX = scale; scaleY = scale
+                this.alpha = alpha
                 shadowElevation = if (lifted) 10.dp.toPx() else 0f
                 this.shape = shape
             }
@@ -797,9 +884,12 @@ private fun RailItem(
             .onFocusChanged { if (it.isFocused) { onSelect(item); onFocused() } }
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                if (!grabbed || reorder == null) {
+                if (!grabbed || reorder == null) return@onKeyEvent when {
+                    // Y picks it up, like a group header.
+                    e.key == Key.ButtonY && reorder != null -> { reorder.grab(key); true }
                     // Left from a grouped section goes up to its header.
-                    return@onKeyEvent if (e.key == Key.DirectionLeft && onLeft != null) { onLeft(); true } else false
+                    e.key == Key.DirectionLeft && onLeft != null -> { onLeft(); true }
+                    else -> false
                 }
                 when (e.key) {
                     Key.DirectionUp, Key.DirectionDown -> {
@@ -809,11 +899,11 @@ private fun RailItem(
                     }
                     // Stays on the rail while a section is picked up.
                     Key.DirectionLeft, Key.DirectionRight -> true
-                    Key.Back, Key.ButtonB, Key.Escape -> { reorder.drop(); true }
+                    Key.ButtonY, Key.Back, Key.ButtonB, Key.Escape -> { reorder.drop(); true }
                     else -> false
                 }
             }
-            .focusControl(f) { reorder?.let { if (grabbed) it.drop() else it.grab(key) } }
+            .focusControl(f) { if (grabbed) reorder?.drop() else onOpen() }
             .noRippleClickable { onSelect(item) }
             .padding(start = if (indent) 26.dp else 14.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -838,7 +928,7 @@ private fun RailItem(
         // General is pinned: no handle, but the same room, so every row is the same height.
         if (reorder == null) { Spacer(Modifier.size(30.dp)); return@Row }
         Icon(
-            Icons.Rounded.DragHandle,
+            if (lifted) Icons.Rounded.SwapVert else Icons.Rounded.DragHandle,
             contentDescription = stringResource(R.string.settings_rail_move, stringResource(item.category.titleRes)),
             tint = if (lifted || f.value) p.accent else p.textTertiary,
             // Small enough that a row is no taller than before the handle, so every section fits on the rail.
@@ -851,7 +941,7 @@ private fun RailItem(
                             reorder.startDrag(key, handleCoords[0]?.localToRoot(it)?.y ?: 0f)
                         },
                         onDrag = { change, amount -> change.consume(); reorder.dragBy(amount.y) },
-                        onDragEnd = reorder::endDrag,
+                        onDragEnd = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); reorder.endDrag() },
                         onDragCancel = reorder::endDrag,
                     )
                 }
@@ -861,6 +951,37 @@ private fun RailItem(
 }
 
 private val RAIL_ITEM_SPACING = 6.dp
+
+/** The fill of a rail row that's picked up: stronger than the selected row's [CompanionPalette.accentSoft]. */
+@Composable
+private fun railLiftedFill(): Color = p.accent.copy(alpha = 0.3f)
+
+/** Rows a picked-up row can't move past fade back, so you can see where it can go. */
+@Composable
+private fun railDimAlpha(dimmed: Boolean): State<Float> {
+    val to = if (dimmed) 0.35f else 1f
+    return if (LocalTccLookSpec.current.traits.animate) animateFloatAsState(to, label = "railDim")
+    else animateFloatAsState(to, snap(), label = "railDim")
+}
+
+/**
+ * A light tick when a rail row is picked up or put down with the gamepad (touch drags tick in their own gesture), and
+ * once it's picked up, scrolls it back into view after the move hint has taken its room at the bottom of the rail.
+ */
+@Composable
+private fun LiftFeedback(grabbed: Boolean, bring: BringIntoViewRequester) {
+    val haptics = LocalHapticFeedback.current
+    val was = remember { booleanArrayOf(grabbed) }
+    LaunchedEffect(grabbed) {
+        if (grabbed == was[0]) return@LaunchedEffect
+        was[0] = grabbed
+        haptics.performHapticFeedback(if (grabbed) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove)
+        if (!grabbed) return@LaunchedEffect
+        // The hint grows in over the default animation spec; once it's in, the row may sit under the new bottom edge.
+        kotlinx.coroutines.delay(400)
+        bring.bringIntoView()
+    }
+}
 
 /**
  * The launcher icon (its adaptive background + foreground layers) clipped to [shape]. The background is drawn at the

@@ -20,8 +20,8 @@ class CompanionTourStepsTest {
         val step = steps.single()
         // Its section opens a group, so the header it spotlights is on screen.
         assertNotNull(step.section?.let(RailGroup::of))
-        // A opens / closes, Y moves a group, A moves a section.
-        assertEquals(listOf(GamepadButton.A, GamepadButton.Y, GamepadButton.A), step.controls.map { it.button })
+        // A opens / closes, Y moves a group, Y moves a section.
+        assertEquals(listOf(GamepadButton.A, GamepadButton.Y, GamepadButton.Y), step.controls.map { it.button })
     }
 
     @Test

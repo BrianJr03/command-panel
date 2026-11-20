@@ -176,7 +176,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
             controls = listOf(
                 TourControl(GamepadButton.A, R.string.tour_groups_open),
                 TourControl(GamepadButton.Y, R.string.tour_groups_move_group),
-                TourControl(GamepadButton.A, R.string.tour_groups_move_section),
+                TourControl(GamepadButton.Y, R.string.tour_groups_move_section),
             ),
         ),
         sectionIntro(navBar, R.string.tour_nav_bar_body),
