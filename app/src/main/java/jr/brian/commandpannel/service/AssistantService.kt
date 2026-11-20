@@ -23,6 +23,7 @@ import jr.brian.commandpannel.overlay.ExternalDisplayTapWaker
 import jr.brian.commandpannel.overlay.OverlayHost
 import jr.brian.commandpannel.plugin.PanelPluginRegistry
 import jr.brian.commandpannel.plugin.PanelPluginSession
+import jr.brian.commandpannel.plugin.PluginNavPrefs
 import jr.brian.commandpannel.plugin.PanelPluginSwap.EndReason
 import jr.brian.commandpannel.system.DisplayTopology
 import jr.brian.commandpannel.system.KeyboardTile
@@ -195,6 +196,10 @@ class AssistantService : Service() {
         replay = jr.brian.commandpannel.system.ReplayBufferController(applicationContext, privileged)
         bdsa = BdsaDetector(applicationContext, privileged)
         plugins = PanelPluginRegistry(applicationContext, scope)
+        Prefs.of(applicationContext).let {
+            navHiddenPlugins.value = PluginNavPrefs.parse(it.getString(PluginNavPrefs.KEY, null))
+            it.registerOnSharedPreferenceChangeListener(navPrefsListener)
+        }
         pluginSession = PanelPluginSession(
             applicationContext,
             bottomDisplayId = { DisplayTopology(applicationContext).bottomDisplay?.displayId },
@@ -212,11 +217,16 @@ class AssistantService : Service() {
             content = { _ ->
                 val state by repository.uiState.collectAsState()
                 val installed by plugins.plugins.collectAsState()
+                val hiddenInNav by navHiddenPlugins.collectAsState()
                 // Theme Studio's unsaved draft, shown live while it's open.
                 val draft by jr.brian.commandpannel.ui.theme.StudioDraft.look.collectAsState()
                 val shown = draft?.let { state.copy(look = it.baseLook, customLook = it) } ?: state
                 OverlayRoot(
-                    state = shown.copy(panelPlugins = installed.map { PanelPluginButton(it.component, it.label) }),
+                    // A plugin hidden from the nav bar (Keyboard section, #43) still works from the Keyboard tile.
+                    state = shown.copy(
+                        panelPlugins = PluginNavPrefs.visible(installed, hiddenInNav) { it.key }
+                            .map { PanelPluginButton(it.component, it.label) },
+                    ),
                     actions = overlayActions,
                 )
             },
@@ -302,7 +312,14 @@ class AssistantService : Service() {
         return START_STICKY
     }
 
+    /** Plugins whose nav bar button is hidden ([PluginNavPrefs]), kept in step with the companion's toggle. */
+    private val navHiddenPlugins = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    private val navPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+        if (key == PluginNavPrefs.KEY) navHiddenPlugins.value = PluginNavPrefs.parse(p.getString(PluginNavPrefs.KEY, null))
+    }
+
     override fun onDestroy() {
+        Prefs.of(applicationContext).unregisterOnSharedPreferenceChangeListener(navPrefsListener)
         isRunning = false
         handler.removeCallbacksAndMessages(null)
         runCatching { unregisterReceiver(aynReceiver) }

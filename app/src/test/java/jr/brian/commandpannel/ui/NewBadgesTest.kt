@@ -117,4 +117,19 @@ class NewBadgesTest {
         // Nav Bar never had anything new.
         assertFalse(s.sectionNew(SettingsCategory.NAV_BAR))
     }
+
+    @Test
+    fun `0_10_0 users see only the Keyboard section's new toggles, which roll up to Keyboard and Extras`() {
+        var s = NewBadgeState(baseline = 15)
+        assertTrue(s.cardNew(KEYBOARD, NewItems.CARD_THORKBM_NAV))
+        assertTrue(s.cardNew(KEYBOARD, NewItems.CARD_THORKBM_TILE))
+        assertFalse(s.cardNew(KEYBOARD, NewItems.CARD_THORKBM)) // shipped in 15
+        assertTrue(s.sectionNew(KEYBOARD))
+        RailGroup.of(KEYBOARD)?.let { assertTrue(s.groupNew(it)) }
+        s = s.copy(seen = s.seen + s.keysAt(NewPlace.Card(KEYBOARD, NewItems.CARD_THORKBM_NAV)) +
+            s.keysAt(NewPlace.Card(KEYBOARD, NewItems.CARD_THORKBM_TILE)))
+        assertFalse(s.sectionNew(KEYBOARD))
+        // A fresh install of 16 shows neither.
+        assertFalse(NewBadgeState(baseline = 16).sectionNew(KEYBOARD))
+    }
 }

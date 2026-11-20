@@ -146,6 +146,10 @@ data class SettingsState(
     val thorKbmBusy: Boolean = false,
     /** Result of the last ThorKBM install, shown in its card. */
     val thorKbmMessage: String? = null,
+    /** Keys of the listed ThorKBM Panel plugins (plugin mode); empty when none is. */
+    val thorKbmPluginKeys: List<String> = emptyList(),
+    /** Plugins whose nav bar button is hidden ([jr.brian.commandpannel.plugin.PluginNavPrefs]). */
+    val navHiddenPlugins: Set<String> = emptySet(),
     val replayEnabled: Boolean = false,
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
@@ -227,6 +231,10 @@ class SettingsViewModel @Inject constructor(
             .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
         thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
+        thorKbmPluginKeys = thorKbmPluginKeys(),
+        navHiddenPlugins = jr.brian.commandpannel.plugin.PluginNavPrefs.parse(
+            prefs.getString(jr.brian.commandpannel.plugin.PluginNavPrefs.KEY, null),
+        ),
         railLayout = RailLayout.read { prefs.getString(it, null) },
         railExpanded = RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)),
         newBadges = loadNewBadges(),
@@ -1250,7 +1258,25 @@ class SettingsViewModel @Inject constructor(
             handedOff = thorKbmHandedOff, installedMessage = app.getString(R.string.msg_thorkbm_installed),
         )
         if (status.releaseInstalled) thorKbmHandedOff = false
-        _state.value = s.copy(thorKbm = status, thorKbmMessage = message)
+        _state.value = s.copy(thorKbm = status, thorKbmMessage = message, thorKbmPluginKeys = thorKbmPluginKeys())
+    }
+
+    /** The listed ThorKBM plugins (the ones with a nav bar button), as the panel lists them. */
+    private fun thorKbmPluginKeys(): List<String> = runCatching {
+        jr.brian.commandpannel.plugin.PanelPluginRegistry(app, viewModelScope).query(allowUntrusted = false)
+            .filter { it.component.packageName in jr.brian.commandpannel.system.KeyboardTile.THORKBM_PACKAGES }
+            .map { it.key }
+    }.getOrDefault(emptyList())
+
+    /** Keyboard section: shows or hides ThorKBM's nav bar button (#43). The Keyboard tile still opens it either way. */
+    fun setThorKbmNavShown(shown: Boolean) {
+        val keys = _state.value.thorKbmPluginKeys
+        val hidden = jr.brian.commandpannel.plugin.PluginNavPrefs.parse(
+            prefs.getString(jr.brian.commandpannel.plugin.PluginNavPrefs.KEY, null),
+        )
+        val next = jr.brian.commandpannel.plugin.PluginNavPrefs.setShown(hidden, keys, shown)
+        prefs.edit().putString(jr.brian.commandpannel.plugin.PluginNavPrefs.KEY, jr.brian.commandpannel.plugin.PluginNavPrefs.encode(next)).apply()
+        _state.value = _state.value.copy(navHiddenPlugins = next)
     }
 
     /** An install was handed to Android's installer and hasn't shown up yet (see [refreshThorKbm]). */

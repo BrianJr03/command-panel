@@ -17,18 +17,23 @@ object NewItems {
     /** Card keys; each is tagged in its pane with `Modifier.newCard(...)` and its title shows the bubble. */
     const val CARD_THORKBM = "thorkbm"
     const val CARD_KEYBOARD_TILE = "tile_keyboard"
+    const val CARD_THORKBM_NAV = "thorkbm_nav"
+    const val CARD_THORKBM_TILE = "thorkbm_tile"
 
     /** Tile rows in Tiles settings that can carry a bubble: tile key to card key. */
     val TILE_CARDS: Map<String, String> = mapOf("keyboard" to CARD_KEYBOARD_TILE)
 
     /** The cards that can carry a bubble, by section (a registry card must be one of these). */
     val CARDS: Map<SettingsCategory, Set<String>> = mapOf(
-        KEYBOARD to setOf(CARD_THORKBM),
+        KEYBOARD to setOf(CARD_THORKBM, CARD_THORKBM_NAV, CARD_THORKBM_TILE),
         SettingsCategory.QUICK_TOGGLES to setOf(CARD_KEYBOARD_TILE),
     )
 
     /** versionCode of the release that brings the grouped rail, Keyboard, ThorKBM and the Keyboard tile (0.9.1 is 14). */
     private const val V_GROUPED_RAIL = 15
+
+    /** versionCode of the release after 0.10.0: the Keyboard section's nav bar and tile toggles (#43). */
+    private const val V_KEYBOARD_TOGGLES = 16
 
     val ALL: List<NewItem> = buildList {
         // The grouped rail itself: each group header is new.
@@ -36,6 +41,8 @@ object NewItems {
         add(NewItem("section:keyboard", V_GROUPED_RAIL, NewPlace.Section(KEYBOARD)))
         add(NewItem("card:thorkbm", V_GROUPED_RAIL, NewPlace.Card(KEYBOARD, CARD_THORKBM)))
         add(NewItem("card:tile_keyboard", V_GROUPED_RAIL, NewPlace.Card(SettingsCategory.QUICK_TOGGLES, CARD_KEYBOARD_TILE)))
+        add(NewItem("card:thorkbm_nav", V_KEYBOARD_TOGGLES, NewPlace.Card(KEYBOARD, CARD_THORKBM_NAV)))
+        add(NewItem("card:thorkbm_tile", V_KEYBOARD_TOGGLES, NewPlace.Card(KEYBOARD, CARD_THORKBM_TILE)))
     }
 }
 

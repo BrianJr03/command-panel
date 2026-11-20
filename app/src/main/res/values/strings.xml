@@ -231,6 +231,12 @@
     <string name="settings_thorkbm_open">Open</string>
     <string name="settings_thorkbm_github">Open on GitHub</string>
     <string name="settings_thorkbm_preview_desc">ThorKBM on the bottom screen: a keyboard with a trackpad beside it</string>
+    <string name="settings_thorkbm_panel_header">In the panel</string>
+    <string name="settings_thorkbm_nav_title">Show in nav bar</string>
+    <string name="settings_thorkbm_nav_desc">ThorKBM\'s button in the panel\'s nav bar. The Keyboard tile opens it either way.</string>
+    <string name="settings_thorkbm_nav_unavailable">The nav bar button comes with a ThorKBM that has plugin mode (2.3.0 or newer). Once one is installed, you can hide it here.</string>
+    <string name="settings_thorkbm_tile_title">Keyboard tile</string>
+    <string name="settings_thorkbm_tile_desc">A tile in the panel that opens ThorKBM. The same switch as in Tiles.</string>
     <string name="settings_replay_location">Save location</string>
     <string name="settings_replay_location_default">TCP Clips</string>
     <string name="settings_replay_location_custom">Choose folder…</string>

@@ -336,7 +336,10 @@ internal fun SettingsContent(
                     openThemes(ThemeLibraryTab.LOCAL)
                 }
                 SettingsCategory.REPLAY -> ReplayBufferCard(state, vm)
-                SettingsCategory.KEYBOARD -> ThorKbmCard(state, vm)
+                SettingsCategory.KEYBOARD -> {
+                    ThorKbmCard(state, vm)
+                    ThorKbmPanelToggles(state, vm)
+                }
                 SettingsCategory.DIAGNOSTICS -> Diagnostics(state, vm)
                 SettingsCategory.EXPERIMENTAL -> Experimental(state, vm)
             }
@@ -1076,6 +1079,46 @@ private fun ThorKbmCard(state: SettingsState, vm: SettingsViewModel) {
 }
 
 /** The ThorKBM card's text and buttons, with the preview between the description and the status when [previewAbove]. */
+/**
+ * Keyboard section, under the ThorKBM card (#43): show or hide ThorKBM's nav bar button, and add or remove the Keyboard
+ * tile (the same switch as in Tiles). The nav bar switch only shows while a ThorKBM with plugin mode is listed, since
+ * only that one has a nav bar button; otherwise one line says why instead of a disabled switch, which the D-pad would
+ * skip. The tile switch always shows: without ThorKBM the tile opens this section to install it.
+ */
+@Composable
+private fun ThorKbmPanelToggles(state: SettingsState, vm: SettingsViewModel) {
+    val badges = LocalNewBadges.current.state
+    SectionHeader(stringResource(R.string.settings_thorkbm_panel_header))
+    Card {
+        if (state.thorKbmPluginKeys.isNotEmpty()) {
+            val isNew = badges.cardNew(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM_NAV)
+            val title = stringResource(R.string.settings_thorkbm_nav_title)
+            Box(Modifier.newCard(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM_NAV).newCornerDot(isNew, p.accent, p.surface)) {
+                SwitchRow(
+                    title, stringResource(R.string.settings_thorkbm_nav_desc),
+                    jr.brian.commandpannel.plugin.PluginNavPrefs.shown(state.thorKbmPluginKeys, state.navHiddenPlugins),
+                    vm::setThorKbmNavShown,
+                )
+                if (isNew) NewBadgeLabel(title)
+            }
+        } else {
+            // Lined up with the switch rows' text.
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                InfoLine(stringResource(R.string.settings_thorkbm_nav_unavailable), tone = p.textTertiary)
+            }
+        }
+        val tileKey = jr.brian.commandpannel.system.QuickSettingTileId.KEYBOARD.key
+        val tileNew = badges.cardNew(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM_TILE)
+        val tileTitle = stringResource(R.string.settings_thorkbm_tile_title)
+        Box(Modifier.newCard(SettingsCategory.KEYBOARD, NewItems.CARD_THORKBM_TILE).newCornerDot(tileNew, p.accent, p.surface)) {
+            SwitchRow(tileTitle, stringResource(R.string.settings_thorkbm_tile_desc), tileKey in state.enabledTiles) {
+                vm.setTileEnabled(tileKey, it)
+            }
+            if (tileNew) NewBadgeLabel(tileTitle)
+        }
+    }
+}
+
 @Composable
 private fun ThorKbmDetails(state: SettingsState, vm: SettingsViewModel, previewAbove: Boolean) {
     val status = state.thorKbm
