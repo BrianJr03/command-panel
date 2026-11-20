@@ -71,6 +71,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.DisposableEffect
 import jr.brian.commandpannel.ui.components.GamepadButton
 import jr.brian.commandpannel.system.FontImportException
+import jr.brian.commandpannel.system.BackgroundImageRules
+import jr.brian.commandpannel.system.BackgroundImportException
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.overlay.OverlayTab
 import jr.brian.commandpannel.ui.theme.BundledFont
@@ -161,6 +163,8 @@ internal fun ThemeStudioScreen(
         onDispose {
             StudioDraft.look.value = null
             vm.persistStudioDraft(null)
+            // An image picked for a draft that wasn't saved is dropped.
+            vm.pruneBackgroundImages()
         }
     }
     // The NavHost's own back handling can run first, so B / Back keys are caught in the key handler below, and this
@@ -298,7 +302,10 @@ internal fun ThemeStudioScreen(
                 val update: (CustomLook) -> Unit = { edit(it) }
                 CompositionLocalProvider(LocalStudioPartFocus provides onFocusPart, LocalStudioRefocus provides refocusCategory) {
                 when (category) {
-                    StudioCategory.PARTS -> PartsControls(draft, update)
+                    StudioCategory.PARTS -> {
+                        PartsControls(draft, update)
+                        BackgroundImageControls(draft, vm, onMessage = { message = it }, onChange = update)
+                    }
                     StudioCategory.CUSTOM -> CustomPartControls(draft, update)
                     StudioCategory.FONTS -> FontControls(draft, state, vm, onMessage = { message = it }, onChange = update)
                     StudioCategory.SHAPES -> ShapeControls(draft, update)
@@ -529,6 +536,50 @@ private fun FitSample(
             Modifier.requiredSize(naturalW, naturalH).graphicsLayer { scaleX = scale; scaleY = scale },
             contentAlignment = Alignment.Center,
         ) { content() }
+    }
+}
+
+/**
+ * The look's background image (#57): pick a PNG, JPG, WebP or GIF, or remove it. The Backdrop part above is its
+ * backup, so the card says when that is what shows.
+ */
+@Composable
+private fun BackgroundImageControls(
+    draft: CustomLook,
+    vm: SettingsViewModel,
+    onMessage: (String) -> Unit,
+    onChange: (CustomLook) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Read when the picker returns, so an edit made meanwhile isn't lost.
+    val latest = androidx.compose.runtime.rememberUpdatedState(draft)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importBackgroundImage(uri) { result ->
+            result.onSuccess {
+                onChange(latest.value.copy(backgroundImage = it))
+                onMessage(context.getString(R.string.theme_background_image_set))
+            }.onFailure { e ->
+                onMessage(context.getString((e as? BackgroundImportException)?.messageRes ?: R.string.msg_background_invalid))
+            }
+        }
+    }
+    val image = draft.backgroundImage
+    Card(Modifier.studioPart(StudioPart.BACKDROP)) {
+        ControlLabel(R.string.theme_background_image)
+        CardDesc(stringResource(R.string.theme_background_image_desc))
+        if (image != null) {
+            InfoLine(
+                stringResource(if (image.animated) R.string.theme_background_image_current_animated else R.string.theme_background_image_current, image.fileName),
+                p.textSecondary,
+            )
+            if (draft.toSpec().traits.blurBehind) InfoLine(stringResource(R.string.theme_background_image_blur_note), p.accent)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip(stringResource(if (image == null) R.string.theme_background_image_choose else R.string.theme_background_image_change)) {
+                launcher.launch(BackgroundImageRules.MIME_TYPES)
+            }
+            if (image != null) Chip(stringResource(R.string.theme_background_image_remove)) { onChange(draft.copy(backgroundImage = null)) }
+        }
     }
 }
 

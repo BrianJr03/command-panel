@@ -34,7 +34,10 @@ data class CustomLook(
     val gauge: GaugeStyle? = null,
     val slider: SliderStyle? = null,
     val nav: NavStyle? = null,
+    /** The pattern behind the panel, and the backup for [backgroundImage] (shown while the image is off or can't show). */
     val backdrop: BackdropStyle? = null,
+    /** A picture (or animation) over the backdrop; `null` for none. */
+    val backgroundImage: BackgroundImage? = null,
     val header: HeaderStyle? = null,
     val panelCardShape: ShapeDef? = null,
     val tileShape: ShapeDef? = null,
@@ -77,6 +80,14 @@ data class CustomLook(
 
     val ref: LookRef get() = LookRef.Custom(id)
 }
+
+/**
+ * A background image file in the app's background store ([jr.brian.commandpannel.system.BackgroundImageStore]).
+ * [fileName] is unique per import and is also its name in `TCP Themes/images`, so a theme pack can find the same file
+ * on another device. [animated] is a GIF or animated WebP.
+ */
+@Immutable
+data class BackgroundImage(val fileName: String, val animated: Boolean = false)
 
 enum class ShapeKind { ROUNDED, RECT, CHAMFER, SQUIRCLE, PILL, CIRCLE }
 
@@ -196,6 +207,7 @@ fun CustomLook.toSpec(fonts: UserFontResolver = UserFontResolver.None): TccLookS
         blurRadiusDp = blurRadius ?: t.blurRadiusDp,
         blurTint = blurTint ?: t.blurTint,
         ghostSegments = ghostSegments ?: t.ghostSegments,
+        backgroundImage = backgroundImage,
     )
     return base.copy(
         panelCardShape = panelCardShape?.toShape() ?: base.panelCardShape,
@@ -273,6 +285,7 @@ object CustomLookJson {
         look.slider?.let { put("slider", it.name) }
         look.nav?.let { put("nav", it.name) }
         look.backdrop?.let { put("backdrop", it.name) }
+        look.backgroundImage?.let { put("backgroundImage", JSONObject().put("file", it.fileName).put("animated", it.animated)) }
         look.header?.let { put("header", it.name) }
         look.panelCardShape?.let { put("panelCardShape", it.toJson()) }
         look.tileShape?.let { put("tileShape", it.toJson()) }
@@ -326,6 +339,9 @@ object CustomLookJson {
             slider = o.enumOrNull<SliderStyle>("slider"),
             nav = o.enumOrNull<NavStyle>("nav"),
             backdrop = o.enumOrNull<BackdropStyle>("backdrop"),
+            backgroundImage = o.optJSONObject("backgroundImage")?.let { b ->
+                safeImageName(b.optString("file"))?.let { BackgroundImage(it, b.optBoolean("animated")) }
+            },
             header = o.enumOrNull<HeaderStyle>("header"),
             panelCardShape = o.shapeOrNull("panelCardShape"),
             tileShape = o.shapeOrNull("tileShape"),
@@ -400,6 +416,10 @@ object CustomLookJson {
         }
         else -> null
     }
+
+    /** A background image name kept inside its folder (no path separators or parent references), or `null`. */
+    internal fun safeImageName(name: String?): String? =
+        name?.substringAfterLast('/')?.replace("..", "_")?.trim()?.take(120)?.ifBlank { null }
 
     private fun Color.hex(): String = "#%08X".format(toArgb())
 

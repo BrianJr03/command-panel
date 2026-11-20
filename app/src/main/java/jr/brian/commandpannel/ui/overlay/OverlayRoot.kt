@@ -24,7 +24,10 @@ import androidx.compose.ui.Alignment
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.system.UserFontStore
 import jr.brian.commandpannel.ui.theme.toSpec
+import jr.brian.commandpannel.ui.components.rememberLookBackgroundImage
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
+import jr.brian.commandpannel.ui.components.tccLookScanlines
+import androidx.compose.ui.graphics.graphicsLayer
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeToolbar
 import jr.brian.commandpannel.ui.overlay.arrange.ArrangeableCard
 import jr.brian.commandpannel.ui.overlay.arrange.arrangeContentArea
@@ -108,10 +111,22 @@ fun OverlayRoot(
         }
         // Nav bar sits at the top or bottom per the user's arrangement (drag it in Arrange mode); default top.
         val navAtTop = state.layout.navBarPosition == jr.brian.commandpannel.system.NavBarPosition.TOP
+        // The look's picture sits over its backdrop, which stays as the backup (Aurora Blur always shows the backdrop).
+        val image = spec.traits.backgroundImage?.takeUnless { spec.traits.blurBehind }
+        val imageLayer = rememberLookBackgroundImage(image)
+        val backdrop = Modifier.tccLookBackdrop(
+            spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true, scanlines = image == null,
+        )
         Box(Modifier.fillMaxSize()) {
+            if (image != null) {
+                // Backdrop, picture and panel each get a layer of their own, so an animation's frames redraw only the
+                // picture; the scanlines stay over the panel's content.
+                Box(Modifier.matchParentSize().graphicsLayer().then(backdrop))
+                Box(Modifier.matchParentSize().graphicsLayer().then(imageLayer))
+            }
             Column(
                 modifier = Modifier.fillMaxSize()
-                    .tccLookBackdrop(spec, LocalTccColors.current, lookColors, windowBlur = windowBlur?.active == true)
+                    .then(if (image != null) Modifier.graphicsLayer().tccLookScanlines(spec, LocalTccColors.current) else backdrop)
                     .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))

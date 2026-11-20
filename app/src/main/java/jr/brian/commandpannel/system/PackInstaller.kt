@@ -34,6 +34,16 @@ object PackInstaller {
         return FontNeeds(missing, pack.fonts.filterKeys { it in missing })
     }
 
+    /**
+     * Copies the background images [looks] need from `TCP Themes/images` into the app, and returns the file names still
+     * missing (those looks show their backup backdrop). Theme repos don't carry images yet.
+     */
+    fun prepareImages(context: Context, privileged: PrivilegedAccess, looks: List<CustomLook>): List<String> =
+        LookPackJson.imageFiles(looks).filter { file ->
+            !BackgroundImageStore.exists(context, jr.brian.commandpannel.ui.theme.BackgroundImage(file)) &&
+                !(ThemeFolder.hasImage(privileged, file) && ThemeFolder.importImage(context, privileged, file).isSuccess)
+        }
+
     /** Downloads [file] from [source] (https only), installs it, and drops a copy in `TCP Themes/fonts`. */
     fun downloadFont(context: Context, privileged: PrivilegedAccess, file: String, source: FontSource): Result<UserFont> = runCatching {
         val bytes = Http.getBytes(source.url, maxBytes = 5 * 1024 * 1024)
@@ -80,11 +90,12 @@ object PackInstaller {
         else -> ref
     }
 
-    /** Builds a pack from saved looks, copying the imported fonts they use into `TCP Themes/fonts`. */
+    /** Builds a pack from saved looks, copying their imported fonts and background images into `TCP Themes`. */
     fun exportPack(context: Context, privileged: PrivilegedAccess, name: String, looks: List<CustomLook>): String? {
         val installed = UserFontStore.all(context)
         val used = LookPackJson.fontFiles(looks).mapNotNull { file -> installed.firstOrNull { it.fileName.equals(file, ignoreCase = true) } }
         used.forEach { ThemeFolder.exportFont(context, privileged, it) }
+        looks.mapNotNull { it.backgroundImage }.distinctBy { it.fileName }.forEach { ThemeFolder.exportImage(context, privileged, it) }
         // Fonts that came from a download URL keep it, so people importing the pack can fetch them too.
         val sources = used.mapNotNull { f -> f.url?.let { f.fileName to FontSource(it, f.license) } }.toMap()
         return ThemeFolder.writePack(context, privileged, LookPack(name = name, looks = looks, fonts = sources))

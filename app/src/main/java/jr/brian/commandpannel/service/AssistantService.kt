@@ -191,6 +191,10 @@ class AssistantService : Service() {
                     showPanel(auto = false)
                     jr.brian.commandpannel.ui.overlay.OverlayDebug.openDialog.value = intent.getStringExtra(EXTRA_TILE)
                 }
+                // Seeds (or removes) a look with a background image, for scripts (#57).
+                ACTION_DEBUG_BACKGROUND -> if (BuildConfig.DEBUG) scope.launch(Dispatchers.IO) {
+                    jr.brian.commandpannel.system.BackgroundImageDebug.handle(applicationContext, privileged, intent)
+                }
                 ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
                     if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
                     else replay.applyEnabledState()
@@ -688,6 +692,7 @@ class AssistantService : Service() {
                 addAction(ACTION_DEBUG_SELECT_MODE)
                 addAction(ACTION_DEBUG_SET_PERFORMANCE)
                 addAction(ACTION_DEBUG_OPEN_DIALOG)
+                addAction(ACTION_DEBUG_BACKGROUND)
             }
         }
         // Exported so the firmware's system broadcast and `am broadcast` can reach it.
@@ -762,6 +767,8 @@ class AssistantService : Service() {
         /** Debug builds only: show the panel with a tile's dialog open ([EXTRA_TILE], e.g. `fan`). */
         const val ACTION_DEBUG_OPEN_DIALOG = "jr.brian.commandpannel.action.DEBUG_OPEN_DIALOG"
         const val EXTRA_TILE = "tile"
+        /** Debug builds only: seed or remove a background-image test look ([jr.brian.commandpannel.system.BackgroundImageDebug]). */
+        const val ACTION_DEBUG_BACKGROUND = "jr.brian.commandpannel.action.DEBUG_BACKGROUND"
         /** From Replay Studio's player: it's in front (sent again every minute as a check-in); pauses the buffer. */
         const val ACTION_REPLAY_PLAYER_OPEN = "jr.brian.commandpannel.action.REPLAY_PLAYER_OPEN"
         /** From Replay Studio's player: it left the front; the buffer re-arms if the user has it on. */

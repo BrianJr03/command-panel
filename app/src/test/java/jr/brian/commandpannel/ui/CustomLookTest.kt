@@ -3,6 +3,7 @@ package jr.brian.commandpannel.ui
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import jr.brian.commandpannel.ui.theme.BackdropStyle
+import jr.brian.commandpannel.ui.theme.BackgroundImage
 import jr.brian.commandpannel.ui.theme.BundledFont
 import jr.brian.commandpannel.ui.theme.CardStyle
 import jr.brian.commandpannel.ui.theme.CustomLook
@@ -108,6 +109,34 @@ class CustomLookTest {
         assertTrue(specForLook(TccUiLook.AURORA_BLUR).traits.blurBehind)
         val off = CustomLook(id = "o", name = "o", baseLook = TccUiLook.AURORA_BLUR, blurBehind = false)
         assertTrue(!off.toSpec().traits.blurBehind)
+    }
+
+    @Test
+    fun `background image round trips and reaches the spec with its backup backdrop`() {
+        val look = CustomLook(
+            id = "b", name = "b", baseLook = TccUiLook.TERMINAL, backdrop = BackdropStyle.STARFIELD,
+            backgroundImage = BackgroundImage("Cat-1a2b3c4d.gif", animated = true),
+        )
+        val decoded = CustomLookJson.decode(CustomLookJson.encode(look))!!
+        assertEquals(look, decoded)
+        val traits = decoded.toSpec().traits
+        assertEquals(BackgroundImage("Cat-1a2b3c4d.gif", animated = true), traits.backgroundImage)
+        assertEquals(BackdropStyle.STARFIELD, traits.backdrop)
+        // No image: nothing in the spec, and a look saved before images existed still parses.
+        assertNull(CustomLook(id = "n", name = "n").toSpec().traits.backgroundImage)
+        assertNull(CustomLookJson.decode(JSONObject().put("id", "old").put("name", "Old"))!!.backgroundImage)
+    }
+
+    @Test
+    fun `background image names stay inside their folder`() {
+        val o = JSONObject().put("id", "x").put("name", "x")
+        val evil = CustomLookJson.decode(JSONObject(o.toString()).put("backgroundImage", JSONObject().put("file", "../../data/x.png")))!!
+        assertEquals("x.png", evil.backgroundImage?.fileName)
+        val dots = CustomLookJson.decode(JSONObject(o.toString()).put("backgroundImage", JSONObject().put("file", "a..b.png")))!!
+        assertEquals("a_b.png", dots.backgroundImage?.fileName)
+        val blank = CustomLookJson.decode(JSONObject(o.toString()).put("backgroundImage", JSONObject().put("file", " ")))!!
+        assertNull(blank.backgroundImage)
+        assertEquals(false, CustomLookJson.decode(JSONObject(o.toString()).put("backgroundImage", JSONObject().put("file", "s.png")))!!.backgroundImage?.animated)
     }
 
     @Test

@@ -419,6 +419,24 @@ class SettingsViewModel @Inject constructor(
     fun deleteCustomLook(id: String) {
         CustomLookStore.delete(prefs, id)
         refreshLooks()
+        pruneBackgroundImages()
+    }
+
+    /** Imports a background image picked with the system file picker; reports the outcome through [onResult]. */
+    fun importBackgroundImage(uri: android.net.Uri, onResult: (Result<jr.brian.commandpannel.ui.theme.BackgroundImage>) -> Unit) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { jr.brian.commandpannel.system.BackgroundImageStore.import(app, uri) }
+            onResult(result)
+        }
+    }
+
+    /**
+     * Deletes stored background images that no saved look (nor a kept Theme Studio draft) uses: images imported into a
+     * draft that was discarded, or left behind by a deleted look.
+     */
+    fun pruneBackgroundImages() {
+        val keep = CustomLookStore.all(prefs) + listOfNotNull(readStudioDraft(), jr.brian.commandpannel.ui.theme.StudioDraft.look.value)
+        viewModelScope.launch(Dispatchers.IO) { jr.brian.commandpannel.system.BackgroundImageStore.prune(app, keep) }
     }
 
     /** Imports a TTF/OTF picked with the system file picker; reports the outcome through [onResult]. */
@@ -458,6 +476,7 @@ class SettingsViewModel @Inject constructor(
     fun addPackLooks(pack: LookPack, looks: List<CustomLook> = pack.looks) {
         viewModelScope.launch {
             val needs = withContext(Dispatchers.IO) {
+                PackInstaller.prepareImages(app, privileged, looks)
                 PackInstaller.prepareFonts(app, privileged, pack, looks).also { PackInstaller.install(app, prefs, looks) }
             }
             refreshLooks()
@@ -468,7 +487,10 @@ class SettingsViewModel @Inject constructor(
     /** Prepares a pack look's fonts, then hands back an unsaved copy to open in Theme Studio ("start from this"). */
     fun startFromPackLook(pack: LookPack, look: CustomLook, onReady: (CustomLook) -> Unit) {
         viewModelScope.launch {
-            val needs = withContext(Dispatchers.IO) { PackInstaller.prepareFonts(app, privileged, pack, listOf(look)) }
+            val needs = withContext(Dispatchers.IO) {
+                PackInstaller.prepareImages(app, privileged, listOf(look))
+                PackInstaller.prepareFonts(app, privileged, pack, listOf(look))
+            }
             reportFonts(null, needs)
             onReady(PackInstaller.relinked(app, look).copy(id = java.util.UUID.randomUUID().toString(), source = null))
         }

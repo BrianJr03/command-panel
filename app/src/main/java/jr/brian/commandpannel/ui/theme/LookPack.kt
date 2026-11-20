@@ -89,6 +89,9 @@ object LookPackJson {
     fun fontFiles(looks: List<CustomLook>): Set<String> =
         looks.flatMap { listOfNotNull(it.labelFont, it.displayFont) }.filterIsInstance<FontRef.User>().map { it.fileName }.toSet()
 
+    /** The background image files [looks] reference (packs carry them in `TCP Themes/images`). */
+    fun imageFiles(looks: List<CustomLook>): Set<String> = looks.mapNotNull { it.backgroundImage?.fileName }.toSet()
+
     /** `My Look.tcplooks.json`, with characters file systems reject replaced. */
     fun fileName(name: String): String = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "looks" } + EXTENSION
 }

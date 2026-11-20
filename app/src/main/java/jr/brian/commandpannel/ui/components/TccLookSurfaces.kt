@@ -482,7 +482,8 @@ internal class BuiltInTileRenderer private constructor(private val style: TileSt
  * Overlay root backdrop for the active look: solid background plus an optional static aurora,
  * paper-dot or HUD-grid layer, and (Tactical HUD) a draw-only scanline overlay above content.
  * [windowBlur] is true when the overlay window is blurring what's behind it (a [jr.brian.commandpannel.ui.theme.LookTraits.blurBehind] look); the
- * background and aurora then turn translucent so the blurred screen shows through.
+ * background and aurora then turn translucent so the blurred screen shows through. [scanlines] false leaves the
+ * scanline overlay to [tccLookScanlines] (the overlay draws it on another layer when a background image sits between).
  */
 fun Modifier.tccLookBackdrop(
     spec: TccLookSpec,
@@ -491,6 +492,7 @@ fun Modifier.tccLookBackdrop(
     // Aurora blob colors (top-left, right, bottom); `null` derives them from the palette accent.
     auroraColors: List<Color>? = null,
     windowBlur: Boolean = false,
+    scanlines: Boolean = true,
 ): Modifier {
     val paint = LookPaint(spec, colors, lookColors)
     val seeThrough = windowBlur && spec.traits.blurBehind
@@ -570,8 +572,13 @@ fun Modifier.tccLookBackdrop(
         BackdropStyle.HONEYCOMB -> base.honeycombBackdrop(paint)
         BackdropStyle.STARFIELD -> base.starfieldBackdrop(paint)
     }
-    if (!spec.traits.scanlines) return withLayer
-    return withLayer.drawWithContent {
+    return if (scanlines) withLayer.tccLookScanlines(spec, colors) else withLayer
+}
+
+/** The look's scanline overlay (Tactical HUD), drawn over the content; a no-op for looks without scanlines. */
+fun Modifier.tccLookScanlines(spec: TccLookSpec, colors: TccColorPalette): Modifier {
+    if (!spec.traits.scanlines) return this
+    return drawWithContent {
         drawContent()
         val pitch = 3.dp.toPx()
         val line = Color.Black.copy(alpha = if (colors.isDark) 0.16f else 0.05f)

@@ -480,6 +480,15 @@
     <string name="theme_backdrop_honeycomb">Honeycomb</string>
     <string name="theme_backdrop_starfield">Starfield</string>
     <string name="theme_part_header">Card headers</string>
+    <string name="theme_background_image">Background image</string>
+    <string name="theme_background_image_desc">A PNG, JPG, WebP or GIF behind the panel, cropped to fill the screen. Animated GIF and WebP files play while the panel is open. The Backdrop above stays as its backup: it shows if the image can\'t load, and with Aurora Blur.</string>
+    <string name="theme_background_image_choose">Choose image…</string>
+    <string name="theme_background_image_change">Change image…</string>
+    <string name="theme_background_image_remove">Remove image</string>
+    <string name="theme_background_image_current">Current: %1$s</string>
+    <string name="theme_background_image_current_animated">Current: %1$s (animated)</string>
+    <string name="theme_background_image_blur_note">Aurora Blur is on, so the panel shows the backdrop instead of the image.</string>
+    <string name="theme_background_image_set">Background image set</string>
     <string name="theme_fonts_desc">Bundled fonts or your own TTF/OTF files. Imported fonts stay on this device.</string>
     <string name="theme_font_labels">Label font</string>
     <string name="theme_font_numbers">Number font</string>
@@ -655,7 +664,7 @@
     <string name="theme_license_unknown">license not stated</string>
     <string name="theme_fonts_download">Download</string>
     <string name="theme_fonts_skip">Skip</string>
-    <string name="theme_folder_readme">TCP Themes\n\nthemes/  Theme packs (.tcplooks.json). Each file can hold many looks.\nfonts/   Font files (.ttf / .otf) the packs use, matched by file name.\n\nThe Themes section of Thor Command Panel lists the packs here and exports your looks here. This folder has the same layout as a theme repo made from the TCP theme template, so you can share it as-is.\n</string>
+    <string name="theme_folder_readme">TCP Themes\n\nthemes/  Theme packs (.tcplooks.json). Each file can hold many looks.\nfonts/   Font files (.ttf / .otf) the packs use, matched by file name.\nimages/  Background images (.png / .jpg / .webp / .gif) the packs use, matched by file name.\n\nThe Themes section of Thor Command Panel lists the packs here and exports your looks here. This folder has the same layout as a theme repo made from the TCP theme template, so you can share it as-is.\n</string>
     <string name="settings_update_title">Updates</string>
     <string name="settings_update_desc">Version %1$s · %2$s</string>
     <string name="settings_update_never_checked">not checked yet</string>
@@ -793,6 +802,11 @@
     <string name="msg_font_unreadable">Couldn\'t open the font file</string>
     <string name="msg_font_too_large">Font is larger than 5 MB</string>
     <string name="msg_font_invalid">Not a valid TTF or OTF font</string>
+    <string name="msg_background_unreadable">Couldn\'t open the image file</string>
+    <string name="msg_background_too_large">Image is larger than 20 MB</string>
+    <string name="msg_background_animation_too_big">This animation is more than twice the screen\'s size. Pick a smaller one.</string>
+    <string name="msg_background_unsupported">Pick a PNG, JPG, WebP or GIF image</string>
+    <string name="msg_background_invalid">Not a valid image</string>
     <string name="font_default_name">Font</string>
     <!-- Companion tour -->
     <string name="tour_next">Next</string>

@@ -1,0 +1,131 @@
+package jr.brian.commandpannel.system
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.annotation.StringRes
+import jr.brian.commandpannel.R
+import jr.brian.commandpannel.ui.theme.BackgroundImage
+import jr.brian.commandpannel.ui.theme.CustomLook
+import java.io.File
+import java.nio.ByteBuffer
+import java.util.UUID
+
+/** Why a background image import failed; [messageRes] is the user-facing explanation. */
+class BackgroundImportException(@StringRes val messageRes: Int) : Exception()
+
+/**
+ * Background images for Theme Studio looks (#57). Files live in `filesDir/backgrounds/<fileName>` (app-private, like
+ * [UserFontStore]); a look points at one by file name. Imports are checked against [BackgroundImageRules]: big still
+ * photos are downscaled (and turned upright from their EXIF rotation, which [ImageDecoder] applies), animations over
+ * the size limit are refused. The overlay decodes them again at its own size when it draws them.
+ */
+object BackgroundImageStore {
+
+    fun dir(context: Context): File = File(context.filesDir, "backgrounds").apply { mkdirs() }
+
+    fun file(context: Context, image: BackgroundImage): File = File(dir(context), image.fileName)
+
+    fun exists(context: Context, image: BackgroundImage): Boolean = file(context, image).isFile
+
+    /** The bottom screen's size, which the size limits are measured against (the current display if it's missing). */
+    fun screenSize(context: Context): PxSize {
+        val topology = DisplayTopology(context)
+        val display = topology.bottomDisplay
+        if (display != null) topology.realSize(display).let { return PxSize(it.x, it.y) }
+        val m = context.resources.displayMetrics
+        return PxSize(m.widthPixels, m.heightPixels)
+    }
+
+    /** Imports the image at [uri] (from the system file picker). Blocking; call off the main thread. */
+    fun import(context: Context, uri: Uri): Result<BackgroundImage> = runCatching {
+        val resolver = context.contentResolver
+        val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+        val bytes = resolver.openInputStream(uri)?.use { readLimited(it) }
+            ?: throw BackgroundImportException(R.string.msg_background_unreadable)
+        register(context, bytes, name).getOrThrow()
+    }
+
+    /** Imports [source] (a file the app can read, e.g. staged from `TCP Themes/images`), keeping [fileName] if given. */
+    fun importFile(context: Context, source: File, fileName: String? = null): Result<BackgroundImage> = runCatching {
+        if (source.length() > BackgroundImageRules.MAX_BYTES) throw BackgroundImportException(R.string.msg_background_too_large)
+        register(context, source.readBytes(), source.name, keepName = fileName).getOrThrow()
+    }
+
+    /**
+     * Checks [bytes] and stores them. [keepName] stores under that exact name (a theme pack's file, so the pack's looks
+     * find it); otherwise the name is made unique from [displayName].
+     */
+    fun register(context: Context, bytes: ByteArray, displayName: String?, keepName: String? = null): Result<BackgroundImage> = runCatching {
+        var mime: String? = null
+        var size = PxSize(0, 0)
+        var animated = false
+        // Decoding at a small sample size proves the file is readable (all frames' header for animations) without the memory.
+        val probe = runCatching {
+            ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+                mime = info.mimeType
+                size = PxSize(info.size.width, info.size.height)
+                animated = info.isAnimated
+                decoder.setTargetSampleSize(8)
+            }
+        }.getOrNull() ?: throw BackgroundImportException(R.string.msg_background_invalid)
+        (probe as? AnimatedImageDrawable)?.let { animated = true }
+        val plan = BackgroundImageRules.plan(bytes.size.toLong(), size, animated, screenSize(context), mime)
+        val tag = UUID.randomUUID().toString().take(8)
+        val image = when (plan) {
+            is ImportPlan.Reject -> throw BackgroundImportException(messageFor(plan.reason))
+            ImportPlan.Keep -> {
+                val stored = keepName ?: BackgroundImageRules.storedName(displayName, tag, mime)
+                File(dir(context), stored).writeBytes(bytes)
+                BackgroundImage(stored, animated)
+            }
+            is ImportPlan.Downscale -> {
+                // Photos stay JPEG; anything else (it may have transparency) becomes WebP.
+                val jpeg = mime == "image/jpeg"
+                val outMime = if (jpeg) "image/jpeg" else "image/webp"
+                val stored = keepName ?: BackgroundImageRules.storedName(displayName, tag, outMime)
+                val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, _, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    decoder.setTargetSize(plan.size.width, plan.size.height)
+                }
+                val dest = File(dir(context), stored)
+                dest.outputStream().use { out ->
+                    bitmap.compress(if (jpeg) Bitmap.CompressFormat.JPEG else Bitmap.CompressFormat.WEBP_LOSSY, 90, out)
+                }
+                bitmap.recycle()
+                BackgroundImage(stored, animated = false)
+            }
+        }
+        image
+    }
+
+    private fun messageFor(reason: RejectReason): Int = when (reason) {
+        RejectReason.TOO_LARGE_FILE -> R.string.msg_background_too_large
+        RejectReason.TOO_LARGE_ANIMATION -> R.string.msg_background_animation_too_big
+        RejectReason.UNSUPPORTED_TYPE -> R.string.msg_background_unsupported
+        RejectReason.NOT_AN_IMAGE -> R.string.msg_background_invalid
+    }
+
+    private fun readLimited(input: java.io.InputStream): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            if (out.size() + n > BackgroundImageRules.MAX_BYTES) throw BackgroundImportException(R.string.msg_background_too_large)
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /** Deletes stored images no look in [keep] uses (after a look is deleted or Theme Studio closes). */
+    fun prune(context: Context, keep: Collection<CustomLook>) {
+        val used = keep.mapNotNull { it.backgroundImage?.fileName }.toSet()
+        dir(context).listFiles()?.filter { it.name !in used }?.forEach { it.delete() }
+    }
+}
