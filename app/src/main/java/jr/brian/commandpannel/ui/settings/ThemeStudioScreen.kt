@@ -361,9 +361,12 @@ internal fun ThemeStudioScreen(
     }
 }
 
-/** "Discard your changes?" on Back with unsaved edits. Focus starts on Keep editing, and B keeps editing too. */
+/**
+ * "Discard your changes?" on Back with unsaved edits. Focus starts on Keep editing, and B keeps editing too. [bodyRes]
+ * says what's lost (Gradient Studio has its own, since it doesn't touch the overlay's look).
+ */
 @Composable
-private fun DiscardChangesDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
+internal fun DiscardChangesDialog(onKeep: () -> Unit, onDiscard: () -> Unit, @StringRes bodyRes: Int = R.string.theme_discard_body) {
     Dialog(onDismissRequest = onKeep, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val keep = remember { FocusRequester() }
         LaunchedEffect(Unit) { runCatching { keep.requestFocus() } }
@@ -376,7 +379,7 @@ private fun DiscardChangesDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(stringResource(R.string.theme_discard_title), color = p.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            CardDesc(stringResource(R.string.theme_discard_body))
+            CardDesc(stringResource(bodyRes))
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.focusRequester(keep)) {

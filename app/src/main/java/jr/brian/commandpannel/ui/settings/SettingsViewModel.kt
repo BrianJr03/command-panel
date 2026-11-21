@@ -201,6 +201,12 @@ data class SettingsState(
     val studioResumed: Boolean = false,
     /** Unsaved Studio work kept from a session that didn't end normally (the app was closed or killed). */
     val unsavedDraft: jr.brian.commandpannel.ui.theme.CustomLook? = null,
+    /** The gradient Gradient Studio is editing (#68, possibly not saved yet), or null when it isn't open. */
+    val gradientDraft: jr.brian.commandpannel.system.GradientSpec? = null,
+    /** Gradient Studio was opened on [unsavedGradientDraft] (Resume), so it starts with unsaved changes. */
+    val gradientDraftResumed: Boolean = false,
+    /** Unsaved Gradient Studio work kept from a session that didn't end normally. */
+    val unsavedGradientDraft: jr.brian.commandpannel.system.GradientSpec? = null,
 )
 
 @HiltViewModel
@@ -231,6 +237,7 @@ class SettingsViewModel @Inject constructor(
         animatedBackgrounds = BackgroundImageSetting.animationsOn(prefs),
         gradients = jr.brian.commandpannel.system.GradientStore.all(prefs),
         activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
+        unsavedGradientDraft = jr.brian.commandpannel.system.GradientJson.decode(prefs.getString(KEY_GRADIENT_DRAFT, null)),
         accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
         companionFollowLook = prefs.getBoolean("companion_follow_look", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
@@ -482,6 +489,36 @@ class SettingsViewModel @Inject constructor(
             activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
             backgroundImage = BackgroundImageSetting.read(prefs),
         )
+    }
+
+    /** Hands Gradient Studio (#68) the gradient to edit; a new one isn't saved until the user saves. */
+    fun openGradientStudio(spec: jr.brian.commandpannel.system.GradientSpec) {
+        _state.value = _state.value.copy(gradientDraft = spec, gradientDraftResumed = spec == _state.value.unsavedGradientDraft)
+    }
+
+    fun closeGradientStudio() {
+        _state.value = _state.value.copy(gradientDraft = null)
+    }
+
+    /** Keeps Gradient Studio's unsaved [spec] (or forgets it, for null) in case the app closes before it's saved. */
+    fun persistGradientDraft(spec: jr.brian.commandpannel.system.GradientSpec?) {
+        if (spec == null) prefs.edit().remove(KEY_GRADIENT_DRAFT).apply()
+        else prefs.edit().putString(KEY_GRADIENT_DRAFT, jr.brian.commandpannel.system.GradientJson.encode(spec).toString()).apply()
+        _state.value = _state.value.copy(unsavedGradientDraft = spec)
+    }
+
+    /**
+     * Saves (inserts or replaces) a gradient from Gradient Studio, and with [apply] also shows it behind the panel.
+     * Returns what was saved (normalized), or null when it isn't a valid gradient.
+     */
+    fun saveGradient(spec: jr.brian.commandpannel.system.GradientSpec, apply: Boolean = false): jr.brian.commandpannel.system.GradientSpec? {
+        val saved = jr.brian.commandpannel.system.GradientStore.save(prefs, spec) ?: return null
+        if (apply) jr.brian.commandpannel.system.BackgroundSetting.selectGradient(prefs, saved.id)
+        refreshGradients()
+        _state.value = _state.value.copy(
+            gradientMessage = if (apply) app.getString(R.string.msg_gradient_applied) else app.getString(R.string.msg_gradient_saved, saved.name),
+        )
+        return saved
     }
 
     /** Clears the library's status line (it's shown until the next action or until the library is opened again). */
@@ -1662,6 +1699,8 @@ class SettingsViewModel @Inject constructor(
         const val KEY_SHOW_NEW_DOTS = "show_new_dots"
         /** Theme Studio's unsaved draft, autosaved while it's open. Not backed up. */
         const val KEY_STUDIO_DRAFT = "studio_draft"
+        /** Gradient Studio's unsaved draft (#68), autosaved while it's open. Not backed up. */
+        const val KEY_GRADIENT_DRAFT = "gradient_studio_draft"
         /** The companion rail's section order, as a CSV of [SettingsCategory] keys. Backed up. */
     }
 }

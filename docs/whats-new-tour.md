@@ -16,6 +16,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: GRADIENTS
   - Callout: Not sure where to start? Pick one of a dozen presets, or one that matches your look, and press Use to save your own copy and show it.
 
+- **Gradient Studio** (#68)
+  - Where: Appearance, Create your own animated background card, Open gradients, then New gradient or a gradient's Edit
+  - Spot: GRADIENTS
+  - Callout: Build your own gradient with a live preview: pick up to six colors, a style, motion and speed, or press Shuffle for colors that go together. Save and apply shows it behind the panel.
+
 ## v0.12.0
 
 - **Custom fan speed** (#59)

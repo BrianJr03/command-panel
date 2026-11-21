@@ -25,6 +25,8 @@ internal object CompanionRoutes {
     const val REPLAY_STUDIO = "replay_studio"
     /** The saved gradient backgrounds (#67), from Appearance. */
     const val GRADIENTS = "gradients"
+    /** Gradient Studio (#68), the gradient editor, from the library. */
+    const val GRADIENT_STUDIO = "gradient_studio"
 
     fun themes(tab: ThemeLibraryTab) = "themes?tab=${tab.key}"
 
@@ -53,6 +55,14 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
     val openThemes: (ThemeLibraryTab) -> Unit = { tab -> nav.navigate(CompanionRoutes.themes(tab)) { launchSingleTop = true } }
     val openReplayStudio: () -> Unit = { nav.navigate(CompanionRoutes.REPLAY_STUDIO) { launchSingleTop = true } }
     val openGradients: () -> Unit = { nav.navigate(CompanionRoutes.GRADIENTS) { launchSingleTop = true } }
+    val openGradientStudio: (jr.brian.commandpannel.system.GradientSpec) -> Unit = { spec ->
+        vm.openGradientStudio(spec)
+        nav.navigate(CompanionRoutes.GRADIENT_STUDIO) { launchSingleTop = true }
+    }
+    val closeGradientStudio: () -> Unit = {
+        vm.closeGradientStudio()
+        nav.popBackStack()
+    }
     val closeStudio: () -> Unit = {
         vm.closeStudio()
         nav.popBackStack()
@@ -97,8 +107,16 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
             }
         }
         composable(CompanionRoutes.GRADIENTS) {
-            // #68 adds the editor: onNew / onEdit open it.
-            GradientLibraryScreen(state, vm, onClose = { nav.popBackStack() })
+            GradientLibraryScreen(state, vm, onClose = { nav.popBackStack() }, onOpenStudio = openGradientStudio)
+        }
+        composable(CompanionRoutes.GRADIENT_STUDIO) {
+            val draft = state.gradientDraft
+            if (draft == null) {
+                // Nothing to edit (the process was recreated while Gradient Studio was open): go back.
+                LaunchedEffect(Unit) { nav.popBackStack() }
+            } else {
+                GradientStudioScreen(draft, state, vm, onClose = closeGradientStudio)
+            }
         }
         composable(CompanionRoutes.REPLAY_STUDIO) {
             jr.brian.commandpannel.replay.studio.ReplayStudioScreen(onClose = { nav.popBackStack() })

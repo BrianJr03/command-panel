@@ -208,7 +208,7 @@ internal fun ColorControls(draft: CustomLook, ledColor: Int?, onChange: (CustomL
 
 /** Fine-tunes a picked color: hue, saturation and brightness steppers, and an exact hex value. */
 @Composable
-private fun ColorTuning(color: Color, onChange: (Color) -> Unit) {
+internal fun ColorTuning(color: Color, onChange: (Color) -> Unit) {
     val hsv = argbToHsv(color.toArgb())
     Stepper(R.string.theme_color_hue, hsv.h, 0f, 350f, 10f, ValueUnit.DEGREES) { onChange(Color(hsvToArgb(hsv.copy(h = it)))) }
     Stepper(R.string.theme_color_saturation, hsv.s, 0f, 1f, 0.05f, ValueUnit.PERCENT) { onChange(Color(hsvToArgb(hsv.copy(s = it)))) }
@@ -226,7 +226,7 @@ private fun ColorTuning(color: Color, onChange: (Color) -> Unit) {
 }
 
 @Composable
-private fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
+internal fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
     val f = focusState()
     val scale by focusScale(f.value, 1.15f, "swatchScale")
     val hex = "#%06X".format(color.toArgb() and 0xFFFFFF)
@@ -369,7 +369,7 @@ internal fun ControlLabel(@StringRes res: Int) =
 
 /** A − value + row for a number; [onChange] gets the clamped, step-rounded value. */
 @Composable
-private fun Stepper(
+internal fun Stepper(
     @StringRes titleRes: Int,
     value: Float,
     min: Float,
@@ -412,7 +412,7 @@ private fun Stepper(
  * Repeats [onStep] while a finger stays down: after 400 ms, then faster down to every 60 ms. The first step is the
  * child's own click; once repeating starts, the release is consumed so it doesn't add one more step.
  */
-private fun Modifier.repeatWhileHeld(onStep: () -> Unit): Modifier = pointerInput(Unit) {
+internal fun Modifier.repeatWhileHeld(onStep: () -> Unit): Modifier = pointerInput(Unit) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var wait = 400L

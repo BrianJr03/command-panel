@@ -13,7 +13,13 @@
 #   - Duplicate saves "<name> copy" (gradient_backgrounds pref) and focus moves to the copy's Apply;
 #   - Delete takes two presses ("Press again to delete"), removes the copy and focus stays in the library;
 #   - "Use my image instead" makes the image the source again and focus lands on a tile's Apply;
-#   - B goes back to Appearance with focus on "Open gradients".
+#   - Gradient Studio (#68), from a tile's Edit: focus starts on the Colors tab; R2 / L2 walk the tabs; Add color and
+#     the hue stepper change the stops; the speed stepper goes Steady to Lively, L3 undoes and R3 redoes it; Select
+#     jumps to Save (prefs: 3 stops, speed 1.5, new colors, source unchanged); Start jumps to Save and apply (source is
+#     that gradient, back in the library, no draft left in gradient_studio_draft);
+#   - New gradient opens Studio on "My gradient 3"; after a change, B asks to discard (focus on Keep editing, the draft
+#     is kept for Resume); Save and apply saves it as a third gradient and shows it;
+#   - B goes back to Appearance with focus on "Open gradients", and the card names the new gradient.
 # Every key goes through key() (helpers), which checks the debug companion is in front on the top screen first: the
 # release Command Panel can catch stray presses. A fresh install's What's new dialog is dismissed with B only after
 # that check and only when the dialog is on screen. Screenshots go to $OUT_DIR; looks need a person.
@@ -61,6 +67,21 @@ gradients_raw() { sh_dev run-as "$PKG" cat "$PREFS" | grep 'name="gradient_backg
 gradients_have() { gradients_raw | grep -q "$1"; }
 gradient_count() { gradients_raw | grep -o 'command-panel-gradient' | wc -l | xargs; }
 source_is() { [ "$(pref background_source)" = "$1" ]; }
+# One field of saved gradient <id> from the gradient_backgrounds pref: speed, stop_count, or stops (colors@positions).
+gradient_field() {
+  gradients_raw | python3 -I -c '
+import html, json, re, sys
+raw = sys.stdin.read()
+m = re.search(r">(.*)</string>", raw, re.S)
+specs = json.loads(html.unescape(m.group(1))) if m else []
+g = next((s for s in specs if s.get("id") == sys.argv[1]), None)
+if g is None: sys.exit(0)
+f = sys.argv[2]
+if f == "speed": print(("%g" % g["speed"]))
+elif f == "stop_count": print(len(g["stops"]))
+elif f == "stops": print(",".join("%d@%g" % (s["color"], s["position"]) for s in g["stops"]))
+' "$1" "$2"
+}
 # The focused control's text is exactly $1.
 focus_is() { [ "$(focused_text)" = "$1" ]; }
 # Any text on screen contains $1.
@@ -199,10 +220,103 @@ check "header says the image is showing" screen_has "Showing your background ima
 check "the gradients are kept ($(gradient_count))" test "$(gradient_count)" -eq 2
 top_shot image-back
 
+# --- Gradient Studio (#68) ------------------------------------------------------------------------------------------
+
+step "Gradient Studio: open from Edit"
+before_a="$(gradient_field glib-a stops)"
+check "D-pad Right reaches $NAME_A's Edit" walk_to "Edit" KEYCODE_DPAD_RIGHT 2
+key KEYCODE_BUTTON_A
+sleep 1.5
+check "Gradient Studio opened (its tabs are on screen)" screen_has "Fine-tune"
+check "focus starts on the Colors tab" focus_is "Colors"
+check "the name field shows $NAME_A" screen_has "$NAME_A"
+top_shot studio-open
+
+step "Gradient Studio: L2 / R2 switch tabs"
+for t in Motion Fine-tune Presets; do key KEYCODE_BUTTON_R2; check "R2 goes to $t" focus_is "$t"; done
+key KEYCODE_BUTTON_R2; check "R2 wraps to Colors" focus_is "Colors"
+key KEYCODE_BUTTON_L2; check "L2 goes back to Presets" focus_is "Presets"
+key KEYCODE_BUTTON_R2
+
+step "Gradient Studio: change a color stop"
+check "D-pad Down reaches Add color" walk_to "Add color" KEYCODE_DPAD_DOWN 6
+key KEYCODE_BUTTON_A
+check "a third color was added" screen_has "Color 2 of 3"
+# Down to the hue stepper of the picked (new) color, and two steps up.
+check "D-pad Down reaches the hue stepper" walk_to "−" KEYCODE_DPAD_DOWN 4
+check "D-pad Right reaches its +" walk_to "+" KEYCODE_DPAD_RIGHT 2
+key KEYCODE_BUTTON_A; key KEYCODE_BUTTON_A
+top_shot studio-colors
+
+step "Gradient Studio: speed, undo and redo"
+key KEYCODE_BUTTON_R2
+check "on the Motion tab" focus_is "Motion"
+check "speed starts at Steady (speed 1)" screen_has "Steady"
+check "D-pad Down reaches the speed stepper" walk_to "−" KEYCODE_DPAD_DOWN 6
+check "D-pad Right reaches its +" walk_to "+" KEYCODE_DPAD_RIGHT 2
+key KEYCODE_BUTTON_A
+check "one step up is Lively" screen_has "Lively"
+key KEYCODE_BUTTON_THUMBL
+check "L3 undoes it (Steady again)" screen_has "Steady"
+key KEYCODE_BUTTON_THUMBR
+check "R3 redoes it (Lively again)" screen_has "Lively"
+top_shot studio-motion
+
+step "Gradient Studio: Save (Select), then Save and apply (Start)"
+key KEYCODE_BUTTON_SELECT
+check "Select jumps to Save" focus_is "Save"
+key KEYCODE_BUTTON_A
+sleep 1
+check "saved: $NAME_A has 3 stops ($(gradient_field glib-a stop_count))" test "$(gradient_field glib-a stop_count)" = 3
+check "saved: its speed is 1.5 ($(gradient_field glib-a speed))" test "$(gradient_field glib-a speed)" = 1.5
+check "saved: its colors changed" test "$(gradient_field glib-a stops)" != "$before_a"
+check "still in Gradient Studio after Save" screen_has "Fine-tune"
+check "Save didn't change the source ($(pref background_source))" source_is image
+key KEYCODE_BUTTON_START
+check "Start jumps to Save and apply" focus_is "Save and apply"
+key KEYCODE_BUTTON_A
+sleep 1.5
+check "$NAME_A is the source ($(pref background_source))" source_is gradient:glib-a
+check "back in the library" screen_has "Your gradients"
+check "no unsaved draft left behind" test -z "$(pref gradient_studio_draft)"
+top_shot studio-applied
+
+step "Gradient Studio: New gradient, discard prompt, Save and apply"
+# Up to the header row (it may land on Back first, then Right to New gradient).
+to_new() {
+  local i f
+  for i in $(seq 1 12); do
+    f="$(focused_text)"
+    [ "$f" = "New gradient" ] && return 0
+    if [ "$f" = Back ]; then key KEYCODE_DPAD_RIGHT; else key KEYCODE_DPAD_UP; fi
+  done
+  return 1
+}
+check "D-pad Up reaches New gradient" to_new
+key KEYCODE_BUTTON_A
+sleep 1.5
+check "Gradient Studio opened on a new gradient" screen_has "My gradient 3"
+key KEYCODE_BUTTON_R2
+walk_to "−" KEYCODE_DPAD_DOWN 6 && walk_to "+" KEYCODE_DPAD_RIGHT 2 && key KEYCODE_BUTTON_A
+key KEYCODE_BUTTON_B
+sleep 1
+check "B with unsaved changes asks first" screen_has "Discard your changes"
+check "focus is on Keep editing" focus_is "Keep editing"
+key KEYCODE_BUTTON_A
+sleep 1
+check "Keep editing stays in Gradient Studio" screen_has "Fine-tune"
+check "the unsaved draft is kept for Resume ($(pref gradient_studio_draft | head -c 40))" test -n "$(pref gradient_studio_draft)"
+key KEYCODE_BUTTON_START
+key KEYCODE_BUTTON_A
+sleep 1.5
+check "the new gradient was saved ($(gradient_count) gradients)" test "$(gradient_count)" -eq 3
+check "and is the source ($(pref background_source))" sh -c "echo '$(pref background_source)' | grep -q '^gradient:' && [ '$(pref background_source)' != gradient:glib-a ]"
+check "the draft was cleared" test -z "$(pref gradient_studio_draft)"
+top_shot studio-new
+
 step "Back"
 key KEYCODE_BUTTON_B
 sleep 1.5
 check "back on Appearance with focus on Open gradients" focus_is "Open gradients"
-screen_has "Showing: " && fail "the card still says a gradient is showing" || pass "the card no longer says a gradient is showing"
-check "the card counts the saved gradients" screen_has "2 saved gradients"
+check "the card says the new gradient is showing" screen_has "Showing: My gradient 3"
 top_shot back

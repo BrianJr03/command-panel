@@ -77,7 +77,8 @@ private const val FOCUS_BACK = "\u0000back"
  * (the first preset once no tiles are left) instead of the screen's first control. After Use, focus goes to the new
  * copy's Applied button.
  *
- * [onNew] and [onEdit] are the gradient editor's entry points (#68): null hides them.
+ * [onOpenStudio] opens Gradient Studio (#68) on a gradient: New gradient (a fresh unsaved one), Edit on a tile, or
+ * Resume on unsaved work kept from a Studio session that didn't end normally. Null hides those entry points.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -85,10 +86,13 @@ internal fun GradientLibraryScreen(
     state: SettingsState,
     vm: SettingsViewModel,
     onClose: () -> Unit,
-    // TODO(#68): CompanionNavHost passes the editor's routes here.
-    onNew: (() -> Unit)? = null,
-    onEdit: ((GradientSpec) -> Unit)? = null,
+    onOpenStudio: ((GradientSpec) -> Unit)? = null,
 ) {
+    val newName = stringResource(R.string.gradient_new_name, state.gradients.size + 1)
+    val onNew: (() -> Unit)? = onOpenStudio?.let { open ->
+        { open(GradientStudioRules.newGradient(java.util.UUID.randomUUID().toString(), newName)) }
+    }
+    val onEdit: ((GradientSpec) -> Unit)? = onOpenStudio
     BackHandler(onBack = onClose)
     val backFocus = remember { FocusRequester() }
     val applyFocus = remember { mutableMapOf<String, FocusRequester>() }
@@ -163,6 +167,20 @@ internal fun GradientLibraryScreen(
                     }
                 }
                 state.gradientMessage?.let { InfoLine(it, p.accent) }
+            }
+            // Gradient Studio work that didn't get saved (the app closed mid-edit): pick it back up or let it go.
+            val unsaved = state.unsavedGradientDraft
+            if (onOpenStudio != null && unsaved != null && state.gradientDraft == null) {
+                Card {
+                    CardTitle(stringResource(R.string.theme_unsaved_title, gradientName(unsaved)))
+                    CardDesc(stringResource(R.string.gradient_unsaved_desc))
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        AccentButton(stringResource(R.string.theme_unsaved_resume)) { onOpenStudio(unsaved) }
+                        // The card goes away: focus moves to Back.
+                        Chip(stringResource(R.string.theme_unsaved_discard)) { vm.persistGradientDraft(null); pendingFocus = FOCUS_BACK }
+                    }
+                }
             }
             val presetSection: @Composable () -> Unit = {
                 SectionHeader(stringResource(R.string.gradient_presets_title))
@@ -309,17 +327,14 @@ private fun GradientTile(
 }
 
 /**
- * A gradient's preview on a library tile. The swap-in point for the renderer (#66): once
- * `GradientBackgroundLayer(spec, modifier, animate)` lands, draw it here instead of the static swatch, at least for
- * [animate] (the focused tile, with Animated backgrounds on and a speed above 0). The other tiles can keep the swatch
- * or use the layer with `animate = false`.
+ * A gradient's preview on a library tile: the renderer (#66) while [animate] (the focused tile, with Animated
+ * backgrounds on and a speed above 0), else the static swatch.
  */
 @Composable
 internal fun GradientTilePreview(spec: GradientSpec, animate: Boolean, modifier: Modifier = Modifier) {
-    // TODO(#66): replace with jr.brian.commandpannel.ui.components.GradientBackgroundLayer(spec, modifier, animate)
-    // (ui/components/GradientBackground.kt). With animate = false it draws one still frame through a shared shader,
-    // so every tile can use it; only the focused one passes animate = true.
-    Box(modifier.gradientSwatch(spec))
+    // The focused tile (moving) uses the panel's renderer; the rest keep the cheap static swatch.
+    if (animate) jr.brian.commandpannel.ui.components.GradientBackgroundLayer(spec, modifier, animate = true)
+    else Box(modifier.gradientSwatch(spec))
 }
 
 /**
