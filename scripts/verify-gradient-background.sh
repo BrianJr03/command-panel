@@ -224,7 +224,9 @@ if $checks; then
   check "the edges change while it moves" edges_differ drift-a drift-b
   [ -n "$TOP_PHYSICAL" ] && note "top screen while moving: $(differs drift-a-top drift-b-top && echo changed || echo unchanged) (look at drift-a-top.png by eye)"
   measure "gradient DRIFT shown"
-  check "window frames within a 30 fps cap (${LAST_FRAMES:-?} in 5 s)" frames_capped "$LAST_FRAMES"
+  # gfxinfo includes the renderer's own surface frames for a gradient (see frames_over), so this is window plus
+  # surface frames, not the panel window alone as for a GIF.
+  check "app frames (window + gradient surface) within a 30 fps cap (${LAST_FRAMES:-?} in 5 s)" frames_capped "$LAST_FRAMES"
   threads "gradient DRIFT shown"
   note "gradient DRIFT shown: app CPU = $(app_cpu)%, SurfaceFlinger CPU = $(sf_cpu)%"
   log_clear
@@ -237,7 +239,8 @@ if $checks; then
   measure "gradient hidden"
   check "no frames while hidden (${LAST_FRAMES:-?} in 5 s)" test "${LAST_FRAMES:-999}" -le 2
   check "no new start while hidden" no_start
-  check "no surface layer left while hidden" test "$(surface_layers)" -eq 0
+  check "no surface layer of ours left while hidden" test "$(surface_layers)" -eq 0
+  note "release app SurfaceView layers on screen meanwhile: $(release_surface_layers) (not counted)"
 
   step "Every motion and style"
   for combo in linear:rotate linear:breathe linear:hue_cycle linear:wave radial:drift aurora:drift; do

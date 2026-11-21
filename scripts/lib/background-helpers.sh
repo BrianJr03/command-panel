@@ -103,7 +103,9 @@ key() {
 }
 press_tile() { broadcast DEBUG_BACKGROUND --ez press_tile true; sleep 1.5; }
 
-# Frames the app rendered over $1 seconds (all its windows; the panel is the only one up).
+# Frames the app rendered over $1 seconds (all its windows; the panel is the only one up). gfxinfo counts every
+# hardware-rendered frame of the process, so it includes frames a player draws onto its own surface with a hardware
+# canvas: the gradient renderer's (about 30 fps, ~150 per 5 s) show up here, the GIF player's don't (~5 per 5 s).
 frames_over() {
   sh_dev dumpsys gfxinfo "$PKG" reset >/dev/null
   sleep "$1"
@@ -127,9 +129,18 @@ threads() {
   sf="$(sh_dev pidof surfaceflinger)"
   [ -n "$sf" ] && note "$label: SurfaceFlinger CPU = $(sh_dev top -b -q -n 2 -d 5 -p "$sf" -o %CPU | tail -1 | xargs)%"
 }
-# The GIF's own surface (#60) in SurfaceFlinger's layer list. A SurfaceView layer is named after its window's title,
-# and the panel window has none, so it is "SurfaceView[]#<id>" (apps' own SurfaceViews carry their activity's name).
-surface_layers() { sh_dev dumpsys SurfaceFlinger --list | grep -c '^SurfaceView\[\]#'; }
+# The background's own surface (#60) in SurfaceFlinger's layer dump, counting only the debug app's layers. A
+# SurfaceView layer is named after its window's title, and the panel window has none, so it is "SurfaceView[]#<id>",
+# and its line carries the owner: "+ ContainerLayer (SurfaceView[]#16270) uid=10248". Other apps' SurfaceViews (the
+# release Command Panel's preview is one, and its name is a prefix of ours) are matched out by the exact uid.
+pkg_uid() { sh_dev pm list packages -U | awk -v p="package:$1" '$1 == p { sub(/^uid:/, "", $2); print $2; exit }'; }
+uid_surface_layers() {
+  [ -n "$1" ] || { echo 0; return; }
+  sh_dev dumpsys SurfaceFlinger | awk -v u="uid=$1" '/^\+ [A-Za-z]+ \(SurfaceView\[\]#[0-9]+\) / && $NF == u { n++ } END { print n + 0 }'
+}
+surface_layers() { uid_surface_layers "$(pkg_uid "$PKG")"; }
+# The release app's SurfaceView layers (for the record: they must never count as ours).
+release_surface_layers() { uid_surface_layers "$(pkg_uid "$RELEASE_PKG")"; }
 # Frames per second the player drew onto its surface, from the last "animation stopped" line.
 last_surface_fps() {
   log_read

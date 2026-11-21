@@ -154,7 +154,8 @@ log_read
 detach_line="$(echo "$LOG" | grep -n "surface detached" | head -1 | cut -d: -f1)"
 stop_line="$(echo "$LOG" | grep -n "animation stopped" | head -1 | cut -d: -f1)"
 check "it left the surface before the panel went away" test "${detach_line:-99}" -lt "${stop_line:-0}"
-check "no surface layer left while hidden" test "$(surface_layers)" -eq 0
+check "no surface layer of ours left while hidden" test "$(surface_layers)" -eq 0
+note "release app SurfaceView layers on screen meanwhile: $(release_surface_layers) (not counted)"
 fps="$(last_fps)"; sfps="$(last_surface_fps)"
 note "GIF playback: ${fps:-?} fps drawn, ${sfps:-?} fps onto the surface (source 50 fps)"
 check "playback capped at 30 fps (${fps:-?} fps)" fps_capped "$fps"
