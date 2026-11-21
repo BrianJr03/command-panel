@@ -428,6 +428,8 @@
     <string name="settings_background_image_removed">Background image removed</string>
     <string name="settings_background_image_animated_link">Animated GIFs and WebP are in Experimental →</string>
     <string name="settings_background_image_not_showing">Not showing now: your gradient %1$s is the background.</string>
+    <string name="settings_background_tile_off">The Background tile is off on the panel, so your background is hidden.</string>
+    <string name="settings_background_tile_turn_on">Turn it back on</string>
     <string name="settings_gradients">Create your own animated background</string>
     <string name="settings_gradients_desc">Make gradients that drift, rotate or shift color behind the panel. One background shows at a time on every look: your image or one gradient.</string>
     <string name="settings_gradients_open">Open gradients</string>
@@ -908,6 +910,7 @@
     <string name="msg_gradient_duplicated">Copy saved as %1$s</string>
     <string name="msg_gradient_deleted">Gradient deleted</string>
     <string name="msg_gradient_saved">%1$s saved</string>
+    <string name="msg_background_tile_on">Background tile turned on</string>
     <string name="msg_gradient_preset_used">Saved %1$s to your gradients and applied it</string>
     <string name="msg_background_animated_off">Animated GIF and WebP images need Animated backgrounds, in Experimental.</string>
     <string name="font_default_name">Font</string>

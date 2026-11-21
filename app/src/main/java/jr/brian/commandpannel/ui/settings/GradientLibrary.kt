@@ -23,6 +23,13 @@ internal object GradientLibrary {
         else -> Showing.BACKDROP
     }
 
+    /**
+     * Whether the panel's Background tile (#58, #72) is hiding a background that's set (#78): the tile is off and
+     * there's an image or a saved gradient to show. With nothing set there's nothing hidden, so no hint.
+     */
+    fun hiddenByTile(activeId: String?, gradients: List<GradientSpec>, hasImage: Boolean, tileOn: Boolean): Boolean =
+        !tileOn && showing(activeId, gradients, hasImage) != Showing.BACKDROP
+
     /** "Use my image instead" is offered only while a saved gradient is showing and an image is stored to go back to. */
     fun canUseImage(activeId: String?, gradients: List<GradientSpec>, hasImage: Boolean): Boolean =
         hasImage && showing(activeId, gradients, hasImage) == Showing.GRADIENT

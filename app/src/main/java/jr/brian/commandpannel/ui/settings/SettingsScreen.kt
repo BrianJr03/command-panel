@@ -1834,6 +1834,15 @@ private fun BackgroundImageCard(state: SettingsState, vm: SettingsViewModel, onJ
                 runCatching { chooseFocus.requestFocus() }
             }
         }
+        // The image is the background but the panel's tile hides it (#78). The gradient card says so for a gradient.
+        if (image != null && !state.backgroundTileOn &&
+            GradientLibrary.showing(state.activeGradientId, state.gradients, hasImage = true) == GradientLibrary.Showing.IMAGE
+        ) {
+            BackgroundTileOffHint {
+                vm.turnOnBackgroundTile()
+                runCatching { chooseFocus.requestFocus() }
+            }
+        }
         state.backgroundMessage?.let { InfoLine(it, p.accent) }
         // GIFs and animated WebP are Experimental: the link opens that section on the switch, the tour's way.
         if (!state.animatedBackgrounds) {
@@ -1880,6 +1889,13 @@ private fun GradientsCard(
                     vm.useBackgroundImage()
                     runCatching { openFocus.requestFocus() }
                 }
+            }
+        }
+        // A gradient is the background but the panel's tile hides it (#78).
+        if (active != null && GradientLibrary.hiddenByTile(state.activeGradientId, state.gradients, state.backgroundImage != null, state.backgroundTileOn)) {
+            BackgroundTileOffHint {
+                vm.turnOnBackgroundTile()
+                runCatching { openFocus.requestFocus() }
             }
         }
         // Gradient motion is Experimental: the link opens that section on the switch, like the image card's.

@@ -13,6 +13,8 @@
 #   - Duplicate saves "<name> copy" (gradient_backgrounds pref) and focus moves to the copy's Apply;
 #   - Delete takes two presses ("Press again to delete"), removes the copy and focus stays in the library;
 #   - "Use my image instead" makes the image the source again and focus lands on a tile's Apply;
+#   - #78: with the panel's Background tile pressed off (DEBUG_BACKGROUND press_tile), the library says the tile hides
+#     the background; Turn it back on sets background_image_on true, the hint goes and focus lands on a tile's Apply;
 #   - Gradient Studio (#68), from a tile's Edit: focus starts on the Colors tab; R2 / L2 walk the tabs; Add color and
 #     the hue stepper change the stops; the speed stepper goes Steady to Lively, L3 undoes and R3 redoes it; Select
 #     jumps to Save (prefs: 3 stops, speed 1.5, new colors, source unchanged); Start jumps to Save and apply (source is
@@ -219,6 +221,25 @@ check "focus landed on the gradient that was showing ($NAME_A's Apply)" focus_is
 check "header says the image is showing" screen_has "Showing your background image"
 check "the gradients are kept ($(gradient_count))" test "$(gradient_count)" -eq 2
 top_shot image-back
+
+# --- #78: the Background tile hides the background -----------------------------------------------------------------
+
+step "Background tile off (#78)"
+check "the tile is on before ($(tile_pref))" test "$(tile_pref)" = true
+# The tile's own press path (the service), as a tap on the panel would do; the library follows the pref live.
+press_tile
+check "the tile is now off ($(tile_pref))" test "$(tile_pref)" = false
+check "the library says the tile hides the background" wait_for 5 'screen_has "The Background tile is off on the panel"'
+top_shot tile-off-hint
+check "D-pad Up reaches Turn it back on" walk_to "Turn it back on" KEYCODE_DPAD_UP 6
+key KEYCODE_BUTTON_A
+sleep 1
+check "the tile is on again ($(tile_pref))" test "$(tile_pref)" = true
+screen_has "The Background tile is off on the panel" && fail "the hint is still on screen" || pass "the hint went away"
+check "status line says so" screen_has "Background tile turned on"
+# The button went away: focus lands on the first tile ($NAME_A's Apply; the image is the source).
+check "focus moved to $NAME_A's Apply" focus_is "Apply"
+top_shot tile-on-again
 
 # --- Gradient Studio (#68) ------------------------------------------------------------------------------------------
 

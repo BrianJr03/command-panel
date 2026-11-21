@@ -90,6 +90,8 @@ data class SettingsState(
     val backgroundMessage: String? = null,
     /** Saved gradient backgrounds (#64), for Appearance's card and the gradient library (#67). */
     val gradients: List<jr.brian.commandpannel.system.GradientSpec> = emptyList(),
+    /** The panel's Background tile (#58, #72): off hides whatever background is set (#78 says so in settings). */
+    val backgroundTileOn: Boolean = true,
     /** The gradient the panel shows (the active background source), or null when it's the image or the backdrop. */
     val activeGradientId: String? = null,
     /** The last gradient library action's outcome ("Gradient applied", …), shown in the library. */
@@ -239,6 +241,7 @@ class SettingsViewModel @Inject constructor(
         animatedBackgrounds = BackgroundImageSetting.animationsOn(prefs),
         gradients = jr.brian.commandpannel.system.GradientStore.all(prefs),
         activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
+        backgroundTileOn = prefs.getBoolean(jr.brian.commandpannel.system.BackgroundImageTile.PREF, true),
         unsavedGradientDraft = jr.brian.commandpannel.system.GradientJson.decode(prefs.getString(KEY_GRADIENT_DRAFT, null)),
         accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
         companionFollowLook = prefs.getBoolean("companion_follow_look", false),
@@ -497,7 +500,18 @@ class SettingsViewModel @Inject constructor(
             gradients = jr.brian.commandpannel.system.GradientStore.all(prefs),
             activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
             backgroundImage = BackgroundImageSetting.read(prefs),
+            backgroundTileOn = prefs.getBoolean(jr.brian.commandpannel.system.BackgroundImageTile.PREF, true),
         )
+    }
+
+    /**
+     * "Turn it back on" (#78): turns the panel's Background tile on, the same pref the tile's press flips, so the
+     * background that's set shows again.
+     */
+    fun turnOnBackgroundTile() {
+        prefs.edit().putBoolean(jr.brian.commandpannel.system.BackgroundImageTile.PREF, true).apply()
+        val msg = app.getString(R.string.msg_background_tile_on)
+        _state.value = _state.value.copy(backgroundTileOn = true, gradientMessage = msg, backgroundMessage = msg)
     }
 
     /** Hands Gradient Studio (#68) the gradient to edit; a new one isn't saved until the user saves. */
@@ -1225,6 +1239,10 @@ class SettingsViewModel @Inject constructor(
     private val onboardingListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         // The onboarding's theme step changes the look from the overlay; keep the Themes section in step.
         if (key == "overlay_look") refreshLooks()
+        // The Background tile pressed on the panel while settings are open (#78): the hints follow it.
+        if (key == jr.brian.commandpannel.system.BackgroundImageTile.PREF) {
+            _state.value = _state.value.copy(backgroundTileOn = prefs.getBoolean(jr.brian.commandpannel.system.BackgroundImageTile.PREF, true))
+        }
     }
 
     init {

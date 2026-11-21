@@ -157,6 +157,14 @@ internal fun GradientLibraryScreen(
                     color = p.textPrimary, fontSize = 15.sp, style = tccTextStyle(),
                 )
                 if (!state.animatedBackgrounds) InfoLine(stringResource(R.string.gradient_library_still_hint), p.textTertiary)
+                if (GradientLibrary.hiddenByTile(state.activeGradientId, state.gradients, state.backgroundImage != null, state.backgroundTileOn)) {
+                    BackgroundTileOffHint {
+                        // The hint goes away: focus moves to the showing gradient (else the first tile, else Back).
+                        vm.turnOnBackgroundTile()
+                        pendingFocus = state.activeGradientId?.takeIf { id -> state.gradients.any { it.id == id } }
+                            ?: state.gradients.firstOrNull()?.id ?: firstPreset ?: FOCUS_BACK
+                    }
+                }
                 if (GradientLibrary.canUseImage(state.activeGradientId, state.gradients, state.backgroundImage != null)) {
                     Spacer(Modifier.height(4.dp))
                     Chip(stringResource(R.string.settings_gradients_use_image)) {
@@ -225,6 +233,16 @@ internal fun GradientLibraryScreen(
             Spacer(Modifier.height(20.dp))
         }
     }
+}
+
+/**
+ * "The Background tile is off on the panel, so your background is hidden." (#78), with a Turn it back on button. Shown
+ * while [GradientLibrary.hiddenByTile] holds; the caller moves focus when [onTurnOn] makes it go away.
+ */
+@Composable
+internal fun BackgroundTileOffHint(onTurnOn: () -> Unit) {
+    InfoLine(stringResource(R.string.settings_background_tile_off), p.danger)
+    Chip(stringResource(R.string.settings_background_tile_turn_on), onClick = onTurnOn)
 }
 
 /** [items] as rows of [TILES_PER_ROW] equal-width tiles; [tile] gets the width modifier to apply. */

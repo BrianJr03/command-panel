@@ -49,6 +49,21 @@ class GradientLibraryTest {
     }
 
     @Test
+    fun `the tile hides a background only while it's off and one is set`() {
+        // Off, with a gradient or an image showing: hidden.
+        assertTrue(GradientLibrary.hiddenByTile("a", listOf(a, b), hasImage = false, tileOn = false))
+        assertTrue(GradientLibrary.hiddenByTile(null, emptyList(), hasImage = true, tileOn = false))
+        // A deleted gradient falls back to the image, which the tile then hides.
+        assertTrue(GradientLibrary.hiddenByTile("gone", listOf(a), hasImage = true, tileOn = false))
+        // Off with nothing set: the backdrop shows anyway, nothing is hidden.
+        assertFalse(GradientLibrary.hiddenByTile(null, listOf(a, b), hasImage = false, tileOn = false))
+        assertFalse(GradientLibrary.hiddenByTile("gone", listOf(a), hasImage = false, tileOn = false))
+        // On: never hidden.
+        assertFalse(GradientLibrary.hiddenByTile("a", listOf(a, b), hasImage = true, tileOn = true))
+        assertFalse(GradientLibrary.hiddenByTile(null, emptyList(), hasImage = true, tileOn = true))
+    }
+
+    @Test
     fun `duplicate keeps everything but the id and the name`() {
         val d = GradientLibrary.duplicate(a, listOf(a, b), "new", "Untitled", copy, copyN)
         assertEquals("new", d.id)
