@@ -416,6 +416,8 @@
     <string name="settings_overlay_look">Overlay look</string>
     <string name="settings_overlay_look_desc">The surface style for the bottom-screen overlay. Auto uses the stock AYN look.</string>
     <string name="settings_overlay_look_moved">Looks moved to Themes, where you can also mix parts from different looks and save your own.</string>
+    <string name="settings_rail_one_open">One rail group open at a time</string>
+    <string name="settings_rail_one_open_desc">Opening a group on the left (Panel, Look, Extras, Advanced) closes the one that was open, so the list stays short.</string>
     <string name="settings_companion_follow_look">Companion follows overlay look</string>
     <string name="settings_companion_follow_look_desc">Apply the overlay\'s look, theme and accent to this settings screen. Off keeps the default companion style.</string>
     <string name="settings_rgb_accent">Accent from Ambient LED</string>

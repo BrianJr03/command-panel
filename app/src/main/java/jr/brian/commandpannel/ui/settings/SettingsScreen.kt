@@ -637,18 +637,36 @@ private fun RailGroupBlock(
     edgeScroll: (String) -> Unit,
 ) {
     val header = RailRow.Header(g).id
-    RailGroupHeader(
-        g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
-        groupReorder, dimmed, onToggle = { onToggle(g, it) },
-    ) { edgeScroll(header) }
-    if (!open) return
-    reorder.items.forEach { k ->
-        val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
-        key(k) {
-            RailItem(
-                item, item == selected, requesters.getValue(item), reorder, navShape, onSelect, openPane,
-                dimmed = dimmed, indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
-            ) { edgeScroll(k) }
+    // One child of the rail per group, so the rail's spacing sits between groups and the gap under the header animates
+    // with the sections below.
+    Column {
+        RailGroupHeader(
+            g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
+            groupReorder, dimmed, onToggle = { onToggle(g, it) },
+        ) { edgeScroll(header) }
+        val motion = LocalTccLookSpec.current.traits.animate
+        // The sections slide open and shut (#82: opening a group can close another, so both animate at once). The gap
+        // above them is inside the animated part, so it grows and shrinks with them instead of popping. A closing group's
+        // rows can't take focus while they animate out.
+        AnimatedVisibility(
+            visible = open,
+            enter = if (motion) fadeIn() + expandVertically(expandFrom = Alignment.Top) else EnterTransition.None,
+            exit = if (motion) fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top) else ExitTransition.None,
+        ) {
+            Column(
+                Modifier.padding(top = RAIL_ITEM_SPACING).focusProperties { canFocus = open },
+                verticalArrangement = Arrangement.spacedBy(RAIL_ITEM_SPACING),
+            ) {
+                reorder.items.forEach { k ->
+                    val item = NavItem.entries.firstOrNull { it.category.key == k } ?: return@forEach
+                    key(k) {
+                        RailItem(
+                            item, item == selected, requesters.getValue(item), reorder, navShape, onSelect, openPane,
+                            dimmed = dimmed, indent = true, onLeft = { runCatching { headerRequesters.getValue(g).requestFocus() } },
+                        ) { edgeScroll(k) }
+                    }
+                }
+            }
         }
     }
 }
@@ -1019,6 +1037,11 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
     BdsaInactiveNote(state, vm)
     // First: updates, so a new version and What's new are one press away.
     UpdatesCard(state, vm)
+    SwitchCard(
+        stringResource(R.string.settings_rail_one_open),
+        stringResource(R.string.settings_rail_one_open_desc),
+        state.railOneOpen, { vm.setRailOneOpen(it, keep = null) },
+    )
     SwitchCard(
         stringResource(R.string.settings_replace_stock),
         when {

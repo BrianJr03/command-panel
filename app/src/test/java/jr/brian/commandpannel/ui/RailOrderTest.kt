@@ -227,6 +227,35 @@ class RailOrderTest {
         assertEquals("look,advanced", RailExpanded.encode(setOf(ADVANCED, LOOK)))
         assertEquals(setOf(PANEL, EXTRAS), RailExpanded.parse(RailExpanded.encode(setOf(PANEL, EXTRAS))))
     }
+
+    // ---- one group open at a time (#82) ----
+
+    @Test
+    fun `opening a group closes the others when one at a time is on`() {
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = true, oneOpen = true))
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL, EXTRAS), LOOK, expanded = true, oneOpen = true))
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = true, oneOpen = true))
+        // Closing only ever removes that group.
+        assertEquals(emptySet<RailGroup>(), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = false, oneOpen = true))
+        assertEquals(setOf(PANEL), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = false, oneOpen = true))
+    }
+
+    @Test
+    fun `with one at a time off groups open side by side`() {
+        assertEquals(setOf(PANEL, LOOK), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = true, oneOpen = false))
+        assertEquals(setOf(PANEL), RailExpanded.toggle(setOf(PANEL, LOOK), LOOK, expanded = false, oneOpen = false))
+    }
+
+    @Test
+    fun `several saved open groups are cut to one`() {
+        // An older save (or the switch just turned on) keeps the first open group in rail order, or the one asked for.
+        assertEquals(setOf(PANEL), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true))
+        assertEquals(setOf(EXTRAS), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true, order = listOf(ADVANCED, EXTRAS, PANEL, LOOK)))
+        assertEquals(setOf(EXTRAS), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true, keep = EXTRAS))
+        assertEquals(setOf(PANEL), RailExpanded.limit(setOf(PANEL), oneOpen = true, keep = LOOK))
+        assertEquals(setOf(EXTRAS, PANEL), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = false))
+        assertEquals(emptySet<RailGroup>(), RailExpanded.limit(emptySet(), oneOpen = true))
+    }
     // ---- moving groups (#30) ----
 
     @Test
