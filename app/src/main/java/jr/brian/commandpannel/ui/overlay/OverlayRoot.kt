@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import jr.brian.commandpannel.system.OverlayCardId
 import jr.brian.commandpannel.system.UserFontStore
 import jr.brian.commandpannel.ui.theme.toSpec
+import jr.brian.commandpannel.ui.components.GradientBackgroundLayer
 import jr.brian.commandpannel.ui.components.LookBackgroundImageLayer
 import jr.brian.commandpannel.ui.components.tccLookBackdrop
 import jr.brian.commandpannel.ui.components.tccLookScanlines
@@ -130,9 +131,10 @@ fun OverlayRoot(
                         background.image, LocalTccColors.current.primaryBackground, Modifier.matchParentSize(),
                         animate = state.animatedBackgrounds,
                     )
-                    // #66: GradientBackgroundLayer(background.spec, Modifier.matchParentSize(), animate = state.animatedBackgrounds)
-                    // goes here. Until then a gradient source shows the backdrop.
-                    is jr.brian.commandpannel.system.PanelBackground.Gradient -> Unit
+                    // A moving gradient also draws on its own surface once the panel is shown (#66).
+                    is jr.brian.commandpannel.system.PanelBackground.Gradient -> GradientBackgroundLayer(
+                        background.spec, Modifier.matchParentSize(), animate = state.animatedBackgrounds,
+                    )
                 }
             }
             Column(

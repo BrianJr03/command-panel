@@ -147,9 +147,9 @@ fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier
     }
 }
 
-/** Whether the display this view is on is lit (not off or dozing). True when there's no display to ask. */
+/** Whether the display this view is on is lit (not off or dozing). True when there's no display to ask. Shared with the gradient renderer (#66). */
 @Composable
-private fun rememberDisplayOn(): Boolean {
+internal fun rememberDisplayOn(): Boolean {
     val view = LocalView.current
     val display = view.display ?: return true
     var on by remember(display.displayId) { mutableStateOf(display.isLit()) }
