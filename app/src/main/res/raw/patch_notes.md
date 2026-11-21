@@ -17,7 +17,7 @@ Animated gradient backgrounds you can make yourself, replay clips on your SD car
 ### Fixes
 - **What's new** shows links and notes properly. Move to a link with the D-pad and press A to open it.
 - **Folders under Documents** can now be picked as the clips location.
-- **One rail group open at a time.** Opening a group on the left closes the one that was open, with a short animation, and General closes them all.
+- **One rail group open at a time.** Opening a group on the left closes the one that was open and takes you straight to its first section, with a short animation. General closes them all.
 
 See the [v0.12.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.12.0) for the previous release.
 
