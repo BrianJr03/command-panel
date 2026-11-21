@@ -8,6 +8,8 @@ import jr.brian.commandpannel.privileged.ReplayBitratePreset
 import jr.brian.commandpannel.privileged.ReplayCaptureEngine
 import jr.brian.commandpannel.privileged.ReplayTarget
 import jr.brian.commandpannel.privileged.ReplayClipWriter
+import jr.brian.commandpannel.privileged.ReplayClipsLocation
+import jr.brian.commandpannel.privileged.ReplayVolumes
 import jr.brian.commandpannel.privileged.ReplayRingBuffer
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
 import jr.brian.commandpannel.replay.studio.ClipAutoDelete
@@ -46,17 +48,29 @@ class ReplayBufferController(
     )
 
     /**
+     * Whether the last [save] went to TCP Clips because the chosen SD card or USB drive wasn't mounted (#75). The
+     * chosen folder is kept, and clips go back to it once the card is back.
+     */
+    @Volatile var lastSaveFellBack: Boolean = false
+        private set
+
+    /**
      * The clips folder: the user's custom folder while it still exists, else TCP Clips. A custom folder deleted outside
      * the app is dropped (pref cleared) rather than silently recreated. If the check itself fails, the folder is kept.
+     * A folder on a removable volume that isn't mounted now (#75) is kept, and this save goes to TCP Clips.
      */
-    private fun clipsRelativeDir(): String {
-        val custom = ScreenRecorderEngine.normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null))
-            ?: return ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR
-        val dir = shellQuote("${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$custom")
-        if (privileged.shell("[ -d $dir ] && echo yes || echo no")?.trim() != "no") return custom
-        Log.i(tag, "custom clips folder '$custom' is gone; saving to the default folder")
-        prefs.edit().remove("replay_clips_dir").apply()
-        return ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR
+    private fun clipsLocation(mounted: Set<String>): ReplayClipsLocation {
+        val custom = ReplayClipsLocation.parse(prefs.getString(ClipRepository.PREF_CLIPS_DIR, null))
+            ?: return ReplayClipsLocation.DEFAULT
+        if (custom.volume != null && custom.volume !in mounted) {
+            Log.i(tag, "clips volume ${custom.volume} isn't mounted; saving to the default folder, keeping the choice")
+            lastSaveFellBack = true
+            return ReplayClipsLocation.DEFAULT
+        }
+        if (privileged.shell("[ -d ${shellQuote(custom.path)} ] && echo yes || echo no")?.trim() != "no") return custom
+        Log.i(tag, "custom clips folder '${custom.path}' is gone; saving to the default folder")
+        prefs.edit().remove(ClipRepository.PREF_CLIPS_DIR).apply()
+        return ReplayClipsLocation.DEFAULT
     }
 
     /** Single-quotes [s] for the shell; folder names may contain an apostrophe. */
@@ -108,22 +122,25 @@ class ReplayBufferController(
             is ReplayRingBuffer.Slice.Clip -> {
                 val tmp = File(context.cacheDir, "replay_tmp.mp4")
                 if (!ReplayClipWriter.write(slice, format, engine.audioFormat, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
-                val dir = clipsRelativeDir()
+                lastSaveFellBack = false
+                val mounted = ReplayStorage.mountedIds(context)
+                val location = clipsLocation(mounted)
                 val basePath = ScreenRecorderEngine.buildReplayClipPath(
                     targetMode = engine.target.mode,
-                    baseDir = "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$dir/${ScreenRecorderEngine.replayTargetFolder(engine.target.mode)}",
+                    baseDir = "${location.path}/${ScreenRecorderEngine.replayTargetFolder(engine.target.mode)}",
                 )
-                if (!ScreenRecorderEngine.isValidReplayClipOutputPath(basePath)) {
+                if (!ScreenRecorderEngine.isValidReplayClipOutputPath(basePath, mounted)) {
                     runCatching { tmp.delete() }
                     return "error:${ScreenRecorderEngine.REPLAY_ERR_INVALID_PATH}"
                 }
                 val parent = basePath.substringBeforeLast('/')
                 // Root lists the folder (the app can't always see it), so a second save in the same second gets `_2`.
-                val taken = privileged.shell("mkdir -p ${shellQuote(parent)} && ls -1 ${shellQuote(parent)} 2>/dev/null; echo $LIST_END")
+                // The folder is made only while the volume's root is there (a card pulled since the check).
+                val taken = privileged.shell("${ReplayVolumes.mkdirsCommand(location.root, parent)} && ls -1 ${shellQuote(parent)} 2>/dev/null; echo $LIST_END")
                     ?.takeIf { it.contains(LIST_END) }
                     ?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
                 val path = taken?.let { ScreenRecorderEngine.pickFreeReplayClipPath(basePath, it) }
-                    ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it) }
+                    ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
                 val copied = path != null && privileged.shell(
                     "cp ${shellQuote(tmp.absolutePath)} ${shellQuote(path)} && chmod 664 ${shellQuote(path)} && echo $COPY_OK",
                 )?.contains(COPY_OK) == true
@@ -132,13 +149,14 @@ class ReplayBufferController(
                     runCatching { tmp.delete() }
                     return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 }
-                // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI.
+                // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI. The media scanner
+                // indexes it on whichever volume it's on, so SD card clips show in the gallery too.
                 val uri = android.net.Uri.fromFile(File(path))
                 privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${shellQuote(uri.toString())} >/dev/null 2>&1")
                 val bytes = tmp.length()
                 runCatching { tmp.delete() }
                 // Replay Studio keeps listing this folder after the user picks another one.
-                ClipRepository.rememberDir(prefs, dir)
+                ClipRepository.rememberDir(prefs, location)
                 Log.i(tag, "saved replay clip -> $path")
                 // Auto-delete old clips (#50), in the background so the save reports right away.
                 ClipAutoDelete.afterSave(context, privileged, path, bytes)

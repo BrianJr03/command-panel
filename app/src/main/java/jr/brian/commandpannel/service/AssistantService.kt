@@ -566,13 +566,15 @@ class AssistantService : Service() {
             Log.i(TAG, "replay save ($source): $result")
             sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
             if (result.startsWith("error:")) toast.show(getString(R.string.msg_save_failed, result.removePrefix("error:")))
-            ClipSavedNotice.savedPath(result)?.let(::announceClipSaved)
+            // The chosen card was removed (#75): the clip still saved, on internal storage, and the toast says so.
+            ClipSavedNotice.savedPath(result)?.let { announceClipSaved(it, fellBack = replay.lastSaveFellBack) }
         }
     }
 
     /** A clip was saved at [path]: a toast and a notification, both with View, which opens it in the player (#48). */
-    private fun announceClipSaved(path: String) {
-        toast.show(getString(R.string.msg_replay_clip_saved), getString(R.string.notif_clip_saved_view)) {
+    private fun announceClipSaved(path: String, fellBack: Boolean = false) {
+        val msg = if (fellBack) R.string.msg_replay_saved_to_internal else R.string.msg_replay_clip_saved
+        toast.show(getString(msg), getString(R.string.notif_clip_saved_view)) {
             Log.i(TAG, "clip-saved: view from toast")
             ReplayPlayerActivity.launch(applicationContext, path)
         }

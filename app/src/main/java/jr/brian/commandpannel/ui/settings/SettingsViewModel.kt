@@ -184,8 +184,12 @@ data class SettingsState(
     val replayHelperDown: Boolean = false,
     /** The armed capture asked for sound but couldn't start it, so clips are video only. */
     val replaySoundVideoOnly: Boolean = false,
-    /** Custom clips folder relative to internal storage, or `null` for the default (TCP Clips). */
-    val replayClipsDir: String? = null,
+    /** Custom clips folder (internal storage or, since #75, an SD card or USB drive), or `null` for TCP Clips. */
+    val replayClipsLocation: jr.brian.commandpannel.privileged.ReplayClipsLocation? = null,
+    /** The "Saving to" line under Save location: where clips go, with the card's name for a removable volume. */
+    val replayLocationLine: String = "",
+    /** The chosen folder's card isn't mounted, so clips go to TCP Clips until it's back (#75). */
+    val replayClipsCardMissing: Boolean = false,
     /** "Auto-delete old clips" in the Replay Buffer section (#50). */
     val replayAutoDelete: jr.brian.commandpannel.replay.studio.AutoDeleteRules = jr.brian.commandpannel.replay.studio.AutoDeleteRules(),
     val appPickerOpen: Boolean = false,
@@ -269,8 +273,9 @@ class SettingsViewModel @Inject constructor(
         replayDoublePress = prefs.getBoolean(AssistantService.PREF_DOUBLE_PRESS_REPLAY, false),
         replayGameAudio = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_GAME_AUDIO, true),
         replayMic = prefs.getBoolean(jr.brian.commandpannel.system.ReplayBufferController.PREF_MIC, false),
-        replayClipsDir = jr.brian.commandpannel.privileged.ScreenRecorderEngine
-            .normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null)),
+        replayClipsLocation = readReplayClipsLocation(),
+        replayLocationLine = replayLocationLine(readReplayClipsLocation()),
+        replayClipsCardMissing = replayCardMissing(readReplayClipsLocation()),
         replayAutoDelete = jr.brian.commandpannel.replay.studio.AutoDeleteRules.read(prefs),
         saveClip = jr.brian.commandpannel.system.update.SaveClipInstaller.status(getApplication()),
         thorKbm = jr.brian.commandpannel.system.update.ThorKbmInstaller.status(getApplication()),
@@ -348,32 +353,60 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(replayTarget = target, replayMessage = replaySettingMessage())
     }
 
-    /** Saves clips to [relative] (under internal storage), or back to the default folder when it's `null`. */
-    fun setReplayClipsDir(relative: String?) {
-        prefs.edit().apply { if (relative == null) remove("replay_clips_dir") else putString("replay_clips_dir", relative) }.apply()
-        _state.value = _state.value.copy(
-            replayClipsDir = relative,
-            replayFolderMessage = null,
-            replayMessage = app.getString(R.string.settings_replay_location_current, replayClipsPath(relative)),
+    private fun readReplayClipsLocation(): jr.brian.commandpannel.privileged.ReplayClipsLocation? =
+        jr.brian.commandpannel.privileged.ReplayClipsLocation.parse(prefs.getString(jr.brian.commandpannel.replay.studio.ClipRepository.PREF_CLIPS_DIR, null))
+
+    /** Whether [location] is on a removable volume that isn't mounted and writable now. */
+    private fun replayCardMissing(location: jr.brian.commandpannel.privileged.ReplayClipsLocation?): Boolean =
+        location?.volume?.let { jr.brian.commandpannel.system.ReplayStorage.state(app, it) != jr.brian.commandpannel.privileged.ReplayVolumes.State.MOUNTED } == true
+
+    /** "Saving to ..." for [location]: the full path on internal storage, the folder and the card's name on a card. */
+    private fun replayLocationLine(location: jr.brian.commandpannel.privileged.ReplayClipsLocation?): String {
+        val loc = location ?: jr.brian.commandpannel.privileged.ReplayClipsLocation.DEFAULT
+        val volume = loc.volume ?: return app.getString(R.string.settings_replay_location_current, loc.path)
+        val card = jr.brian.commandpannel.system.ReplayStorage.description(app, volume)
+            ?: app.getString(R.string.settings_replay_location_card_fallback, volume)
+        return app.getString(R.string.settings_replay_location_current_card, loc.relativeDir, card)
+    }
+
+    /** The Save location state for [location] (the folder, its "Saving to" line, whether its card is missing). */
+    private fun withReplayLocation(state: SettingsState, location: jr.brian.commandpannel.privileged.ReplayClipsLocation?) =
+        state.copy(
+            replayClipsLocation = location,
+            replayLocationLine = replayLocationLine(location),
+            replayClipsCardMissing = replayCardMissing(location),
         )
+
+    /** Saves clips to [location], or back to the default folder (TCP Clips) when it's `null`. */
+    fun setReplayClipsLocation(location: jr.brian.commandpannel.privileged.ReplayClipsLocation?) {
+        prefs.edit().apply {
+            if (location == null) remove(jr.brian.commandpannel.replay.studio.ClipRepository.PREF_CLIPS_DIR) else putString(jr.brian.commandpannel.replay.studio.ClipRepository.PREF_CLIPS_DIR, location.encode())
+        }.apply()
+        val next = withReplayLocation(_state.value, location)
+        _state.value = next.copy(replayFolderMessage = null, replayMessage = next.replayLocationLine)
     }
 
     /**
      * Opens the clips folder in the system file manager, creating it first if no clip has been saved yet. A custom folder
-     * deleted outside the app falls back to TCP Clips, the same as saving does.
+     * deleted outside the app falls back to TCP Clips, the same as saving does; one on a card that isn't mounted (#75)
+     * opens TCP Clips, where clips go meanwhile, and stays chosen.
      */
     fun openReplayClipsFolder() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val engine = jr.brian.commandpannel.privileged.ScreenRecorderEngine
-            fun quoted(s: String) = "'" + s.replace("'", "'\\''") + "'"
-            val custom = _state.value.replayClipsDir
-            if (custom != null && privileged.shell("[ -d ${quoted(replayClipsPath(custom))} ] && echo yes || echo no")?.trim() == "no") {
-                prefs.edit().remove("replay_clips_dir").apply()
-                _state.value = _state.value.copy(replayClipsDir = null)
+            val volumes = jr.brian.commandpannel.privileged.ReplayVolumes
+            val custom = _state.value.replayClipsLocation
+            val resolved = jr.brian.commandpannel.system.ReplayStorage.resolve(app, custom)
+            if (custom != null && !resolved.fellBack &&
+                privileged.shell("[ -d ${volumes.shellQuote(custom.path)} ] && echo yes || echo no")?.trim() == "no"
+            ) {
+                prefs.edit().remove(jr.brian.commandpannel.replay.studio.ClipRepository.PREF_CLIPS_DIR).apply()
+                _state.value = withReplayLocation(_state.value, null)
             }
-            val relative = _state.value.replayClipsDir ?: engine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR
-            privileged.shell("mkdir -p ${quoted(replayClipsPath(relative))}")
-            val uri = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:$relative")
+            val loc = if (resolved.fellBack) resolved.location
+                else _state.value.replayClipsLocation ?: jr.brian.commandpannel.privileged.ReplayClipsLocation.DEFAULT
+            privileged.shell(volumes.mkdirsCommand(loc.root, loc.path))
+            val docVolume = loc.volume ?: volumes.PRIMARY
+            val uri = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "$docVolume:${loc.relativeDir}")
             val intent = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, android.provider.DocumentsContract.Document.MIME_TYPE_DIR)
                 // No URI grant flag: the app holds no permission on this document, so asking to pass one on throws.
@@ -392,19 +425,29 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * A folder picked in the system folder picker; folders clips can't go in are refused with a message shown under
-     * Save location (#74), with its own wording for an SD card.
+     * A folder picked in the system folder picker. Internal storage and (#75) a mounted, writable SD card or USB drive
+     * are accepted; anything else is refused with a message shown under Save location (#74).
      */
     fun onReplayFolderPicked(uri: android.net.Uri) {
-        val engine = jr.brian.commandpannel.privileged.ScreenRecorderEngine
+        val volumes = jr.brian.commandpannel.privileged.ReplayVolumes
         val docId = runCatching { android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
-        val dir = docId?.let(engine::replayClipsDirFromTreeDocId)
-        if (dir == null) {
-            val why = if (docId != null && engine.isOtherVolumeTreeDocId(docId)) R.string.msg_replay_folder_sd_card
-                else R.string.msg_replay_folder_invalid
-            _state.value = _state.value.copy(replayFolderMessage = app.getString(why))
+        // Only the system's storage provider names real volumes (Downloads, Drive and others use their own ids).
+        val storage = uri.authority == "com.android.externalstorage.documents"
+        val pick = if (docId != null && storage) volumes.fromTreeDocId(docId) else jr.brian.commandpannel.privileged.ReplayVolumes.Pick.Invalid
+        val location = (pick as? jr.brian.commandpannel.privileged.ReplayVolumes.Pick.Ok)?.location
+        val why = when {
+            location == null -> R.string.msg_replay_folder_invalid
+            location.volume == null -> null
+            else -> when (jr.brian.commandpannel.system.ReplayStorage.state(app, location.volume)) {
+                jr.brian.commandpannel.privileged.ReplayVolumes.State.MOUNTED -> null
+                jr.brian.commandpannel.privileged.ReplayVolumes.State.READ_ONLY -> R.string.msg_replay_folder_card_read_only
+                jr.brian.commandpannel.privileged.ReplayVolumes.State.MISSING -> R.string.msg_replay_folder_card_missing
+            }
+        }
+        if (location == null || why != null) {
+            _state.value = _state.value.copy(replayFolderMessage = app.getString(why ?: R.string.msg_replay_folder_invalid))
         } else {
-            setReplayClipsDir(dir)
+            setReplayClipsLocation(location)
         }
     }
 
@@ -418,8 +461,7 @@ class SettingsViewModel @Inject constructor(
                 val result = i.getStringExtra(AssistantService.EXTRA_REPLAY_RESULT).orEmpty()
                 val msg = if (result.startsWith("error:")) app.getString(R.string.msg_save_failed, result.removePrefix("error:")) else app.getString(R.string.msg_saved_to, result)
                 // The service drops a custom folder that was deleted, so re-read it to show where clips go now.
-                val dir = jr.brian.commandpannel.privileged.ScreenRecorderEngine.normalizeReplayClipsRelativeDir(prefs.getString("replay_clips_dir", null))
-                _state.value = _state.value.copy(replayMessage = msg, replayClipsDir = dir)
+                _state.value = withReplayLocation(_state.value, readReplayClipsLocation()).copy(replayMessage = msg)
                 runCatching { c.unregisterReceiver(this) }
             }
         }, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
@@ -1732,7 +1774,3 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-/** Full path of the clips folder for a [SettingsState.replayClipsDir] value. */
-internal fun replayClipsPath(relative: String?): String =
-    "${jr.brian.commandpannel.privileged.ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/" +
-        (relative ?: jr.brian.commandpannel.privileged.ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR)

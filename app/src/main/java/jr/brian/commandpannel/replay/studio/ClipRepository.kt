@@ -6,7 +6,9 @@ import android.net.Uri
 import android.util.Log
 import jr.brian.commandpannel.BuildConfig
 import jr.brian.commandpannel.privileged.PrivilegedAccess
-import jr.brian.commandpannel.privileged.ScreenRecorderEngine
+import jr.brian.commandpannel.privileged.ReplayClipsLocation
+import jr.brian.commandpannel.privileged.ReplayVolumes
+import jr.brian.commandpannel.system.ReplayStorage
 import jr.brian.commandpannel.system.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
@@ -33,17 +35,11 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
     private val readDir = File(app.cacheDir, READ_DIR)
     private val decodeDir = File(app.cacheDir, DECODE_DIR)
 
-    /** Absolute folders searched: the default, the current custom one, and every folder a clip was saved to. */
-    fun searchDirs(): List<String> {
-        val relative = buildSet {
-            add(ScreenRecorderEngine.DEFAULT_REPLAY_CLIPS_RELATIVE_DIR)
-            ScreenRecorderEngine.normalizeReplayClipsRelativeDir(prefs.getString(PREF_CLIPS_DIR, null))?.let(::add)
-            prefs.getStringSet(PREF_KNOWN_DIRS, emptySet()).orEmpty().forEach { raw ->
-                ScreenRecorderEngine.normalizeReplayClipsRelativeDir(raw)?.let(::add)
-            }
-        }
-        return relative.map { "${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/$it" }
-    }
+    /**
+     * Absolute folders searched: the default, the current custom one, and every folder a clip was saved to, on
+     * internal storage or a removable volume (#75; one that isn't mounted is skipped by the listing's `[ -d ]`).
+     */
+    fun searchDirs(): List<String> = searchDirs(prefs.getString(PREF_CLIPS_DIR, null), prefs.getStringSet(PREF_KNOWN_DIRS, emptySet()).orEmpty())
 
     /**
      * Every clip, newest first, from one shell call over [searchDirs] and their Top/Bottom/Both subfolders. `null`
@@ -158,11 +154,7 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
     private fun canRead(file: File): Boolean =
         runCatching { FileInputStream(file).use { it.read() >= 0 } }.getOrDefault(false)
 
-    private fun isDeletablePath(path: String): Boolean {
-        if (!path.startsWith("${ScreenRecorderEngine.REPLAY_STORAGE_ROOT}/")) return false
-        if (path.split('/').any { it == ".." || it == "." }) return false
-        return parseReplayClip(path.substringAfterLast('/'), path.substringBeforeLast('/')) != null
-    }
+    private fun isDeletablePath(path: String): Boolean = isDeletableClipPath(path, ReplayStorage.mountedIds(app))
 
     /** Single-quotes [s] for the shell; folder names may contain an apostrophe. */
     private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
@@ -191,12 +183,32 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
         /** Caps concurrent decodes across instances: a grid asks for many clips at once and each holds a decoder. */
         private val decodeSlots = Semaphore(2)
 
-        /** Remembers [relativeDir] as a clips folder so its clips stay listed after the user picks another one. */
-        fun rememberDir(prefs: SharedPreferences, relativeDir: String) {
-            val dir = ScreenRecorderEngine.normalizeReplayClipsRelativeDir(relativeDir) ?: return
+        /** Remembers [location] as a clips folder so its clips stay listed after the user picks another one. */
+        fun rememberDir(prefs: SharedPreferences, location: ReplayClipsLocation) {
+            val dir = location.encode()
             val known = prefs.getStringSet(PREF_KNOWN_DIRS, emptySet()).orEmpty()
             if (dir in known) return
             prefs.edit().putStringSet(PREF_KNOWN_DIRS, known + dir).apply()
+        }
+
+        /**
+         * [searchDirs]' rules, pure: TCP Clips, the [current] folder pref and every [known] one, each parsed with
+         * [ReplayClipsLocation.parse] (plain folders are internal storage), as absolute paths without duplicates.
+         */
+        fun searchDirs(current: String?, known: Set<String>): List<String> = buildList {
+            add(ReplayClipsLocation.DEFAULT)
+            ReplayClipsLocation.parse(current)?.let(::add)
+            known.sorted().forEach { raw -> ReplayClipsLocation.parse(raw)?.let(::add) }
+        }.map { it.path }.distinct()
+
+        /**
+         * Whether root may delete [path]: a clip file name directly under a clips folder on internal storage or on one
+         * of the [mounted] removable volumes, with no `.` or `..` segments. Pure.
+         */
+        fun isDeletableClipPath(path: String, mounted: Collection<String>): Boolean {
+            if (ReplayVolumes.storageRoots(mounted).none { path.startsWith("$it/") }) return false
+            if (path.split('/').any { it == ".." || it == "." }) return false
+            return parseReplayClip(path.substringAfterLast('/'), path.substringBeforeLast('/')) != null
         }
     }
 }

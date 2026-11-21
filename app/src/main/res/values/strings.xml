@@ -258,6 +258,9 @@
     <string name="settings_replay_location_custom">Choose folder…</string>
     <string name="settings_replay_location_open">Open folder</string>
     <string name="settings_replay_location_current">Saving to %1$s, in Top, Bottom and Both folders</string>
+    <string name="settings_replay_location_current_card">Saving to %1$s on %2$s, in Top, Bottom and Both folders</string>
+    <string name="settings_replay_location_card_fallback">the SD card (%1$s)</string>
+    <string name="settings_replay_location_card_missing">The card with your clips folder isn\'t available, so clips are saved to TCP Clips on internal storage until it\'s back.</string>
     <string name="settings_replay_double_press">Double-press AYN to clip</string>
     <string name="settings_replay_double_press_desc">Double-press the AYN button to save a clip. If the buffer is off, the first double press turns it on. Single presses wait a moment before opening the panel.</string>
     <string name="replay_quality_high">High</string>
@@ -832,8 +835,10 @@
     <string name="msg_replay_off">Replay buffer off</string>
     <string name="msg_replay_next_arm">Takes effect next time the buffer arms</string>
     <string name="msg_replay_folder_open_failed">No file manager could open the clips folder</string>
-    <string name="msg_replay_folder_sd_card">Clips can\'t be saved to the SD card yet. Pick a folder on internal storage.</string>
-    <string name="msg_replay_folder_invalid">That folder can\'t hold clips. Pick a folder on internal storage, outside Android.</string>
+    <string name="msg_replay_folder_invalid">That folder can\'t hold clips. Pick a folder outside Android, on internal storage or an SD card.</string>
+    <string name="msg_replay_folder_card_missing">That card isn\'t available right now. Put it back in, or pick another folder.</string>
+    <string name="msg_replay_folder_card_read_only">That card is read-only. Pick a folder on internal storage or another card.</string>
+    <string name="msg_replay_saved_to_internal">The card with your clips folder isn\'t available, so this clip went to TCP Clips on internal storage.</string>
     <string name="msg_replay_rearming">Restarting the buffer with the new setting…</string>
     <string name="msg_replay_rearmed">Buffer restarted with the new setting</string>
     <string name="msg_replay_rearm_failed">Couldn\'t restart the buffer. Turn it off and on to try again.</string>

@@ -37,7 +37,7 @@ object ScreenRecorderEngine {
     const val REPLAY_STORAGE_ROOT = "/storage/emulated/0"
     const val DEFAULT_REPLAY_CLIPS_RELATIVE_DIR = "TCP Clips"
     const val REPLAY_CLIPS_DIR = "$REPLAY_STORAGE_ROOT/$DEFAULT_REPLAY_CLIPS_RELATIVE_DIR"
-    private const val MAX_REPLAY_DIR_DEPTH = 8
+    internal const val MAX_REPLAY_DIR_DEPTH = 8
     private const val MAX_REPLAY_DIR_SEGMENT_LENGTH = 64
     private val REPLAY_DIR_FORBIDDEN_CHARS = Regex("[\\\\:*?\"<>|\\u0000-\\u001F]")
     val REPLAY_WINDOW_OPTIONS_SECONDS = listOf(15, 30, 60, 90)
@@ -218,33 +218,14 @@ object ScreenRecorderEngine {
         else -> "Both"
     }
 
-    private const val PRIMARY_VOLUME = "primary"
-
     /**
-     * Whether a picked folder's tree document id (`"1A2B-3C4D:DCIM"`) is on another storage volume than internal storage
-     * (an SD card or USB drive), which clips can't be saved to yet (#74). The Documents shortcut (`"home:"`) is internal
-     * storage, and an id with no volume isn't a storage folder at all; neither counts.
+     * Confined to a [normalizeReplayClipsRelativeDir]-valid folder with a strict leaf name, on internal shared storage
+     * or (#75) on one of [mountedVolumes], the removable volumes mounted and writable right now
+     * ([ReplayVolumes.storageRoots] keeps only valid ids). Every root-run write and delete of a clip checks this first.
      */
-    fun isOtherVolumeTreeDocId(docId: String): Boolean {
-        val volume = docId.substringBefore(':', missingDelimiterValue = "")
-        return volume.isNotBlank() && volume != PRIMARY_VOLUME && volume != "home"
-    }
-
-    /**
-     * The clips folder for a folder picked in the system picker, from its tree document id (`"primary:Movies/Clips"`),
-     * or `null` if clips can't go there: another volume (SD card), the storage root, anything
-     * [normalizeReplayClipsRelativeDir] rejects, or too deep to fit the per-screen subfolder.
-     */
-    fun replayClipsDirFromTreeDocId(docId: String): String? {
-        val volume = docId.substringBefore(':', missingDelimiterValue = "")
-        if (volume != PRIMARY_VOLUME) return null
-        val dir = normalizeReplayClipsRelativeDir(docId.substringAfter(':')) ?: return null
-        return dir.takeIf { it.split('/').size < MAX_REPLAY_DIR_DEPTH }
-    }
-
-    /** Confined to a [normalizeReplayClipsRelativeDir]-valid folder on internal shared storage with a strict leaf name. */
-    internal fun isValidReplayClipOutputPath(path: String): Boolean {
-        val root = PrivilegedHelperMain.DEFAULT_STORAGE_ROOTS.firstOrNull { path.startsWith("$it/") } ?: return false
+    internal fun isValidReplayClipOutputPath(path: String, mountedVolumes: Collection<String> = emptySet()): Boolean {
+        val roots = ReplayVolumes.storageRoots(mountedVolumes)
+        val root = roots.firstOrNull { path.startsWith("$it/") } ?: return false
         val relative = path.removePrefix("$root/")
         val leaf = relative.substringAfterLast('/')
         if (!REPLAY_CLIP_NAME_REGEX.matches(leaf)) return false
@@ -255,6 +236,7 @@ object ScreenRecorderEngine {
             path = path,
             subDirs = normalizedDir.split('/'),
             requiredExtension = ".mp4",
+            storageRoots = roots,
         )
     }
 }

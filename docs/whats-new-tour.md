@@ -31,10 +31,10 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: none
   - Callout: The Background Image tile is now called Background, since it turns a gradient on and off too. Find it in the panel's Quick Tiles.
 
-- **Clearer clips folder message** (#74)
-  - Where: Replay Buffer, Save location card
-  - Spot: none
-  - Callout: Picking a clips folder on the SD card now says plainly that it isn't supported yet, right under Save location.
+- **Save clips to the SD card** (#75, replaces the #74 message)
+  - Where: Replay Buffer, Save location (Choose folder…)
+  - Spot: REPLAY
+  - Callout: Choose folder now takes a folder on your SD card or a USB drive, so clips stop filling internal storage. If the card is out, clips go to TCP Clips until it's back.
 
 - **Smoother GIF backgrounds** (#73)
   - Where: panel: an animated GIF or WebP background

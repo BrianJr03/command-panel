@@ -249,8 +249,10 @@ class ClipTrimmer(
      * free.
      */
     private fun place(clip: ReplayClip, tmp: File): String? {
+        // A trim goes next to its clip, which may be on a mounted SD card (#75).
+        val mounted = jr.brian.commandpannel.system.ReplayStorage.mountedIds(app)
         val base = ScreenRecorderEngine.replayTrimClipPath(clip.path)
-            ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it) }
+            ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
             ?: throw PlaceError(TrimError.INVALID_PATH)
         val parent = shellQuote(clip.dir)
         // Root lists the folder (the app can't always see it), the same way a save picks `_2`.
@@ -259,7 +261,7 @@ class ClipTrimmer(
             ?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
             ?: return null
         val path = ScreenRecorderEngine.pickFreeReplayClipPath(base, taken)
-            ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it) }
+            ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
             ?: throw PlaceError(TrimError.INVALID_PATH)
         val dst = shellQuote(path)
         // `[ ! -e ]` keeps a file that appeared since the listing; this never overwrites anything.

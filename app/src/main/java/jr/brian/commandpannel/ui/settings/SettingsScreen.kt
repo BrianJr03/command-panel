@@ -1159,15 +1159,17 @@ private fun ReplayBufferCard(
             if (state.replayFolderMessage != null) runCatching { chooseFolderFocus.requestFocus() }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Chip(stringResource(R.string.settings_replay_location_default), selected = state.replayClipsDir == null) { vm.setReplayClipsDir(null) }
+            Chip(stringResource(R.string.settings_replay_location_default), selected = state.replayClipsLocation == null) { vm.setReplayClipsLocation(null) }
             Box(Modifier.focusRequester(chooseFolderFocus)) {
-                Chip(stringResource(R.string.settings_replay_location_custom), selected = state.replayClipsDir != null) { pickFolder.launch(null) }
+                Chip(stringResource(R.string.settings_replay_location_custom), selected = state.replayClipsLocation != null) { pickFolder.launch(null) }
             }
             Chip(stringResource(R.string.settings_replay_location_open)) { vm.openReplayClipsFolder() }
         }
         state.replayFolderMessage?.let { Spacer(Modifier.height(8.dp)); InfoLine(it, p.danger) }
         Spacer(Modifier.height(8.dp))
-        InfoLine(stringResource(R.string.settings_replay_location_current, replayClipsPath(state.replayClipsDir)))
+        InfoLine(state.replayLocationLine)
+        // The chosen card was removed (#75): say where clips go meanwhile. The choice comes back with the card.
+        if (state.replayClipsCardMissing) { Spacer(Modifier.height(6.dp)); InfoLine(stringResource(R.string.settings_replay_location_card_missing), p.danger) }
         Spacer(Modifier.height(12.dp))
         AccentButton(stringResource(R.string.settings_replay_save_now), enabled = state.replayEnabled, onClick = vm::saveReplayClip)
         state.replayMessage?.let { Spacer(Modifier.height(10.dp)); InfoLine(it) }
