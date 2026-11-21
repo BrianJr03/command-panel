@@ -1923,6 +1923,8 @@ private fun Experimental(state: SettingsState, vm: SettingsViewModel) {
         // Where Appearance's link lands.
         Modifier.jumpTarget(TourSpot.ANIMATED_BACKGROUNDS),
     )
+    // What moving backgrounds cost (#80), right under the switch.
+    BackgroundPerformanceCard()
 }
 
 // ---- Diagnostics ----
