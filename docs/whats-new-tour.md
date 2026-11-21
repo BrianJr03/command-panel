@@ -24,7 +24,7 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 - **Performance details for animated backgrounds** (#80)
   - Where: Experimental, Performance row under the Animated backgrounds switch
   - Spot: ANIMATED_BACKGROUNDS
-  - Callout: Open Performance under Animated backgrounds to see what a moving background costs. On the Thor a moving gradient uses about as much as an animated GIF, and only while the panel is open.
+  - Callout: Open Performance under Animated backgrounds to see what a moving background costs. On the AYN Thor Max, a moving gradient uses about as much as an animated GIF, and only while the panel is open.
 
 - **Background tile** (#72)
   - Where: panel: Background tile (was Background Image)

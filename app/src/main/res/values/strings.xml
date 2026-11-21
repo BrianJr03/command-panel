@@ -441,7 +441,7 @@
     <string name="settings_performance_value">%1$d%%</string>
     <string name="settings_performance_chart_item">%1$s, about %2$d%%.</string>
     <string name="settings_performance_chart_desc">%1$s. %2$s</string>
-    <string name="settings_performance_note">Measured on the AYN Thor. Your numbers may vary.</string>
+    <string name="settings_performance_note">Measured on the AYN Thor Max. Your numbers may vary.</string>
     <string name="settings_performance_fact_panel">Backgrounds only move while the panel is open. They stop when the panel hides, the screen turns off or the lid closes.</string>
     <string name="settings_performance_fact_cap">Capped at 30 frames per second, and slower when the Thor gets warm.</string>
     <string name="settings_performance_fact_still">A gradient set to Still, or any background while this is off, costs the same as a still image.</string>
