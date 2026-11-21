@@ -215,8 +215,12 @@ internal fun SettingsContent(
             }.requestFocus()
         }
     }
-    // Showing a section (picked on the rail, by the tour, or by the onboarding's theme step) opens its group.
-    LaunchedEffect(nav) { RailGroup.of(nav.category)?.let { vm.setRailGroupExpanded(it, true) } }
+    // Showing a section (picked on the rail, by the tour, or by the onboarding's theme step) opens its group, which
+    // closes any other (#82); showing General, which sits outside every group, closes them all.
+    LaunchedEffect(nav) {
+        val group = RailGroup.of(nav.category)
+        if (group != null) vm.setRailGroupExpanded(group, true) else vm.collapseRailGroups()
+    }
     // Re-detect Better Dual Screen Assistant and the other build whenever the companion comes to the front (e.g. back
     // from BDSA's app).
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -1046,11 +1050,6 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         },
         state.replaceStock, vm::setReplaceStock,
         Modifier.tourTarget(TourSpot.REPLACE_STOCK),
-    )
-    SwitchCard(
-        stringResource(R.string.settings_rail_one_open),
-        stringResource(R.string.settings_rail_one_open_desc),
-        state.railOneOpen, { vm.setRailOneOpen(it, keep = null) },
     )
     SwitchCard(
         stringResource(R.string.settings_battery_estimate),

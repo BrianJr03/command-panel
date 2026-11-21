@@ -148,26 +148,16 @@ object RailExpanded {
 
     fun encode(groups: Set<RailGroup>): String = RailGroup.entries.filter { it in groups }.joinToString(",") { it.key }
 
-    /** The General switch for [toggle]'s one-open rule (#82); on by default. */
-    const val KEY_ONE_OPEN = "rail_one_group_open"
-
     /**
-     * The open groups after opening or closing [group]. With [oneOpen], opening a group closes every other one;
-     * closing only ever removes [group].
+     * The open groups after opening or closing [group] (#82): only one group is open at a time, so opening one closes
+     * the rest; closing only ever removes [group].
      */
-    fun toggle(current: Set<RailGroup>, group: RailGroup, expanded: Boolean, oneOpen: Boolean): Set<RailGroup> = when {
-        !expanded -> current - group
-        oneOpen -> setOf(group)
-        else -> current + group
-    }
+    fun toggle(current: Set<RailGroup>, group: RailGroup, expanded: Boolean): Set<RailGroup> =
+        if (expanded) setOf(group) else current - group
 
-    /**
-     * [groups] cut down to one open group when [oneOpen] (a pref saved with several open, or the switch just turned
-     * on): [keep] if it's open, else the first open one in rail [order].
-     */
-    fun limit(groups: Set<RailGroup>, oneOpen: Boolean, order: List<RailGroup> = RailGroup.entries, keep: RailGroup? = null): Set<RailGroup> =
-        if (!oneOpen || groups.size <= 1) groups
-        else setOf(keep?.takeIf { it in groups } ?: order.first { it in groups })
+    /** [groups] cut down to one open group (a save from before #82 can hold several): the first in rail [order]. */
+    fun limit(groups: Set<RailGroup>, order: List<RailGroup> = RailGroup.entries): Set<RailGroup> =
+        if (groups.size <= 1) groups else setOf(order.first { it in groups })
 }
 
 /** The rows on screen, top to bottom: sections of collapsed groups aren't there, so focus can't land on them. */

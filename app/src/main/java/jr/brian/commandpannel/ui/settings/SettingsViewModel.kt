@@ -152,8 +152,6 @@ data class SettingsState(
     val railLayout: RailLayout = RailLayout.DEFAULT,
     /** The rail groups that are open. */
     val railExpanded: Set<RailGroup> = emptySet(),
-    /** General's "One rail group open at a time" (#82): opening a group closes the others. */
-    val railOneOpen: Boolean = true,
     /** Which "new" bubbles show on the rail and in the panes. */
     val newBadges: NewBadgeState = NewBadgeState(),
     /** TCP Save Clip (the Replay Buffer shortcut): installed, and paired with this build. */
@@ -287,9 +285,8 @@ class SettingsViewModel @Inject constructor(
         ),
         railLayout = RailLayout.read { prefs.getString(it, null) },
         railExpanded = RailLayout.read { prefs.getString(it, null) }.let { layout ->
-            RailExpanded.limit(RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)), railOneOpen(), layout.groups)
+            RailExpanded.limit(RailExpanded.parse(prefs.getString(RailExpanded.KEY, null)), layout.groups)
         },
-        railOneOpen = railOneOpen(),
         newBadges = loadNewBadges(),
     )
 
@@ -1065,22 +1062,19 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(newBadges = badges.copy(seen = seen))
     }
 
-    private fun railOneOpen(): Boolean = prefs.getBoolean(RailExpanded.KEY_ONE_OPEN, true)
-
-    /** Opens or closes a rail group, and remembers it. With one group open at a time (#82), opening closes the rest. */
+    /** Opens or closes a rail group, and remembers it. Only one group is open at a time (#82), so opening closes the rest. */
     fun setRailGroupExpanded(group: RailGroup, expanded: Boolean) {
-        val now = RailExpanded.toggle(_state.value.railExpanded, group, expanded, _state.value.railOneOpen)
+        val now = RailExpanded.toggle(_state.value.railExpanded, group, expanded)
+        setRailExpanded(now)
+    }
+
+    /** Closes every rail group (#82: showing General does this). */
+    fun collapseRailGroups() = setRailExpanded(emptySet())
+
+    private fun setRailExpanded(now: Set<RailGroup>) {
         if (now == _state.value.railExpanded) return
         prefs.edit().putString(RailExpanded.KEY, RailExpanded.encode(now)).apply()
         _state.value = _state.value.copy(railExpanded = now)
-    }
-
-    /** General's "One rail group open at a time" (#82). Turning it on keeps [keep] (the shown section's group) open. */
-    fun setRailOneOpen(enable: Boolean, keep: RailGroup?) {
-        prefs.edit().putBoolean(RailExpanded.KEY_ONE_OPEN, enable).apply()
-        val now = RailExpanded.limit(_state.value.railExpanded, enable, _state.value.railLayout.groups, keep)
-        if (now != _state.value.railExpanded) prefs.edit().putString(RailExpanded.KEY, RailExpanded.encode(now)).apply()
-        _state.value = _state.value.copy(railOneOpen = enable, railExpanded = now)
     }
 
     fun setQuickLaunchShowApp(enable: Boolean) {

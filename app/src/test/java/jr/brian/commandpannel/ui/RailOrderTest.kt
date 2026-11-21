@@ -231,31 +231,25 @@ class RailOrderTest {
     // ---- one group open at a time (#82) ----
 
     @Test
-    fun `opening a group closes the others when one at a time is on`() {
-        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = true, oneOpen = true))
-        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL, EXTRAS), LOOK, expanded = true, oneOpen = true))
-        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = true, oneOpen = true))
+    fun `opening a group closes the others`() {
+        assertEquals(setOf(LOOK), RailExpanded.toggle(emptySet(), LOOK, expanded = true))
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = true))
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(PANEL, EXTRAS), LOOK, expanded = true))
+        assertEquals(setOf(LOOK), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = true))
         // Closing only ever removes that group.
-        assertEquals(emptySet<RailGroup>(), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = false, oneOpen = true))
-        assertEquals(setOf(PANEL), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = false, oneOpen = true))
+        assertEquals(emptySet<RailGroup>(), RailExpanded.toggle(setOf(LOOK), LOOK, expanded = false))
+        assertEquals(setOf(PANEL), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = false))
     }
 
     @Test
-    fun `with one at a time off groups open side by side`() {
-        assertEquals(setOf(PANEL, LOOK), RailExpanded.toggle(setOf(PANEL), LOOK, expanded = true, oneOpen = false))
-        assertEquals(setOf(PANEL), RailExpanded.toggle(setOf(PANEL, LOOK), LOOK, expanded = false, oneOpen = false))
+    fun `a save with several open groups is cut to one`() {
+        // Saves from before #82 can hold several; the first open one in rail order stays.
+        assertEquals(setOf(PANEL), RailExpanded.limit(setOf(EXTRAS, PANEL)))
+        assertEquals(setOf(EXTRAS), RailExpanded.limit(setOf(EXTRAS, PANEL), order = listOf(ADVANCED, EXTRAS, PANEL, LOOK)))
+        assertEquals(setOf(LOOK), RailExpanded.limit(setOf(LOOK)))
+        assertEquals(emptySet<RailGroup>(), RailExpanded.limit(emptySet()))
     }
 
-    @Test
-    fun `several saved open groups are cut to one`() {
-        // An older save (or the switch just turned on) keeps the first open group in rail order, or the one asked for.
-        assertEquals(setOf(PANEL), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true))
-        assertEquals(setOf(EXTRAS), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true, order = listOf(ADVANCED, EXTRAS, PANEL, LOOK)))
-        assertEquals(setOf(EXTRAS), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = true, keep = EXTRAS))
-        assertEquals(setOf(PANEL), RailExpanded.limit(setOf(PANEL), oneOpen = true, keep = LOOK))
-        assertEquals(setOf(EXTRAS, PANEL), RailExpanded.limit(setOf(EXTRAS, PANEL), oneOpen = false))
-        assertEquals(emptySet<RailGroup>(), RailExpanded.limit(emptySet(), oneOpen = true))
-    }
     // ---- moving groups (#30) ----
 
     @Test
