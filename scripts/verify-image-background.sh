@@ -23,6 +23,9 @@
 #     doesn't repaint per frame, it plays at 20 fps or more on the surface, it leaves the surface as the hide starts
 #     (before the panel goes away) and no surface layer is left while hidden; per-thread CPU (top -H) and
 #     SurfaceFlinger's CPU for a GIF and a PNG go to numbers.txt;
+#   - full color on the surface (#73): a dark gray-ramp GIF at the panel's size plays on its surface; SurfaceFlinger
+#     reports the surface's buffer as 8888 (not RGB_565), and a row of the shot keeps about 60 levels (565 bands to
+#     about 8 to 16);
 #   - limits: an animation over twice the screen is refused; a still photo over it is downscaled on import, to the
 #     smallest size that still covers twice the screen;
 #   - tile (#58): off shows the backdrop (red gone) and stops a GIF; on brings the image back; the pref flips;
@@ -165,6 +168,89 @@ measure "GIF hidden"
 check "no frames while hidden (${LAST_FRAMES:-?} in 5 s)" test "${LAST_FRAMES:-999}" -le 2
 no_restart() { ! log_has "animation started"; }
 check "no decoding while hidden (no new start)" no_restart
+
+# --- #73: the GIF's surface keeps full color --------------------------------------------------------------------------
+
+# SurfaceView maps PixelFormat.OPAQUE to RGB_565, which bands smooth areas; the player's surface asks for RGBX_8888.
+# Test GIF: a dark, slow gray ramp at the panel's own size (so the surface isn't scaled), 0x10 to 0x4F across the
+# width (64 levels), exact colors (no palette dithering), with a small box in frame 2 so it imports as an animation.
+# On an 8888 surface a row of the shot keeps about 60 red levels; on a 565 one only about 8 to 16.
+make_ramp() {
+  local f="$OUT_DIR/images/ramp.gif"; mkdir -p "$OUT_DIR/images"
+  "$FFMPEG" -v error -y -f lavfi \
+    -i "nullsrc=s=1240x1080:r=2:d=1,format=rgb24,geq=r='16+floor(X*64/W)':g='16+floor(X*64/W)':b='16+floor(X*64/W)',drawbox=x=0:y=0:w=8:h=8:color=white:t=fill:enable='eq(n,1)'" \
+    -filter_complex "[0]split[a][b];[a]palettegen=max_colors=256:reserve_transparent=0:stats_mode=full[p];[b][p]paletteuse=dither=none" \
+    -loop 0 "$f" && adb push "$f" "$DEV_DIR/ramp.gif" >/dev/null && sh_dev chmod 644 "$DEV_DIR/ramp.gif"
+}
+# Distinct red values along one row near the bottom edge of shot $1 (under the panel's cards, 40 px in from the sides).
+red_levels() {
+  "$FFMPEG" -v error -i "$OUT_DIR/$1.png" -vf "crop=iw-80:1:40:ih-6,format=gbrp,extractplanes=r" -f rawvideo -pix_fmt gray - |
+    od -An -tu1 -v | tr -s ' ' '\n' | grep -v '^$' | sort -un | wc -l | xargs
+}
+# The formats of the debug app's background surface in SurfaceFlinger's layer dump: for each of its layers that hangs
+# off a SurfaceView ("parent=SurfaceView[]#..." or a "SurfaceView[](BLAST)" name) and holds a buffer, the layer's
+# format and the active buffer's format (last field of "activeBuffer=[WxH:stride,<fmt>]"), as "layer|buffer". The Thor
+# (Android 13) prints them as text, e.g. "defaultPixelFormat=Unknown/None" and "activeBuffer=[1240x1080:...,RGBx_8888]";
+# older builds print PixelFormat codes ("format=   2", buffer "  2"). Both forms are kept as printed.
+surface_formats() {
+  local uid; uid="$(pkg_uid "$PKG")"; [ -n "$uid" ] || return 0
+  sh_dev dumpsys SurfaceFlinger | surface_formats_of "$uid"
+}
+# [surface_formats]' parser, on a dump given on stdin, for the layers of uid $1.
+surface_formats_of() {
+  awk -v u="uid=$1" '
+    function flush() { if (mine && sv && buf != "") printf "%s|%s ", (fmt == "" ? "?" : fmt), buf }
+    /^\+ / { flush(); mine = ($NF == u); sv = ($0 ~ /SurfaceView\[\]\(BLAST\)/); fmt = ""; buf = ""; next }
+    /parent=SurfaceView\[\]#/ { sv = 1 }
+    /defaultPixelFormat=/ { if (match($0, /defaultPixelFormat=[^ ,]+/)) fmt = substr($0, RSTART + 19, RLENGTH - 19) }
+    fmt == "" && /[ ,]format= *[0-9]+/ { if (match($0, /[ ,]format= *[0-9]+/)) { t = substr($0, RSTART, RLENGTH); sub(/.*format= */, "", t); fmt = t } }
+    /activeBuffer=\[/ { if (match($0, /activeBuffer=\[[^]]*\]/)) { t = substr($0, RSTART, RLENGTH); n = split(t, q, ","); b = q[n]; gsub(/[] ]/, "", b); if (b != "" && t !~ /\[ *0x *0:/) buf = b } }
+    END { flush() }'
+}
+# A pixel format, as text or a PixelFormat code, as 8888 (RGBA_8888, RGBx_8888, RGBX_8888, BGRA_8888, B8888; codes 1,
+# 2, 5), 565 (RGB_565, B565; code 4) or other.
+format_class() {
+  case "$1" in
+    *565*|4) echo 565 ;;
+    *8888*|1|2|5) echo 8888 ;;
+    *) echo other ;;
+  esac
+}
+# Every buffer in [surface_formats]' output ($1) is 8888, and there is at least one.
+buffers_8888() {
+  local entry n=0
+  for entry in $1; do
+    [ "$(format_class "${entry#*|}")" = 8888 ] || return 1
+    n=$((n + 1))
+  done
+  [ "$n" -gt 0 ]
+}
+
+step "GIF surface keeps full color (#73)"
+check "ramp GIF made and pushed" make_ramp
+name="$(seed ramp.gif)"
+check "ramp.gif imported as an animation ($name)" log_has "animated=true"
+log_clear
+show_panel
+if wait_for 5 'log_has "surface attached"'; then
+  pass "the ramp GIF is on its surface"
+  sleep 1
+  formats="$(surface_formats)"
+  note "background surface formats (layer|buffer): ${formats:-none found}"
+  if [ -z "$formats" ]; then
+    skip "no buffer format found in the SurfaceFlinger dump (check the raw dump by hand)"
+    sh_dev dumpsys SurfaceFlinger > "$OUT_DIR/surfaceflinger.txt"
+  else
+    check "the surface's buffer is 8888, not RGB_565 ($formats)" buffers_8888 "$formats"
+  fi
+  shot ramp-surface
+  levels="$(red_levels ramp-surface)"
+  note "ramp on the surface: ${levels:-?} red levels along the bottom row (source 60; 565 gives about 8 to 16)"
+  check "no 565 banding on the ramp (${levels:-?} red levels, at least 40)" test "${levels:-0}" -ge 40
+else
+  fail "the ramp GIF never reached its surface (no \"surface attached\")"
+fi
+hide_panel
 
 if $sleep_test; then
   step "GIF stops with the screen off (--sleep)"

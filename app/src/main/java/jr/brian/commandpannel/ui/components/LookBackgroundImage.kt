@@ -129,7 +129,9 @@ fun LookBackgroundImageLayer(image: BackgroundImage?, fillColor: Color, modifier
                 AndroidView(
                     factory = { ctx ->
                         SurfaceView(ctx).apply {
-                            holder.setFormat(PixelFormat.OPAQUE)
+                            // Not OPAQUE: SurfaceView turns that into RGB_565, which bands smooth areas (#73). RGBX
+                            // is opaque 8888; fillColor still fills under the frame's transparent pixels.
+                            holder.setFormat(PixelFormat.RGBX_8888)
                             // The surface is the frame's size; the display scales it to the view.
                             holder.setFixedSize(p.frameSize.width, p.frameSize.height)
                             holder.addCallback(p.surfaceCallback)
