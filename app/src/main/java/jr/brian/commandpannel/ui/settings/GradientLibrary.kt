@@ -1,7 +1,10 @@
 package jr.brian.commandpannel.ui.settings
 
+import android.content.SharedPreferences
+import jr.brian.commandpannel.system.BackgroundSetting
 import jr.brian.commandpannel.system.GradientRules
 import jr.brian.commandpannel.system.GradientSpec
+import jr.brian.commandpannel.system.GradientStore
 
 /** The gradient library's rules (#67), pure so they're unit-tested. The screen is [GradientLibraryScreen]. */
 internal object GradientLibrary {
@@ -55,5 +58,39 @@ internal object GradientLibrary {
         val i = ids.indexOf(deletedId)
         if (i < 0) return null
         return ids.getOrNull(i + 1) ?: ids.getOrNull(i - 1)
+    }
+
+    /**
+     * The editable copy of a built-in preset [preset] (#69), as [usePreset] saves it: the preset's look under [newId],
+     * keeping the preset's name unless a gradient in [existing] already has it (ignoring case), then "<name> copy",
+     * "<name> copy 2", … via [copyName].
+     */
+    fun presetCopy(
+        preset: GradientSpec,
+        existing: List<GradientSpec>,
+        newId: String,
+        copy: (String) -> String,
+        copyN: (String, Int) -> String,
+    ): GradientSpec {
+        val taken = existing.map { it.name.trim().lowercase() }.toSet()
+        val name = preset.name.trim()
+        if (name.isNotEmpty() && name.lowercase() !in taken) return preset.copy(id = newId, name = name.take(GradientRules.MAX_NAME))
+        return duplicate(preset, existing, newId, fallbackName = name, copy = copy, copyN = copyN)
+    }
+
+    /**
+     * "Use" on a preset: saves [presetCopy] at the end of the user's gradients and makes it the active background.
+     * Returns what was saved, or null if the preset isn't a valid gradient (nothing changes then).
+     */
+    fun usePreset(
+        prefs: SharedPreferences,
+        preset: GradientSpec,
+        newId: String,
+        copy: (String) -> String,
+        copyN: (String, Int) -> String,
+    ): GradientSpec? {
+        val saved = GradientStore.save(prefs, presetCopy(preset, GradientStore.all(prefs), newId, copy, copyN)) ?: return null
+        BackgroundSetting.selectGradient(prefs, saved.id)
+        return saved
     }
 }

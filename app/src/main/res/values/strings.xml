@@ -444,7 +444,7 @@
     <string name="gradient_library_now_backdrop">Showing the look\'s backdrop</string>
     <string name="gradient_library_still_hint">Animated backgrounds is off in Experimental, so gradients show still.</string>
     <string name="gradient_library_empty_title">No gradients yet</string>
-    <string name="gradient_library_empty_desc">Gradients you make or save show up here.</string>
+    <string name="gradient_library_empty_desc">Pick a preset above and press Use to save your first one. It shows up here, ready to apply anytime.</string>
     <string name="gradient_new">New gradient</string>
     <string name="gradient_duplicate">Duplicate</string>
     <string name="gradient_showing">Showing now</string>
@@ -459,6 +459,23 @@
     <string name="gradient_motion_breathe">Breathe</string>
     <string name="gradient_motion_hue_cycle">Color cycle</string>
     <string name="gradient_motion_wave">Wave</string>
+    <string name="gradient_presets_title">Presets</string>
+    <string name="gradient_presets_desc">Use one to save your own copy and show it behind the panel.</string>
+    <string name="gradient_preset_use">Use</string>
+    <string name="gradient_preset_match_look">Match my look</string>
+    <string name="gradient_preset_match_glow">My look glow</string>
+    <string name="gradient_preset_aurora">Aurora</string>
+    <string name="gradient_preset_ocean">Deep Ocean</string>
+    <string name="gradient_preset_sunset">Sunset</string>
+    <string name="gradient_preset_synthwave">Synthwave</string>
+    <string name="gradient_preset_ember">Ember</string>
+    <string name="gradient_preset_forest">Forest</string>
+    <string name="gradient_preset_twilight">Twilight</string>
+    <string name="gradient_preset_nebula">Nebula</string>
+    <string name="gradient_preset_lagoon">Lagoon</string>
+    <string name="gradient_preset_frost">Frost</string>
+    <string name="gradient_preset_desert">Desert</string>
+    <string name="gradient_preset_midnight">Midnight</string>
 
     <!-- Overlay looks (proper names) -->
     <string name="look_auto">Auto (stock)</string>
@@ -851,6 +868,7 @@
     <string name="msg_gradient_applied">Gradient applied</string>
     <string name="msg_gradient_duplicated">Copy saved as %1$s</string>
     <string name="msg_gradient_deleted">Gradient deleted</string>
+    <string name="msg_gradient_preset_used">Saved %1$s to your gradients and applied it</string>
     <string name="msg_background_animated_off">Animated GIF and WebP images need Animated backgrounds, in Experimental.</string>
     <string name="font_default_name">Font</string>
     <!-- Companion tour -->

@@ -11,6 +11,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: new: GRADIENTS
   - Callout: Keep your own gradient backgrounds in a library and apply one to show it behind the panel on any look. Your image stays saved, so you can switch back anytime.
 
+- **Built-in gradient presets** (#69)
+  - Where: Appearance, Create your own animated background card, Open gradients (Presets section of the library)
+  - Spot: GRADIENTS
+  - Callout: Not sure where to start? Pick one of a dozen presets, or one that matches your look, and press Use to save your own copy and show it.
+
 ## v0.12.0
 
 - **Custom fan speed** (#59)

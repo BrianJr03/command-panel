@@ -524,6 +524,23 @@ class SettingsViewModel @Inject constructor(
         return saved?.id
     }
 
+    /**
+     * "Use" on a built-in preset (#69): saves an editable copy of [preset] (already named and, for "Match my look",
+     * already in the look's colors) into the user's gradients and shows it. Returns the copy's id, or null.
+     */
+    fun usePreset(preset: jr.brian.commandpannel.system.GradientSpec): String? {
+        val saved = GradientLibrary.usePreset(
+            prefs, preset, java.util.UUID.randomUUID().toString(),
+            copy = { app.getString(R.string.theme_copy_name, it) },
+            copyN = { n, i -> app.getString(R.string.theme_copy_name_n, n, i) },
+        )
+        refreshGradients()
+        _state.value = _state.value.copy(
+            gradientMessage = saved?.let { app.getString(R.string.msg_gradient_preset_used, it.name) },
+        )
+        return saved?.id
+    }
+
     /** Deletes gradient [id]; if it was showing, the panel goes back to the stored image (or the backdrop). */
     fun deleteGradient(id: String) {
         jr.brian.commandpannel.system.GradientStore.delete(prefs, id)

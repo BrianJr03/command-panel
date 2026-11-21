@@ -35,11 +35,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jr.brian.commandpannel.R
+import jr.brian.commandpannel.system.GradientPresets
 import jr.brian.commandpannel.system.GradientRules
 import jr.brian.commandpannel.system.GradientSpec
 import jr.brian.commandpannel.system.GradientStyle
@@ -65,9 +67,15 @@ private const val FOCUS_BACK = "\u0000back"
  * One background shows at a time on every look; applying a gradient keeps the stored image, which "Use my image
  * instead" switches back to.
  *
- * Gamepad: focus starts on the showing gradient's Apply (else the first tile, else Back); the D-pad moves between the
- * header's buttons and the tiles' Apply / Duplicate / Delete; B goes back. Delete takes two presses. When a button
- * disappears (Use my image, a deleted tile) focus moves to its neighbor instead of the screen's first control.
+ * Below the user's gradients (above them while there are none) sit the built-in presets (#69, [GradientPresets]): "Use"
+ * saves an editable copy into the user's gradients and shows it. The two "Match my look" presets take the panel look's
+ * accent and background each time the screen composes.
+ *
+ * Gamepad: focus starts on the showing gradient's Apply (else the first tile, else the first preset's Use, else Back);
+ * the D-pad moves between the header's buttons, the tiles' Apply / Duplicate / Delete and the presets' Use; B goes
+ * back. Delete takes two presses. When a button disappears (Use my image, a deleted tile) focus moves to its neighbor
+ * (the first preset once no tiles are left) instead of the screen's first control. After Use, focus goes to the new
+ * copy's Applied button.
  *
  * [onNew] and [onEdit] are the gradient editor's entry points (#68): null hides them.
  */
@@ -85,17 +93,29 @@ internal fun GradientLibraryScreen(
     val backFocus = remember { FocusRequester() }
     val applyFocus = remember { mutableMapOf<String, FocusRequester>() }
     fun applyRequester(id: String) = applyFocus.getOrPut(id) { FocusRequester() }
-    // A tile (by id) or [FOCUS_BACK] to focus once it's composed.
+    // The presets, named and (for "Match my look") colored by the panel's current look.
+    val (lookColors, _) = rememberOverlayLook(state)
+    val accent = lookColors.accent.toArgb()
+    val lookBg = lookColors.primaryBackground.toArgb()
+    val presetNames = GradientPresets.all.map { stringResource(it.nameRes) }
+    val presets = remember(accent, lookBg, presetNames) {
+        GradientPresets.all.mapIndexed { i, preset -> preset.spec(presetNames[i], accent, lookBg) }
+    }
+    val firstPreset = presets.firstOrNull()?.id
+    // A tile or preset (by id) or [FOCUS_BACK] to focus once it's composed.
     var pendingFocus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         vm.refreshGradients()
         vm.clearGradientMessage()
         val s = vm.state.value
-        pendingFocus = s.activeGradientId?.takeIf { id -> s.gradients.any { it.id == id } } ?: s.gradients.firstOrNull()?.id ?: FOCUS_BACK
+        pendingFocus = s.activeGradientId?.takeIf { id -> s.gradients.any { it.id == id } }
+            ?: s.gradients.firstOrNull()?.id ?: firstPreset ?: FOCUS_BACK
     }
     LaunchedEffect(pendingFocus, state.gradients) {
         val target = pendingFocus ?: return@LaunchedEffect
-        if (target != FOCUS_BACK && state.gradients.none { it.id == target }) return@LaunchedEffect
+        if (target != FOCUS_BACK && state.gradients.none { it.id == target } && presets.none { it.id == target }) {
+            return@LaunchedEffect
+        }
         withFrameNanos { }
         runCatching { (if (target == FOCUS_BACK) backFocus else applyRequester(target)).requestFocus() }
         pendingFocus = null
@@ -144,15 +164,27 @@ internal fun GradientLibraryScreen(
                 }
                 state.gradientMessage?.let { InfoLine(it, p.accent) }
             }
+            val presetSection: @Composable () -> Unit = {
+                SectionHeader(stringResource(R.string.gradient_presets_title))
+                InfoLine(stringResource(R.string.gradient_presets_desc))
+                TileRows(presets) { preset, modifier ->
+                    PresetTile(
+                        spec = preset,
+                        animationsOn = state.animatedBackgrounds,
+                        useFocus = applyRequester(preset.id),
+                        onUse = { vm.usePreset(preset)?.let { pendingFocus = it } },
+                        modifier = modifier,
+                    )
+                }
+            }
             if (state.gradients.isEmpty()) {
+                presetSection()
                 Card {
                     CardTitle(stringResource(R.string.gradient_library_empty_title))
                     CardDesc(stringResource(R.string.gradient_library_empty_desc))
                 }
             } else {
-                state.gradients.chunked(TILES_PER_ROW).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        row.forEach { spec ->
+                TileRows(state.gradients) { spec, modifier ->
                             GradientTile(
                                 spec = spec,
                                 active = spec.id == state.activeGradientId,
@@ -165,17 +197,57 @@ internal fun GradientLibraryScreen(
                                     val next = GradientLibrary.focusAfterDelete(state.gradients.map { it.id }, spec.id)
                                     vm.deleteGradient(spec.id)
                                     applyFocus.remove(spec.id)
-                                    pendingFocus = next ?: FOCUS_BACK
+                                    pendingFocus = next ?: firstPreset ?: FOCUS_BACK
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = modifier,
                             )
-                        }
-                        repeat(TILES_PER_ROW - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
                 }
+                presetSection()
             }
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+/** [items] as rows of [TILES_PER_ROW] equal-width tiles; [tile] gets the width modifier to apply. */
+@Composable
+private fun TileRows(items: List<GradientSpec>, tile: @Composable (GradientSpec, Modifier) -> Unit) {
+    items.chunked(TILES_PER_ROW).forEach { row ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            row.forEach { spec -> androidx.compose.runtime.key(spec.id) { tile(spec, Modifier.weight(1f)) } }
+            repeat(TILES_PER_ROW - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+    }
+}
+
+/**
+ * A built-in preset (#69): the same swatch and name as a saved gradient's tile, with one action, Use, which saves an
+ * editable copy into the user's gradients and shows it.
+ */
+@Composable
+private fun PresetTile(
+    spec: GradientSpec,
+    animationsOn: Boolean,
+    useFocus: FocusRequester,
+    onUse: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var hasFocus by remember { mutableStateOf(false) }
+    Column(
+        modifier
+            .onFocusChanged { hasFocus = it.hasFocus }
+            .bringIntoViewOnFocus()
+            .companionCard(focused = hasFocus)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        GradientTilePreview(
+            spec, animate = hasFocus && GradientRules.moves(spec, animationsOn),
+            modifier = Modifier.fillMaxWidth().height(110.dp).clip(controlShape(10.dp)),
+        )
+        Text(spec.name, color = p.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, style = tccTextStyle(), maxLines = 1)
+        InfoLine(stringResource(R.string.gradient_tile_meta, stringResource(spec.style.labelRes), stringResource(spec.motion.labelRes)))
+        Box(Modifier.focusRequester(useFocus)) { Chip(stringResource(R.string.gradient_preset_use), onClick = onUse) }
     }
 }
 
