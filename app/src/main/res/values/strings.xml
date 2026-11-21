@@ -815,6 +815,7 @@
     <string name="msg_replay_off">Replay buffer off</string>
     <string name="msg_replay_next_arm">Takes effect next time the buffer arms</string>
     <string name="msg_replay_folder_open_failed">No file manager could open the clips folder</string>
+    <string name="msg_replay_folder_sd_card">Clips can\'t be saved to the SD card yet. Pick a folder on internal storage.</string>
     <string name="msg_replay_folder_invalid">That folder can\'t hold clips. Pick a folder on internal storage, outside Android.</string>
     <string name="msg_replay_rearming">Restarting the buffer with the new setting…</string>
     <string name="msg_replay_rearmed">Buffer restarted with the new setting</string>

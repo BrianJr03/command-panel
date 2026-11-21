@@ -172,6 +172,8 @@ data class SettingsState(
     val replayWindowSeconds: Int = 30,
     val replayPreset: jr.brian.commandpannel.privileged.ReplayBitratePreset = jr.brian.commandpannel.privileged.ReplayBitratePreset.BALANCED,
     val replayMessage: String? = null,
+    /** Why the last folder picked for clips was refused (#74), shown under Save location; null after a good pick or Default. */
+    val replayFolderMessage: String? = null,
     val replayTarget: jr.brian.commandpannel.privileged.ReplayTarget = jr.brian.commandpannel.privileged.ReplayTarget.DEFAULT,
     val replayDoublePress: Boolean = false,
     val replayGameAudio: Boolean = true,
@@ -348,6 +350,7 @@ class SettingsViewModel @Inject constructor(
         prefs.edit().apply { if (relative == null) remove("replay_clips_dir") else putString("replay_clips_dir", relative) }.apply()
         _state.value = _state.value.copy(
             replayClipsDir = relative,
+            replayFolderMessage = null,
             replayMessage = app.getString(R.string.settings_replay_location_current, replayClipsPath(relative)),
         )
     }
@@ -385,12 +388,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** A folder picked in the system folder picker; folders clips can't go in are refused with a message. */
+    /**
+     * A folder picked in the system folder picker; folders clips can't go in are refused with a message shown under
+     * Save location (#74), with its own wording for an SD card.
+     */
     fun onReplayFolderPicked(uri: android.net.Uri) {
+        val engine = jr.brian.commandpannel.privileged.ScreenRecorderEngine
         val docId = runCatching { android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
-        val dir = docId?.let(jr.brian.commandpannel.privileged.ScreenRecorderEngine::replayClipsDirFromTreeDocId)
+        val dir = docId?.let(engine::replayClipsDirFromTreeDocId)
         if (dir == null) {
-            _state.value = _state.value.copy(replayMessage = app.getString(R.string.msg_replay_folder_invalid))
+            val why = if (docId != null && engine.isOtherVolumeTreeDocId(docId)) R.string.msg_replay_folder_sd_card
+                else R.string.msg_replay_folder_invalid
+            _state.value = _state.value.copy(replayFolderMessage = app.getString(why))
         } else {
             setReplayClipsDir(dir)
         }

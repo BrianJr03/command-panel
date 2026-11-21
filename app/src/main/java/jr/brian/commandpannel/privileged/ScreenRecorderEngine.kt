@@ -218,6 +218,18 @@ object ScreenRecorderEngine {
         else -> "Both"
     }
 
+    private const val PRIMARY_VOLUME = "primary"
+
+    /**
+     * Whether a picked folder's tree document id (`"1A2B-3C4D:DCIM"`) is on another storage volume than internal storage
+     * (an SD card or USB drive), which clips can't be saved to yet (#74). The Documents shortcut (`"home:"`) is internal
+     * storage, and an id with no volume isn't a storage folder at all; neither counts.
+     */
+    fun isOtherVolumeTreeDocId(docId: String): Boolean {
+        val volume = docId.substringBefore(':', missingDelimiterValue = "")
+        return volume.isNotBlank() && volume != PRIMARY_VOLUME && volume != "home"
+    }
+
     /**
      * The clips folder for a folder picked in the system picker, from its tree document id (`"primary:Movies/Clips"`),
      * or `null` if clips can't go there: another volume (SD card), the storage root, anything
@@ -225,7 +237,7 @@ object ScreenRecorderEngine {
      */
     fun replayClipsDirFromTreeDocId(docId: String): String? {
         val volume = docId.substringBefore(':', missingDelimiterValue = "")
-        if (volume != "primary") return null
+        if (volume != PRIMARY_VOLUME) return null
         val dir = normalizeReplayClipsRelativeDir(docId.substringAfter(':')) ?: return null
         return dir.takeIf { it.split('/').size < MAX_REPLAY_DIR_DEPTH }
     }

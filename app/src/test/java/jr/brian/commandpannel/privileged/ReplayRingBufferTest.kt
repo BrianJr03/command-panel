@@ -260,6 +260,18 @@ class ReplayRingBufferTest {
     }
 
     @Test
+    fun `a folder on an SD card or USB drive is told apart from other refused folders`() {
+        val other = ScreenRecorderEngine::isOtherVolumeTreeDocId
+        for (sd in listOf("1A2B-3C4D:DCIM", "1A2B-3C4D:", "ABCD-1234:Movies/Clips")) {
+            assertTrue(sd, other(sd))
+            assertEquals(sd, null, ScreenRecorderEngine.replayClipsDirFromTreeDocId(sd))
+        }
+        for (notSd in listOf("primary:Movies", "primary:", "primary:Android/data/x", "home:Clips", "Movies", "", ":x")) {
+            assertFalse(notSd, other(notSd))
+        }
+    }
+
+    @Test
     fun `clips go in a per-screen subfolder that passes validation`() {
         val modes = mapOf(
             ScreenRecorderEngine.TARGET_TOP to "Top",

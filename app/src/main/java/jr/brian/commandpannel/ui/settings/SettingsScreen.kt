@@ -1153,11 +1153,19 @@ private fun ReplayBufferCard(
         val pickFolder = androidx.activity.compose.rememberLauncherForActivityResult(
             androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
         ) { uri -> if (uri != null) vm.onReplayFolderPicked(uri) }
+        // A refused pick (#74) keeps focus on Choose folder, so the user can try again right away.
+        val chooseFolderFocus = remember { FocusRequester() }
+        LaunchedEffect(state.replayFolderMessage) {
+            if (state.replayFolderMessage != null) runCatching { chooseFolderFocus.requestFocus() }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Chip(stringResource(R.string.settings_replay_location_default), selected = state.replayClipsDir == null) { vm.setReplayClipsDir(null) }
-            Chip(stringResource(R.string.settings_replay_location_custom), selected = state.replayClipsDir != null) { pickFolder.launch(null) }
+            Box(Modifier.focusRequester(chooseFolderFocus)) {
+                Chip(stringResource(R.string.settings_replay_location_custom), selected = state.replayClipsDir != null) { pickFolder.launch(null) }
+            }
             Chip(stringResource(R.string.settings_replay_location_open)) { vm.openReplayClipsFolder() }
         }
+        state.replayFolderMessage?.let { Spacer(Modifier.height(8.dp)); InfoLine(it, p.danger) }
         Spacer(Modifier.height(8.dp))
         InfoLine(stringResource(R.string.settings_replay_location_current, replayClipsPath(state.replayClipsDir)))
         Spacer(Modifier.height(12.dp))
