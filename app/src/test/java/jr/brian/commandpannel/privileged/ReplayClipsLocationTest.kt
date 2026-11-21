@@ -74,6 +74,19 @@ class ReplayClipsLocationTest {
     }
 
     @Test
+    fun `folders picked under the Documents shortcut are internal Documents folders`() {
+        assertEquals(ReplayClipsLocation(null, "Documents/Clips"), ok("home:Clips"))
+        assertEquals(ReplayClipsLocation(null, "Documents/Games/Replays"), ok("home:Games/Replays"))
+        assertEquals(ReplayClipsLocation(null, "Documents"), ok("home:"))
+        assertEquals("/storage/emulated/0/Documents/Clips", ok("home:Clips")!!.path)
+        // Documents takes one level, so the depth limit counts it.
+        assertEquals(ReplayClipsLocation(null, "Documents/a/b/c/d/e/f"), ok("home:a/b/c/d/e/f"))
+        for (bad in listOf("home:a/b/c/d/e/f/g", "home:../Android/data", "home:.hidden", "home:x/../..", "home:bad:name", "HOME:Clips")) {
+            assertEquals(bad, ReplayVolumes.Pick.Invalid, ReplayVolumes.fromTreeDocId(bad))
+        }
+    }
+
+    @Test
     fun `clip paths on a removable volume are valid only while it is mounted`() {
         val path = "/storage/$sd/DCIM/Replays/Top/$clip"
         assertTrue(ScreenRecorderEngine.isValidReplayClipOutputPath(path, setOf(sd)))

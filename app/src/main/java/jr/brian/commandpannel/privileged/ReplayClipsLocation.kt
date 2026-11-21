@@ -109,21 +109,28 @@ object ReplayVolumes {
         data object Invalid : Pick
     }
 
+    /** The picker's Documents shortcut: `home:<folder>` is `Documents/<folder>` on internal storage (#81). */
+    const val HOME = "home"
+    private const val HOME_DIR = "Documents"
+
     /**
-     * Maps a picked folder's tree document id to a location: `primary:<folder>` is internal storage, `<id>:<folder>`
-     * a removable volume (whether it is mounted is checked separately). The folder must pass
-     * [ScreenRecorderEngine.normalizeReplayClipsRelativeDir] with room for the per-screen subfolder.
+     * Maps a picked folder's tree document id to a location: `primary:<folder>` is internal storage, `home:<folder>`
+     * internal `Documents/<folder>` (#81), `<id>:<folder>` a removable volume (whether it is mounted is checked
+     * separately). The folder must pass [ScreenRecorderEngine.normalizeReplayClipsRelativeDir] with room for the
+     * per-screen subfolder.
      */
     fun fromTreeDocId(docId: String): Pick {
         val colon = docId.indexOf(':')
         if (colon <= 0) return Pick.Invalid
         val volumeId = docId.substring(0, colon)
-        val volume = when {
-            volumeId == PRIMARY -> null
-            isRemovableId(volumeId) -> volumeId
+        val path = docId.substring(colon + 1)
+        val (volume, folder) = when {
+            volumeId == PRIMARY -> null to path
+            volumeId == HOME -> null to "$HOME_DIR/$path"
+            isRemovableId(volumeId) -> volumeId to path
             else -> return Pick.Invalid
         }
-        val location = ReplayClipsLocation.of(volume, docId.substring(colon + 1)) ?: return Pick.Invalid
+        val location = ReplayClipsLocation.of(volume, folder) ?: return Pick.Invalid
         if (location.relativeDir.split('/').size >= ScreenRecorderEngine.MAX_REPLAY_DIR_DEPTH) return Pick.Invalid
         return Pick.Ok(location)
     }
