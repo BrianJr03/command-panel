@@ -6,6 +6,8 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+## v0.13.0
+
 - **Gradient backgrounds and their library** (#67)
   - Where: Appearance, Create your own animated background card (opens the gradient library)
   - Spot: new: GRADIENTS

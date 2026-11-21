@@ -234,7 +234,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
  * The version the newest what's-new tour belongs to, pinned at "ship it" to the release that brought those changes.
  * The next release's tour goes under its own key.
  */
-internal const val WHATS_NEW_TOUR_VERSION = "0.12.0"
+internal const val WHATS_NEW_TOUR_VERSION = "0.13.0"
 
 /** The opening step of a what's-new tour: "What's new in <version>", with no section or spotlight. */
 private fun whatsNewIntro(version: String) =
@@ -251,6 +251,16 @@ private val whatsNewDone = TourStep(null, null, R.string.tour_whats_new_done_tit
 internal val WHATS_NEW_TOURS: Map<String, List<TourStep>> = mapOf(
     WHATS_NEW_TOUR_VERSION to listOf(
         whatsNewIntro(WHATS_NEW_TOUR_VERSION),
+        TourStep(SettingsCategory.APPEARANCE, TourSpot.GRADIENTS, R.string.settings_gradients, R.string.tour_new_gradients_body),
+        TourStep(SettingsCategory.APPEARANCE, TourSpot.GRADIENTS, R.string.tour_new_gradient_studio_title, R.string.tour_new_gradient_studio_body),
+        TourStep(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS, R.string.settings_performance, R.string.tour_new_performance_body),
+        TourStep(SettingsCategory.REPLAY, TourSpot.REPLAY, R.string.tour_new_sd_card_title, R.string.tour_new_sd_card_body),
+        TourStep(null, null, R.string.tour_new_background_tile_title, R.string.tour_new_tile_rename_body),
+        TourStep(null, null, R.string.tour_new_fixes_title, R.string.tour_new_fixes_body),
+        whatsNewDone,
+    ),
+    "0.12.0" to listOf(
+        whatsNewIntro("0.12.0"),
         TourStep(null, null, R.string.tour_new_fan_speed_title, R.string.tour_new_fan_speed_body),
         TourStep(SettingsCategory.APPEARANCE, TourSpot.BACKGROUND_IMAGE, R.string.settings_background_image, R.string.tour_new_background_image_body),
         TourStep(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS, R.string.settings_animated_backgrounds, R.string.tour_new_animated_backgrounds_body),

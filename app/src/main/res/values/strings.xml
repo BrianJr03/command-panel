@@ -1001,6 +1001,15 @@
     <string name="tour_new_animated_backgrounds_body">Turn this on to use GIF and animated WebP backgrounds. They play only while the panel is open.</string>
     <string name="tour_new_background_tile_title">Background tile</string>
     <string name="tour_new_background_tile_body">Add the Background tile to switch between your background and the look\'s backdrop from the panel.</string>
+    <string name="tour_new_gradients_body">Apply one of 14 animated gradient presets, or keep your own in a library. They work on any look, and your background image stays saved.</string>
+    <string name="tour_new_gradient_studio_title">Gradient Studio</string>
+    <string name="tour_new_gradient_studio_body">Open gradients and press New gradient to build your own with a live preview: colors, style, motion and speed. Shuffle picks colors that go together.</string>
+    <string name="tour_new_performance_body">Turn on Animated backgrounds to see gradients move. Open Performance under it to see what a moving background costs.</string>
+    <string name="tour_new_sd_card_title">Clips on your SD card</string>
+    <string name="tour_new_sd_card_body">In Save location, choose a folder on an SD card or USB drive. If the card is out, clips go to TCP Clips until it\'s back.</string>
+    <string name="tour_new_tile_rename_body">The panel\'s Background Image tile is now called Background, since it turns gradients on and off too.</string>
+    <string name="tour_new_fixes_title">Smoother GIFs, working links</string>
+    <string name="tour_new_fixes_body">Animated GIF and WebP backgrounds play in full color, and links in What\'s new open with the D-pad and A.</string>
     <plurals name="msg_restored_settings">
         <item quantity="one">Restored %1$d setting</item>
         <item quantity="other">Restored %1$d settings</item>

@@ -1,23 +1,26 @@
-## Command Panel v0.12.0
+## Command Panel v0.13.0
 
-Your own background for the panel, a custom fan speed, and a quick tour of what's new.
+Animated gradient backgrounds you can make yourself, replay clips on your SD card, and a round of fixes.
 
 ### New
-- **Background image.** Pick a PNG, JPG or WebP in Look → Appearance to show behind the panel on any look.
-- **Animated backgrounds (Experimental).** Turn on Animated backgrounds in Experimental to use GIF and animated WebP images. They play only while the panel is open.
-- **Background Image tile.** Switch between your image and the look's backdrop right from the panel. Add it in Quick Tiles.
-- **Custom fan speed.** At High performance, the Fan Control tile's Custom option now has a slider from 50% to 100%, like the stock panel.
-- **Tour what's new.** This dialog has a Tour button that shows you where each new feature lives.
+- **Animated gradient backgrounds.** In Look → Appearance, open Create your own animated background to apply one of 14 presets or one you made. They work on any look, and your background image stays saved so you can switch back. Turn on Animated backgrounds in Experimental to see them move.
+- **Gradient Studio.** Build your own gradient with a live preview: up to six colors, a style, a motion and a speed. Shuffle picks colors that go together, and From my look starts from your look's colors.
+- **Performance details.** Under Animated backgrounds in Experimental, open Performance to see what a moving background costs. On the AYN Thor Max, a moving gradient uses about as much as an animated GIF, and only while the panel is open.
+- **Save clips to your SD card.** Pick a folder on an SD card or USB drive in Replay Buffer → Save location. If the card is out, clips go to TCP Clips until it's back.
 
 ### Improvements
-- **Fan options match stock.** The Fan Control tile offers the same options as the stock panel at each performance level.
-- **Undo and redo in Theme Studio** are now arrow buttons, so your look's name fits. L3 and R3 still undo and redo.
-- **Reset everything** in Theme Studio now sits on its own line under Reset parts.
-- **Updates first.** Updates is now the first card in General.
+- **Background tile.** The Background Image tile is now called Background, since it turns gradients on and off too.
+- **Background tile hint.** When the Background tile is off, Appearance and the gradient library say so, with a button to turn it back on.
+- **Smoother GIF backgrounds.** Animated GIF and WebP backgrounds now play in full color, without banding.
+- **Clearer clips folder messages.** When a folder can't hold clips, the reason shows right under Save location.
 
-See the [v0.11.1 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.11.1) for the previous release.
+### Fixes
+- **What's new** shows links and notes properly. Move to a link with the D-pad and press A to open it.
+- **Folders under Documents** can now be picked as the clips location.
 
-> **About `tcp-sc-0.12.0.apk`:** an optional helper app, TCP SC. It's a shortcut for Replay Buffer: open it from a home screen shortcut, a gesture app or an app like Back Button Hero to save a clip. You only need it for that, and Command Panel can install it for you from its Replay Buffer section. If you install it by hand, install it after Command Panel.
+See the [v0.12.0 notes](https://github.com/BrianJr03/command-panel/releases/tag/v0.12.0) for the previous release.
+
+> **About `tcp-sc-0.13.0.apk`:** an optional helper app, TCP SC. It's a shortcut for Replay Buffer: open it from a home screen shortcut, a gesture app or an app like Back Button Hero to save a clip. You only need it for that, and Command Panel can install it for you from its Replay Buffer section. If you install it by hand, install it after Command Panel.
 
 ---
 *Licensed under the GPL v3. Bundles OFL fonts (see THIRD_PARTY_NOTICES); AYN's icons are loaded from the stock app on your device, not shipped.*

@@ -45,8 +45,20 @@ class WhatsNewTourTest {
     }
 
     @Test
-    fun `the first what's new tour covers the unreleased notes`() {
+    fun `the 0_13_0 tour covers its notes`() {
         val steps = whatsNewTourFor(WHATS_NEW_TOUR_VERSION)!!
+        assertEquals("0.13.0", WHATS_NEW_TOUR_VERSION)
+        // Gradients and Gradient Studio, Performance, SD card clips, then two text steps for the panel and fixes.
+        assertEquals(2, steps.count { it.spot == TourSpot.GRADIENTS && it.section == SettingsCategory.APPEARANCE })
+        assertEquals(SettingsCategory.EXPERIMENTAL, steps.single { it.spot == TourSpot.ANIMATED_BACKGROUNDS }.section)
+        assertEquals(SettingsCategory.REPLAY, steps.single { it.spot == TourSpot.REPLAY }.section)
+        assertTrue(steps.any { it.titleRes == R.string.tour_new_background_tile_title && it.spot == null })
+        assertTrue(steps.any { it.titleRes == R.string.tour_new_fixes_title && it.spot == null })
+    }
+
+    @Test
+    fun `the 0_12_0 tour still covers its notes`() {
+        val steps = whatsNewTourFor("0.12.0")!!
         // Fan slider (panel only, text step), background image, animated backgrounds, the tile.
         assertTrue(steps.any { it.titleRes == R.string.tour_new_fan_speed_title && it.spot == null })
         assertEquals(SettingsCategory.APPEARANCE, steps.single { it.spot == TourSpot.BACKGROUND_IMAGE }.section)

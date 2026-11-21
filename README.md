@@ -8,7 +8,7 @@
   <img src="assets/icon.png" width="104" alt="Command Panel icon" />
   <h1>Thor Command Panel (TCP)</h1>
   <p><b>A user-installable replacement for the AYN Thor's stock dual-screen assistant.</b></p>
-  <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick-setting tiles, and live hardware telemetry), then goes well past the original with themes, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
+  <p>The bottom-screen control panel, rebuilt as a normal app you can install yourself. It handles the essentials (screen modes, brightness, volume, quick-setting tiles, and live hardware telemetry), then goes well past the original with themes, custom and animated backgrounds, a <b>Theme Studio</b> for building your own, a companion app, and more.</p>
 </div>
 
 https://github.com/user-attachments/assets/fe6379b3-bcc7-4a41-be42-1eb2219ed595
@@ -84,7 +84,7 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 - **Screen modes** — dual screen, top-only, bottom-only (with real screen blanking).
 - **Brightness & volume** for each screen.
 - **60/120 Hz toggle** with a live FPS readout.
-- **Quick-setting tiles** — focus lock, performance mode, fan control, clean memory, controller style, direct power, vibration, ambient LED, force landscape, theme.
+- **Quick-setting tiles** — focus lock, performance mode, fan control (with stock's Custom 50 to 100% speed slider), clean memory, controller style, direct power, vibration, ambient LED, force landscape, theme.
 - **Hardware telemetry** — temperature, fan, and CPU / GPU / power / RAM gauges.
 - **Task** (recent apps) and **Settings** dialogs.
 
@@ -93,15 +93,16 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 
 - 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
+- 🌄 **Backgrounds**: put your own PNG, JPG or WebP behind the panel on any look, or pick an **animated gradient**: 14 presets, or build your own in **Gradient Studio** (up to six colors, a style, a motion and a speed). Animated GIF/WebP images and moving gradients are under **Experimental**, play only while the panel is open, and a **Performance** page shows what they cost.
 - 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything, with a guided tour of every section on first launch.
-- 🧩 **Customizable tiles** — turn each one on or off and **drag-and-drop to reorder** them.
+- 🧩 **Customizable tiles** — turn each one on or off and **drag-and-drop to reorder** them. A **Background** tile switches your background image or gradient on and off right from the panel.
 - ✋ **Arrange mode** — long-press the overlay to drag-and-drop its cards into any layout.
-- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video.
+- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video. Save clips to internal storage or a folder on an **SD card or USB drive**; if the card is out, clips go to TCP Clips until it's back.
 - 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
 - 🔋 **Battery time estimate** and an option to **hide the network-speed** readout.
 - 💾 **Settings backup & restore.**
-- ⬆️ **In-app updates** — checks GitHub for new releases, shows the patch notes, and installs the update in one press (silently with root, otherwise through Android's installer). Skip a version if you like; What's New shows once after updating.
+- ⬆️ **In-app updates** — checks GitHub for new releases, shows the patch notes, and installs the update in one press (silently with root, otherwise through Android's installer). Skip a version if you like; What's New shows once after updating, with a **Tour** button that shows where each new feature lives.
 - 🎮 **Full gamepad navigation** across the whole UI.
 - 🧷 **Quality-of-life:** the overlay reopens on your last tab, a pinned top nav bar, and a launcher icon of its own.
 
