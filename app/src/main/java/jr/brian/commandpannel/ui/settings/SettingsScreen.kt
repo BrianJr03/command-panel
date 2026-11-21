@@ -1038,11 +1038,6 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
     // First: updates, so a new version and What's new are one press away.
     UpdatesCard(state, vm)
     SwitchCard(
-        stringResource(R.string.settings_rail_one_open),
-        stringResource(R.string.settings_rail_one_open_desc),
-        state.railOneOpen, { vm.setRailOneOpen(it, keep = null) },
-    )
-    SwitchCard(
         stringResource(R.string.settings_replace_stock),
         when {
             state.bdsa.active -> stringResource(R.string.settings_replace_stock_paused, stringResource(R.string.bdsa_name))
@@ -1051,6 +1046,11 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         },
         state.replaceStock, vm::setReplaceStock,
         Modifier.tourTarget(TourSpot.REPLACE_STOCK),
+    )
+    SwitchCard(
+        stringResource(R.string.settings_rail_one_open),
+        stringResource(R.string.settings_rail_one_open_desc),
+        state.railOneOpen, { vm.setRailOneOpen(it, keep = null) },
     )
     SwitchCard(
         stringResource(R.string.settings_battery_estimate),
