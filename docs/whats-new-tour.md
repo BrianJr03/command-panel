@@ -31,6 +31,21 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: none
   - Callout: The Background Image tile is now called Background, since it turns a gradient on and off too. Find it in the panel's Quick Tiles.
 
+- **Clearer clips folder message** (#74)
+  - Where: Replay Buffer, Save location card
+  - Spot: none
+  - Callout: Picking a clips folder on the SD card now says plainly that it isn't supported yet, right under Save location.
+
+- **Smoother GIF backgrounds** (#73)
+  - Where: panel: an animated GIF or WebP background
+  - Spot: none
+  - Callout: Animated GIF and WebP backgrounds now play in full color on the panel, so smooth shades no longer show bands.
+
+- **Links in What's new** (#53)
+  - Where: What's new dialog
+  - Spot: none
+  - Callout: Links and notes in What's new now show properly. Move to a link with the D-pad and press A to open it.
+
 ## v0.12.0
 
 - **Custom fan speed** (#59)
