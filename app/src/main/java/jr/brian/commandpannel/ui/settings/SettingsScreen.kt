@@ -641,21 +641,32 @@ private fun RailGroupBlock(
     edgeScroll: (String) -> Unit,
 ) {
     val header = RailRow.Header(g).id
+    // Opening a group from its header moves focus to its first section, so it takes one press less to get there.
+    var focusFirst by remember { mutableStateOf(false) }
+    val motion = LocalTccLookSpec.current.traits.animate
+    // Keyed on [open] only: clearing the flag here must not restart (and so cancel) the effect before it focuses.
+    LaunchedEffect(open) {
+        if (!open || !focusFirst) return@LaunchedEffect
+        // Let the group slide open first (like the onboarding's moves), then focus lands on its first section.
+        if (motion) kotlinx.coroutines.delay(RAIL_GROUP_SLIDE_MS.toLong() + RAIL_FOCUS_SETTLE_MS) else androidx.compose.runtime.withFrameNanos { }
+        val first = reorder.items.firstNotNullOfOrNull { k -> NavItem.entries.firstOrNull { it.category.key == k } }
+        if (first != null) runCatching { requesters.getValue(first).requestFocus() }
+        focusFirst = false
+    }
     // One child of the rail per group, so the rail's spacing sits between groups and the gap under the header animates
     // with the sections below.
     Column {
         RailGroupHeader(
             g, open, holdsSelected = RailGroup.of(selected.category) == g, headerRequesters.getValue(g), navShape,
-            groupReorder, dimmed, onToggle = { onToggle(g, it) },
+            groupReorder, dimmed, onToggle = { expand -> if (expand) focusFirst = true; onToggle(g, expand) },
         ) { edgeScroll(header) }
-        val motion = LocalTccLookSpec.current.traits.animate
         // The sections slide open and shut (#82: opening a group can close another, so both animate at once). The gap
         // above them is inside the animated part, so it grows and shrinks with them instead of popping. A closing group's
         // rows can't take focus while they animate out.
         AnimatedVisibility(
             visible = open,
-            enter = if (motion) fadeIn() + expandVertically(expandFrom = Alignment.Top) else EnterTransition.None,
-            exit = if (motion) fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top) else ExitTransition.None,
+            enter = if (motion) fadeIn(railGroupSlide()) + expandVertically(railGroupSlide(), expandFrom = Alignment.Top) else EnterTransition.None,
+            exit = if (motion) fadeOut(railGroupSlide()) + shrinkVertically(railGroupSlide(), shrinkTowards = Alignment.Top) else ExitTransition.None,
         ) {
             Column(
                 Modifier.padding(top = RAIL_ITEM_SPACING).focusProperties { canFocus = open },
@@ -989,6 +1000,14 @@ private fun RailItem(
 }
 
 private val RAIL_ITEM_SPACING = 6.dp
+
+/** A rail group's slide open or shut (#82): the onboarding's ease, kept short so it feels quick. */
+private const val RAIL_GROUP_SLIDE_MS = 87
+
+/** A short beat after the slide before focus lands on the opened group's first section. */
+private const val RAIL_FOCUS_SETTLE_MS = 13L
+
+private fun <T> railGroupSlide() = androidx.compose.animation.core.tween<T>(RAIL_GROUP_SLIDE_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing)
 
 /** The fill of a rail row that's picked up: stronger than the selected row's [CompanionPalette.accentSoft]. */
 @Composable
