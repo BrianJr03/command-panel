@@ -29,6 +29,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,11 @@ sealed interface UpdatePhase {
 /**
  * The update / What's New dialog. Gamepad-friendly: focus starts on the main button, D-pad up/down scroll the notes,
  * left/right move between buttons, and B closes it (except while downloading or installing).
+ *
+ * Links in the notes (#53) are focusable: D-pad up from the buttons enters the lowest link on screen, up / down then
+ * step between the links on screen and scroll when there's none further that way, and down past the last one (with
+ * nothing left to scroll) returns to the main button. A focused link that scrolls out of view hands focus back to the
+ * main button, so A never opens a link you can't see.
  */
 @Composable
 internal fun UpdateDialog(phase: UpdatePhase, vm: SettingsViewModel) {
@@ -67,6 +74,8 @@ internal fun UpdateDialog(phase: UpdatePhase, vm: SettingsViewModel) {
         val notesScroll = rememberScrollState()
         val scope = rememberCoroutineScope()
         val primary = remember { FocusRequester() }
+        val links = remember { MarkdownLinks() }
+        links.onFocusedLeftView = { runCatching { primary.requestFocus() } }
         LaunchedEffect(phase::class) { runCatching { primary.requestFocus() } }
         Column(
             Modifier.width(780.dp).heightIn(max = 430.dp)
@@ -74,12 +83,19 @@ internal fun UpdateDialog(phase: UpdatePhase, vm: SettingsViewModel) {
                 .clip(cardShape()).background(p.bg)
                 .companionCard()
                 .onPreviewKeyEvent { e ->
-                    val dy = when (e.key) {
-                        Key.DirectionUp -> -220f
-                        Key.DirectionDown -> 220f
+                    val down = when (e.key) {
+                        Key.DirectionUp -> false
+                        Key.DirectionDown -> true
                         else -> return@onPreviewKeyEvent false
                     }
-                    if (e.type == KeyEventType.KeyDown) scope.launch { notesScroll.animateScrollBy(dy) }
+                    if (e.type == KeyEventType.KeyDown) {
+                        val link = links.next(down)
+                        when {
+                            link != null -> runCatching { link.requestFocus() }
+                            down && links.focused != null && !notesScroll.canScrollForward -> runCatching { primary.requestFocus() }
+                            else -> scope.launch { notesScroll.animateScrollBy(if (down) 220f else -220f) }
+                        }
+                    }
                     true
                 }
                 .padding(24.dp),
@@ -103,8 +119,16 @@ internal fun UpdateDialog(phase: UpdatePhase, vm: SettingsViewModel) {
                 else -> null
             }
             if (notes != null) {
-                Box(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(notesScroll)) {
-                    if (notes.isBlank()) CardDesc(stringResource(R.string.update_no_notes)) else MarkdownText(notes)
+                // Room at the edges so a focused link's ring isn't clipped when it's brought into view.
+                PaddedBringIntoView {
+                    Box(
+                        Modifier.weight(1f, fill = false).fillMaxWidth()
+                            .onGloballyPositioned { links.viewport = it.boundsInRoot() }
+                            .verticalScroll(notesScroll),
+                    ) {
+                        if (notes.isBlank()) CardDesc(stringResource(R.string.update_no_notes))
+                        else MarkdownText(notes, Modifier.padding(horizontal = 4.dp), links)
+                    }
                 }
             }
             if (phase is UpdatePhase.Downloading) {
