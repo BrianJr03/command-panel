@@ -101,7 +101,7 @@
     <string name="tile_name_clear_all_tasks">Clear All Tasks</string>
     <string name="tile_name_replay_buffer">Replay Buffer</string>
     <string name="tile_name_replay_studio">Replay Studio</string>
-    <string name="tile_name_background_image">Background Image</string>
+    <string name="tile_name_background_image">Background</string>
     <string name="tile_category_stock">Stock</string>
     <string name="tile_category_android">Android System</string>
     <string name="tile_category_tools">Tools</string>
@@ -119,7 +119,7 @@
     <string name="tile_clear_all_tasks">Clear All\nTasks</string>
     <string name="tile_replay_buffer">Replay\nBuffer</string>
     <string name="tile_replay_studio">Replay\nStudio</string>
-    <string name="tile_background_image">Background\nImage</string>
+    <string name="tile_background_image">Background</string>
     <string name="tile_trigger_digital">Trigger:\nDigital</string>
     <string name="tile_trigger_analog">Trigger:\nAnalog</string>
     <string name="tile_trigger_both">Trigger:\nBoth</string>
@@ -974,8 +974,8 @@
     <string name="tour_new_fan_speed_body" formatted="false">At High performance, pick Custom in the panel\'s Fan Control tile and a slider sets the fan from 50% to 100%.</string>
     <string name="tour_new_background_image_body">Pick a PNG, JPG or WebP to show behind the panel on any look.</string>
     <string name="tour_new_animated_backgrounds_body">Turn this on to use GIF and animated WebP backgrounds. They play only while the panel is open.</string>
-    <string name="tour_new_background_tile_title">Background Image tile</string>
-    <string name="tour_new_background_tile_body">Add the Background Image tile to switch between your image and the look\'s backdrop from the panel.</string>
+    <string name="tour_new_background_tile_title">Background tile</string>
+    <string name="tour_new_background_tile_body">Add the Background tile to switch between your background and the look\'s backdrop from the panel.</string>
     <plurals name="msg_restored_settings">
         <item quantity="one">Restored %1$d setting</item>
         <item quantity="other">Restored %1$d settings</item>

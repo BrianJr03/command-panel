@@ -21,6 +21,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: GRADIENTS
   - Callout: Build your own gradient with a live preview: pick up to six colors, a style, motion and speed, or press Shuffle for colors that go together. Save and apply shows it behind the panel.
 
+- **Background tile** (#72)
+  - Where: panel: Background tile (was Background Image)
+  - Spot: none
+  - Callout: The Background Image tile is now called Background, since it turns a gradient on and off too. Find it in the panel's Quick Tiles.
+
 ## v0.12.0
 
 - **Custom fan speed** (#59)
