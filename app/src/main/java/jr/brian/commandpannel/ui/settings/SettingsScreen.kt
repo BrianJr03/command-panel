@@ -190,6 +190,7 @@ internal fun SettingsContent(
     openStudio: (jr.brian.commandpannel.ui.theme.CustomLook) -> Unit,
     openThemes: (ThemeLibraryTab) -> Unit,
     openReplayStudio: () -> Unit,
+    openGradients: () -> Unit,
 ) {
     // Saveable, so coming back from Theme Studio or the Themes library lands on the same section (and scroll).
     var nav by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(NavItem.GENERAL) }
@@ -222,6 +223,7 @@ internal fun SettingsContent(
         vm.refreshBdsa()
         vm.refreshSaveClip()
         vm.refreshThorKbm()
+        vm.refreshGradients()
         onPauseOrDispose { }
     }
     val scroll = rememberScrollState()
@@ -260,6 +262,15 @@ internal fun SettingsContent(
         returnToReplayStudio = false
         repeat(2) { androidx.compose.runtime.withFrameNanos { } }
         runCatching { replayStudioFocus.requestFocus() }
+    }
+    // Back from the gradient library, focus goes back to the card's Open button.
+    val gradientsFocus = remember { FocusRequester() }
+    var returnToGradients by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!returnToGradients) return@LaunchedEffect
+        returnToGradients = false
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        runCatching { gradientsFocus.requestFocus() }
     }
     val tourTargets = remember { TourTargets() }
     val touring = state.tourStep != null
@@ -362,7 +373,13 @@ internal fun SettingsContent(
                 SettingsCategory.GENERAL -> General(state, vm)
                 SettingsCategory.QUICK_TOGGLES -> QuickToggles(state, vm, scroll) { viewport.value }
                 SettingsCategory.NAV_BAR -> NavBarSettings(state, vm, scroll) { viewport.value }
-                SettingsCategory.APPEARANCE -> Appearance(state, vm) { if (!touring) jump = it }
+                SettingsCategory.APPEARANCE -> Appearance(
+                    state, vm, gradientsFocus,
+                    openGradients = {
+                        returnToGradients = true
+                        openGradients()
+                    },
+                ) { if (!touring) jump = it }
                 SettingsCategory.THEMES -> Themes(state, vm, openStudio, deckFocus) {
                     returnToDeck = true
                     openThemes(ThemeLibraryTab.LOCAL)
@@ -1736,7 +1753,13 @@ private fun NavBarSettings(state: SettingsState, vm: SettingsViewModel, scroll: 
 // ---- Appearance ----
 
 @Composable
-private fun Appearance(state: SettingsState, vm: SettingsViewModel, onJump: (PaneJump) -> Unit) {
+private fun Appearance(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    gradientsFocus: FocusRequester,
+    openGradients: () -> Unit,
+    onJump: (PaneJump) -> Unit,
+) {
     Card(Modifier.tourTarget(TourSpot.OVERLAY_THEME)) {
         CardTitle(stringResource(R.string.settings_overlay_theme))
         Spacer(Modifier.height(6.dp))
@@ -1747,6 +1770,7 @@ private fun Appearance(state: SettingsState, vm: SettingsViewModel, onJump: (Pan
         }
     }
     BackgroundImageCard(state, vm, onJump)
+    GradientsCard(state, vm, gradientsFocus, openGradients, onJump)
     SectionHeader(stringResource(R.string.settings_overlay_look))
     Card { CardDesc(stringResource(R.string.settings_overlay_look_moved)) }
     SwitchCard(
@@ -1785,6 +1809,10 @@ private fun BackgroundImageCard(state: SettingsState, vm: SettingsViewModel, onJ
                     image.fileName,
                 ),
             )
+            // One source at a time (#64): say so when a gradient is showing instead of the stored image.
+            state.gradients.firstOrNull { it.id == state.activeGradientId }?.let { g ->
+                InfoLine(stringResource(R.string.settings_background_image_not_showing, g.name.ifBlank { stringResource(R.string.gradient_unnamed) }), p.textTertiary)
+            }
         }
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1803,6 +1831,53 @@ private fun BackgroundImageCard(state: SettingsState, vm: SettingsViewModel, onJ
         if (!state.animatedBackgrounds) {
             FocusRow(selected = false, onClick = { onJump(PaneJump(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS)) }) {
                 Text(stringResource(R.string.settings_background_image_animated_link), color = p.accent, fontSize = 14.sp, style = tccTextStyle())
+            }
+        }
+    }
+}
+
+/**
+ * "Create your own animated background" (#67): the way into the gradient library, with what's showing now. Use my image
+ * instead (while a gradient shows and an image is stored) disappears once pressed; focus goes to Open gradients.
+ * [openFocus] is where focus lands back from the library.
+ */
+@Composable
+private fun GradientsCard(
+    state: SettingsState,
+    vm: SettingsViewModel,
+    openFocus: FocusRequester,
+    openGradients: () -> Unit,
+    onJump: (PaneJump) -> Unit,
+) {
+    val active = state.gradients.firstOrNull { it.id == state.activeGradientId }
+    Card(Modifier.tourTarget(TourSpot.GRADIENTS)) {
+        CardTitle(stringResource(R.string.settings_gradients))
+        CardDesc(stringResource(R.string.settings_gradients_desc))
+        when {
+            active != null -> InfoLine(
+                stringResource(R.string.settings_gradients_showing, active.name.ifBlank { stringResource(R.string.gradient_unnamed) }),
+                p.accent,
+            )
+            state.gradients.isNotEmpty() -> InfoLine(
+                androidx.compose.ui.res.pluralStringResource(R.plurals.settings_gradients_count, state.gradients.size, state.gradients.size),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.focusRequester(openFocus)) {
+                Chip(stringResource(R.string.settings_gradients_open), onClick = openGradients)
+            }
+            if (GradientLibrary.canUseImage(state.activeGradientId, state.gradients, state.backgroundImage != null)) {
+                Chip(stringResource(R.string.settings_gradients_use_image)) {
+                    vm.useBackgroundImage()
+                    runCatching { openFocus.requestFocus() }
+                }
+            }
+        }
+        // Gradient motion is Experimental: the link opens that section on the switch, like the image card's.
+        if (!state.animatedBackgrounds) {
+            FocusRow(selected = false, onClick = { onJump(PaneJump(SettingsCategory.EXPERIMENTAL, TourSpot.ANIMATED_BACKGROUNDS)) }) {
+                Text(stringResource(R.string.settings_gradients_animated_link), color = p.accent, fontSize = 14.sp, style = tccTextStyle())
             }
         }
     }

@@ -117,6 +117,8 @@ internal enum class TourSpot(val inPane: Boolean = true) {
     ANIMATED_BACKGROUNDS,
     /** Appearance's Background image card (#57, #61). */
     BACKGROUND_IMAGE,
+    /** Appearance's "Create your own animated background" card, the way into the gradient library (#67). */
+    GRADIENTS,
     TOUR_REPLAY;
 
     companion object {
@@ -196,6 +198,7 @@ internal val TOUR_STEPS: List<TourStep> = run {
 
         sectionIntro(appearance, R.string.tour_appearance_body),
         TourStep(appearance, TourSpot.OVERLAY_THEME, R.string.settings_overlay_theme, R.string.tour_overlay_theme_body),
+        TourStep(appearance, TourSpot.GRADIENTS, R.string.settings_gradients, R.string.tour_gradients_body),
         TourStep(appearance, TourSpot.FOLLOW_LOOK, R.string.settings_companion_follow_look, R.string.tour_follow_look_body),
         TourStep(appearance, TourSpot.RGB_ACCENT, R.string.settings_rgb_accent, R.string.tour_rgb_accent_body),
 

@@ -16,13 +16,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import jr.brian.commandpannel.ui.theme.LocalTccLookSpec
 
-/** The companion's screens: the two-pane settings, the Themes library, Theme Studio, and Replay Studio. */
+/** The companion's screens: the two-pane settings, the Themes library, Theme Studio, Replay Studio and the gradient library. */
 internal object CompanionRoutes {
     const val SETTINGS = "settings"
     const val THEMES = "themes?tab={tab}"
     const val STUDIO = "studio"
     /** Replay Studio (saved clips). [STUDIO] is Theme Studio. */
     const val REPLAY_STUDIO = "replay_studio"
+    /** The saved gradient backgrounds (#67), from Appearance. */
+    const val GRADIENTS = "gradients"
 
     fun themes(tab: ThemeLibraryTab) = "themes?tab=${tab.key}"
 
@@ -50,6 +52,7 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
     }
     val openThemes: (ThemeLibraryTab) -> Unit = { tab -> nav.navigate(CompanionRoutes.themes(tab)) { launchSingleTop = true } }
     val openReplayStudio: () -> Unit = { nav.navigate(CompanionRoutes.REPLAY_STUDIO) { launchSingleTop = true } }
+    val openGradients: () -> Unit = { nav.navigate(CompanionRoutes.GRADIENTS) { launchSingleTop = true } }
     val closeStudio: () -> Unit = {
         vm.closeStudio()
         nav.popBackStack()
@@ -70,7 +73,7 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
         popExitTransition = { if (motion) fadeOut(tween(160)) else ExitTransition.None },
     ) {
         composable(CompanionRoutes.SETTINGS) {
-            SettingsContent(state, vm, openStudio, openThemes, openReplayStudio)
+            SettingsContent(state, vm, openStudio, openThemes, openReplayStudio, openGradients)
         }
         composable(
             CompanionRoutes.THEMES,
@@ -92,6 +95,10 @@ internal fun CompanionNavHost(state: SettingsState, vm: SettingsViewModel) {
             } else {
                 ThemeStudioScreen(draft, state, vm, onClose = closeStudio)
             }
+        }
+        composable(CompanionRoutes.GRADIENTS) {
+            // #68 adds the editor: onNew / onEdit open it.
+            GradientLibraryScreen(state, vm, onClose = { nav.popBackStack() })
         }
         composable(CompanionRoutes.REPLAY_STUDIO) {
             jr.brian.commandpannel.replay.studio.ReplayStudioScreen(onClose = { nav.popBackStack() })

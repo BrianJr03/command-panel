@@ -88,6 +88,12 @@ data class SettingsState(
     val animatedBackgrounds: Boolean = false,
     /** The last background image change's outcome ("Background image set", or why it was refused). */
     val backgroundMessage: String? = null,
+    /** Saved gradient backgrounds (#64), for Appearance's card and the gradient library (#67). */
+    val gradients: List<jr.brian.commandpannel.system.GradientSpec> = emptyList(),
+    /** The gradient the panel shows (the active background source), or null when it's the image or the backdrop. */
+    val activeGradientId: String? = null,
+    /** The last gradient library action's outcome ("Gradient applied", …), shown in the library. */
+    val gradientMessage: String? = null,
     /** Ambient-LED accent (opaque ARGB) when [rgbAccentSync] is on; themes the companion when it follows the look. */
     val accentOverride: Int? = null,
     /** When on, the companion screen uses the overlay's look, theme mode and accent instead of its default style. */
@@ -223,6 +229,8 @@ class SettingsViewModel @Inject constructor(
         rgbAccentSync = prefs.getBoolean("rgb_accent_sync", false),
         backgroundImage = BackgroundImageSetting.read(prefs),
         animatedBackgrounds = BackgroundImageSetting.animationsOn(prefs),
+        gradients = jr.brian.commandpannel.system.GradientStore.all(prefs),
+        activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
         accentOverride = ThorRgbController.accentOverride(app, prefs.getBoolean("rgb_accent_sync", false)),
         companionFollowLook = prefs.getBoolean("companion_follow_look", false),
         enabledTiles = jr.brian.commandpannel.system.QuickSettingTileId
@@ -451,6 +459,8 @@ class SettingsViewModel @Inject constructor(
             }
             _state.value = _state.value.copy(
                 backgroundImage = BackgroundImageSetting.read(prefs),
+                // Picking an image makes it the active source, so a gradient stops showing.
+                activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
                 backgroundMessage = result.fold(
                     { app.getString(R.string.settings_background_image_set) },
                     { e -> app.getString((e as? BackgroundImportException)?.messageRes ?: R.string.msg_background_invalid) },
@@ -463,6 +473,62 @@ class SettingsViewModel @Inject constructor(
     fun setAnimatedBackgrounds(enable: Boolean) {
         prefs.edit().putBoolean(BackgroundImageSetting.KEY_ANIMATIONS_ON, enable).apply()
         _state.value = _state.value.copy(animatedBackgrounds = enable)
+    }
+
+    /** Re-reads the saved gradients and the active source (opening the library, or back in the companion). */
+    fun refreshGradients() {
+        _state.value = _state.value.copy(
+            gradients = jr.brian.commandpannel.system.GradientStore.all(prefs),
+            activeGradientId = jr.brian.commandpannel.system.BackgroundSetting.activeGradientId(prefs),
+            backgroundImage = BackgroundImageSetting.read(prefs),
+        )
+    }
+
+    /** Clears the library's status line (it's shown until the next action or until the library is opened again). */
+    fun clearGradientMessage() {
+        _state.value = _state.value.copy(gradientMessage = null)
+    }
+
+    /** Shows saved gradient [id] behind the panel on every look (#67). The stored image is kept to switch back to. */
+    fun applyGradient(id: String) {
+        if (jr.brian.commandpannel.system.GradientStore.find(prefs, id) == null) return refreshGradients()
+        jr.brian.commandpannel.system.BackgroundSetting.selectGradient(prefs, id)
+        refreshGradients()
+        _state.value = _state.value.copy(gradientMessage = app.getString(R.string.msg_gradient_applied))
+    }
+
+    /** Goes back from a gradient to the stored background image ("Use my image instead", #67). */
+    fun useBackgroundImage() {
+        if (BackgroundImageSetting.read(prefs) == null) return refreshGradients()
+        jr.brian.commandpannel.system.BackgroundSetting.selectImage(prefs)
+        refreshGradients()
+        val msg = app.getString(R.string.settings_background_image_set)
+        _state.value = _state.value.copy(gradientMessage = msg, backgroundMessage = msg)
+    }
+
+    /** Saves a copy of gradient [id] ("<name> copy") at the end of the library; returns the copy's id, or null. */
+    fun duplicateGradient(id: String): String? {
+        val all = jr.brian.commandpannel.system.GradientStore.all(prefs)
+        val spec = all.firstOrNull { it.id == id } ?: return null.also { refreshGradients() }
+        val copy = GradientLibrary.duplicate(
+            spec, all, java.util.UUID.randomUUID().toString(),
+            fallbackName = app.getString(R.string.gradient_unnamed),
+            copy = { app.getString(R.string.theme_copy_name, it) },
+            copyN = { n, i -> app.getString(R.string.theme_copy_name_n, n, i) },
+        )
+        val saved = jr.brian.commandpannel.system.GradientStore.save(prefs, copy)
+        refreshGradients()
+        _state.value = _state.value.copy(
+            gradientMessage = saved?.let { app.getString(R.string.msg_gradient_duplicated, it.name) },
+        )
+        return saved?.id
+    }
+
+    /** Deletes gradient [id]; if it was showing, the panel goes back to the stored image (or the backdrop). */
+    fun deleteGradient(id: String) {
+        jr.brian.commandpannel.system.GradientStore.delete(prefs, id)
+        refreshGradients()
+        _state.value = _state.value.copy(gradientMessage = app.getString(R.string.msg_gradient_deleted))
     }
 
     /** Removes the background image; every look shows its own backdrop again. */

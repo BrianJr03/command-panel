@@ -6,6 +6,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+- **Gradient backgrounds and their library** (#67)
+  - Where: Appearance, Create your own animated background card (opens the gradient library)
+  - Spot: new: GRADIENTS
+  - Callout: Keep your own gradient backgrounds in a library and apply one to show it behind the panel on any look. Your image stays saved, so you can switch back anytime.
+
 ## v0.12.0
 
 - **Custom fan speed** (#59)

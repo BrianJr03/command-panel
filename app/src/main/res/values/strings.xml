@@ -197,7 +197,7 @@
     <string name="settings_task_fps">In-game FPS</string>
     <string name="settings_task_fps_desc">Count the frames the game itself draws, not everything both screens show. With no game reading, the counter says compositor FPS. Still being tested, so readings may be off.</string>
     <string name="settings_animated_backgrounds">Animated backgrounds</string>
-    <string name="settings_animated_backgrounds_desc">Play GIF and animated WebP background images (set in Appearance). An animated background uses more battery while the panel is open. While this is off, one that\'s already set shows its first frame.</string>
+    <string name="settings_animated_backgrounds_desc">Play GIF and animated WebP background images and let gradient backgrounds move (both set in Appearance). An animated background uses more battery while the panel is open. While this is off, an animated image shows its first frame and a gradient shows still.</string>
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>
     <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>
@@ -427,6 +427,38 @@
     <string name="settings_background_image_set">Background image set</string>
     <string name="settings_background_image_removed">Background image removed</string>
     <string name="settings_background_image_animated_link">Animated GIFs and WebP are in Experimental →</string>
+    <string name="settings_background_image_not_showing">Not showing now: your gradient %1$s is the background.</string>
+    <string name="settings_gradients">Create your own animated background</string>
+    <string name="settings_gradients_desc">Make gradients that drift, rotate or shift color behind the panel. One background shows at a time on every look: your image or one gradient.</string>
+    <string name="settings_gradients_open">Open gradients</string>
+    <string name="settings_gradients_showing">Showing: %1$s</string>
+    <plurals name="settings_gradients_count">
+        <item quantity="one">%1$d saved gradient</item>
+        <item quantity="other">%1$d saved gradients</item>
+    </plurals>
+    <string name="settings_gradients_use_image">Use my image instead</string>
+    <string name="settings_gradients_animated_link">Gradients move only with Animated backgrounds, in Experimental →</string>
+    <string name="gradient_library_title">Your gradients</string>
+    <string name="gradient_library_now_gradient">Showing your gradient %1$s</string>
+    <string name="gradient_library_now_image">Showing your background image</string>
+    <string name="gradient_library_now_backdrop">Showing the look\'s backdrop</string>
+    <string name="gradient_library_still_hint">Animated backgrounds is off in Experimental, so gradients show still.</string>
+    <string name="gradient_library_empty_title">No gradients yet</string>
+    <string name="gradient_library_empty_desc">Gradients you make or save show up here.</string>
+    <string name="gradient_new">New gradient</string>
+    <string name="gradient_duplicate">Duplicate</string>
+    <string name="gradient_showing">Showing now</string>
+    <string name="gradient_unnamed">Untitled gradient</string>
+    <string name="gradient_tile_meta">%1$s · %2$s</string>
+    <string name="gradient_motion_still">Still</string>
+    <string name="gradient_style_linear">Linear</string>
+    <string name="gradient_style_radial">Radial</string>
+    <string name="gradient_style_aurora">Aurora</string>
+    <string name="gradient_motion_drift">Drift</string>
+    <string name="gradient_motion_rotate">Rotate</string>
+    <string name="gradient_motion_breathe">Breathe</string>
+    <string name="gradient_motion_hue_cycle">Color cycle</string>
+    <string name="gradient_motion_wave">Wave</string>
 
     <!-- Overlay looks (proper names) -->
     <string name="look_auto">Auto (stock)</string>
@@ -816,6 +848,9 @@
     <string name="msg_background_animation_too_big">This animation is more than twice the screen\'s size. Pick a smaller one.</string>
     <string name="msg_background_unsupported">Pick a PNG, JPG, WebP or GIF image</string>
     <string name="msg_background_invalid">Not a valid image</string>
+    <string name="msg_gradient_applied">Gradient applied</string>
+    <string name="msg_gradient_duplicated">Copy saved as %1$s</string>
+    <string name="msg_gradient_deleted">Gradient deleted</string>
     <string name="msg_background_animated_off">Animated GIF and WebP images need Animated backgrounds, in Experimental.</string>
     <string name="font_default_name">Font</string>
     <!-- Companion tour -->
@@ -857,6 +892,7 @@
     <string name="tour_tile_picker_body">Every tile Command Panel offers, grouped into the stock AYN tiles, Android system tiles and extra tools. Flip a switch to add or remove a tile.</string>
     <string name="tour_appearance_body">The overlay\'s theme mode, and how its look and accent carry over to this screen.</string>
     <string name="tour_overlay_theme_body">Light, dark, or follow the system theme for the bottom-screen overlay.</string>
+    <string name="tour_gradients_body">Make your own gradient backgrounds and keep them in a library. Apply one to show it behind the panel on any look, or switch back to your image.</string>
     <string name="tour_follow_look_body">Restyle this companion screen with the overlay\'s look, theme and accent, so both screens match.</string>
     <string name="tour_rgb_accent_body">Use the Thor\'s Ambient LED color as the overlay\'s accent, so the UI matches your joystick lights.</string>
     <string name="tour_themes_body">Pick a look for the overlay, mix your own in Theme Studio, and share or download looks.</string>

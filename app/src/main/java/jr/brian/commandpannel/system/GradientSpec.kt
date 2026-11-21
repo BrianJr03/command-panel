@@ -1,6 +1,8 @@
 package jr.brian.commandpannel.system
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
+import jr.brian.commandpannel.R
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -8,9 +10,11 @@ import org.json.JSONObject
 @Immutable
 data class GradientStop(val color: Int, val position: Float)
 
-/** How the stops are laid out. [key] is stored in prefs and backups; never rename it. */
-enum class GradientStyle(val key: String) {
-    LINEAR("linear"), RADIAL("radial"), AURORA("aurora");
+/** How the stops are laid out. [key] is stored in prefs and backups; never rename it. [labelRes] is its display name. */
+enum class GradientStyle(val key: String, @StringRes val labelRes: Int) {
+    LINEAR("linear", R.string.gradient_style_linear),
+    RADIAL("radial", R.string.gradient_style_radial),
+    AURORA("aurora", R.string.gradient_style_aurora);
 
     companion object {
         val DEFAULT = LINEAR
@@ -18,9 +22,16 @@ enum class GradientStyle(val key: String) {
     }
 }
 
-/** How the gradient moves while Animated backgrounds is on. [key] is stored in prefs and backups; never rename it. */
-enum class GradientMotion(val key: String) {
-    DRIFT("drift"), ROTATE("rotate"), BREATHE("breathe"), HUE_CYCLE("hue_cycle"), WAVE("wave");
+/**
+ * How the gradient moves while Animated backgrounds is on. [key] is stored in prefs and backups; never rename it.
+ * [labelRes] is its display name.
+ */
+enum class GradientMotion(val key: String, @StringRes val labelRes: Int) {
+    DRIFT("drift", R.string.gradient_motion_drift),
+    ROTATE("rotate", R.string.gradient_motion_rotate),
+    BREATHE("breathe", R.string.gradient_motion_breathe),
+    HUE_CYCLE("hue_cycle", R.string.gradient_motion_hue_cycle),
+    WAVE("wave", R.string.gradient_motion_wave);
 
     companion object {
         val DEFAULT = DRIFT
