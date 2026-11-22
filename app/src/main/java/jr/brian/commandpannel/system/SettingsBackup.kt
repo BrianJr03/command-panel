@@ -81,18 +81,34 @@ object SettingsBackup {
         // Stage in app storage, then copy to the visible folder as root.
         val staged = File(context.cacheDir, name).apply { writeText(json) }
         val dest = "$DIR/$name"
-        privileged.shell("mkdir -p $DIR && cp ${staged.absolutePath} $dest && chmod 644 $dest")
+        val q = ThemeFolder::q
+        privileged.shell("mkdir -p ${q(DIR)} && cp ${q(staged.absolutePath)} ${q(dest)} && chmod 644 ${q(dest)}")
         staged.delete()
         MediaScannerConnection.scanFile(context, arrayOf(dest), arrayOf("application/json"), null)
         return dest
     }
 
+    /**
+     * The name [export] gives a backup. The backups folder is shared storage any app can write to, and the names go
+     * into a root shell, so only names of exactly this form are listed or read.
+     */
+    private val BACKUP_NAME = Regex("""command-panel-backup-\d{8}-\d{6}\.json""")
+
+    /** Whether [name] (a file name, not a path) is one [export] could have written. Pure, so it's unit tested. */
+    fun isBackupName(name: String): Boolean = BACKUP_NAME.matches(name)
+
+    /** Backups in the folder, newest first, as full paths. Files not named like a backup are skipped. */
     fun list(privileged: PrivilegedAccess): List<String> =
-        privileged.shell("ls -1t $DIR 2>/dev/null").orEmpty()
-            .lineSequence().filter { it.endsWith(".json") }.map { "$DIR/$it" }.toList()
+        names(privileged.shell("ls -1t ${ThemeFolder.q(DIR)} 2>/dev/null").orEmpty()).map { "$DIR/$it" }
+
+    /** The backup names in `ls -1` output, in order. Pure, so it's unit tested. */
+    fun names(lsOutput: String): List<String> =
+        lsOutput.lineSequence().map { it.trim() }.filter(::isBackupName).toList()
 
     fun import(context: Context, privileged: PrivilegedAccess, path: String): Int {
-        val json = privileged.shell("cat $path") ?: return 0
+        // Only a backup in our folder, by its exact name; quoted all the same.
+        if (path.substringBeforeLast('/') != DIR || !isBackupName(path.substringAfterLast('/'))) return 0
+        val json = privileged.shell("cat ${ThemeFolder.q(path)}") ?: return 0
         val values = decode(json) ?: return 0
         val editor = Prefs.of(context).edit()
         for ((k, v) in values) when (v) {

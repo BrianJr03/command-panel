@@ -4,14 +4,14 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import jr.brian.commandpannel.privileged.HiddenApi
-import java.io.BufferedReader
-import java.util.concurrent.TimeUnit
 
 /**
  * Entry point of the root helper. Launched by the app as:
  *
  *     CLASSPATH=<apk> app_process /system/bin \
- *         jr.brian.commandpannel.privileged.helper.RootHelperMain <appPackage>
+ *         jr.brian.commandpannel.privileged.helper.RootHelperMain <appPackage> [<appUid>]
+ *
+ * `<appUid>` is the only uid (besides root) the helper answers; without it the helper looks it up with `pm`.
  *
  * It runs as the uid `PServerBinder` gives it (root on this firmware), builds the [IRootHelper] stub, and publishes
  * it under a per-app name in `ServiceManager`, where the app picks it up with `getService`. It then waits on a
@@ -33,7 +33,7 @@ object RootHelperMain {
         Looper.prepareMainLooper()
         HiddenApi.exempt()
 
-        val binder = RootHelperService(appPackage)
+        val binder = RootHelperService(appPackage, launchUid = args.getOrNull(1)?.toIntOrNull())
         if (!publishBinder(appPackage, binder)) {
             Log.e(TAG, "failed to publish binder; exiting")
             return
@@ -55,21 +55,7 @@ object RootHelperMain {
         }
     }
 
-    /** Runs a command via /system/bin/sh as the helper's uid. */
-    fun runShell(command: String, timeoutMs: Int): Triple<Int, String, String> {
-        return try {
-            val p = ProcessBuilder("/system/bin/sh", "-c", command).redirectErrorStream(false).start()
-            val out = p.inputStream.bufferedReader().use(BufferedReader::readText)
-            val err = p.errorStream.bufferedReader().use(BufferedReader::readText)
-            val finished = p.waitFor(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
-            if (!finished) {
-                p.destroyForcibly()
-                Triple(-1, out, "timeout after ${timeoutMs}ms")
-            } else {
-                Triple(p.exitValue(), out, err)
-            }
-        } catch (t: Throwable) {
-            Triple(-1, "", t.message ?: t.javaClass.simpleName)
-        }
-    }
+    /** Runs a command via /system/bin/sh as the helper's uid. See [ShellRunner] for the timeout. */
+    fun runShell(command: String, timeoutMs: Int): Triple<Int, String, String> =
+        ShellRunner.run(listOf("/system/bin/sh", "-c", command), timeoutMs.toLong())
 }

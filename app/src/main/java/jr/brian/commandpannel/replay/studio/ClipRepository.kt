@@ -140,12 +140,13 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
     private fun rootCopy(clip: ReplayClip, dest: File): File? {
         val uid = android.os.Process.myUid()
         val dst = shellQuote(dest.absolutePath)
-        privileged.shell(
+        // The marker, not just a readable file: a copy cut off by the timeout is readable but incomplete.
+        val copied = privileged.shell(
             "cp ${shellQuote(clip.path)} $dst && chown $uid:$uid $dst && chmod 600 $dst && " +
-                "(restorecon $dst >/dev/null 2>&1; true)",
-            COPY_TIMEOUT_MS,
-        )
-        if (canRead(dest)) return dest
+                "(restorecon $dst >/dev/null 2>&1; true) && echo $COPIED_MARKER",
+            jr.brian.commandpannel.system.ClipCopy.TIMEOUT_MS,
+        )?.contains(COPIED_MARKER) == true
+        if (copied && canRead(dest)) return dest
         Log.w(TAG, "no readable copy of ${clip.path}")
         runCatching { dest.delete() }
         return null
@@ -176,7 +177,7 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
         private const val READ_DIR = "replay_read"
         private const val DECODE_DIR = "replay_decode"
         private const val LIST_TIMEOUT_MS = 10_000
-        private const val COPY_TIMEOUT_MS = 30_000
+        private const val COPIED_MARKER = "__CP_COPIED__"
         private const val END_MARKER = "__CP_LIST_END__"
         private const val GONE_MARKER = "__CP_GONE__"
 

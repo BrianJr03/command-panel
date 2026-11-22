@@ -263,14 +263,14 @@ class ClipTrimmer(
         val path = ScreenRecorderEngine.pickFreeReplayClipPath(base, taken)
             ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
             ?: throw PlaceError(TrimError.INVALID_PATH)
-        val dst = shellQuote(path)
-        // `[ ! -e ]` keeps a file that appeared since the listing; this never overwrites anything.
+        // Keeps a file that appeared since the listing; this never overwrites anything.
         val copied = privileged.shell(
-            "[ ! -e $dst ] && cp ${shellQuote(tmp.absolutePath)} $dst && chmod 664 $dst && echo $COPY_OK",
-            COPY_TIMEOUT_MS,
+            jr.brian.commandpannel.system.ClipCopy.command(tmp.absolutePath, path, COPY_OK),
+            jr.brian.commandpannel.system.ClipCopy.TIMEOUT_MS,
         )?.contains(COPY_OK) == true
         if (!copied) {
             Log.w(TAG, "couldn't copy the trim into ${clip.dir}")
+            privileged.shell(jr.brian.commandpannel.system.ClipCopy.cleanupCommand(path))
             return null
         }
         val uri = shellQuote(Uri.fromFile(File(path)).toString())
@@ -289,7 +289,6 @@ class ClipTrimmer(
 
         private const val WORK_DIR = "replay_trim"
         private const val MIN_BUFFER_BYTES = 1024 * 1024
-        private const val COPY_TIMEOUT_MS = 30_000
         private const val LIST_END = "__CP_LS_END__"
         private const val COPY_OK = "__CP_COPY_OK__"
 

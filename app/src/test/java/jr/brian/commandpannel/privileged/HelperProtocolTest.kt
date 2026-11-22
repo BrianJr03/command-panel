@@ -2,6 +2,7 @@ package jr.brian.commandpannel.privileged
 
 import jr.brian.commandpannel.privileged.helper.HelperProtocol
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,5 +34,24 @@ class HelperProtocolTest {
     fun reconnectBackoffDoublesUpToTheCap() {
         assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L), (0..6).map(HelperProtocol::backoffMs))
         assertEquals(30_000L, HelperProtocol.backoffMs(40)) // no shift overflow
+    }
+
+    @Test
+    fun onlyRootTheHelperAndTheAppMayCall() {
+        val app = 10_123
+        val helper = 0
+        assertTrue(HelperProtocol.isAllowedCaller(0, appUid = app, helperUid = helper))
+        assertTrue(HelperProtocol.isAllowedCaller(app, appUid = app, helperUid = helper))
+        assertTrue(HelperProtocol.isAllowedCaller(1_000, appUid = app, helperUid = 1_000)) // a non-root helper itself
+        assertFalse(HelperProtocol.isAllowedCaller(10_456, appUid = app, helperUid = helper)) // another app
+        assertFalse(HelperProtocol.isAllowedCaller(2_000, appUid = app, helperUid = helper)) // adb shell
+    }
+
+    @Test
+    fun anUnknownAppUidLetsNoAppIn() {
+        // A failed `pm` lookup (-1) must not match some other caller.
+        assertFalse(HelperProtocol.isAllowedCaller(-1, appUid = -1, helperUid = 0))
+        assertFalse(HelperProtocol.isAllowedCaller(10_456, appUid = -1, helperUid = 0))
+        assertTrue(HelperProtocol.isAllowedCaller(0, appUid = -1, helperUid = 0))
     }
 }

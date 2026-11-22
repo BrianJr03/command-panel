@@ -17,6 +17,13 @@ object HelperProtocol {
     /** How long the helper outlives its client (app crash, force-stop) before it recovers stock and exits. */
     const val GRACE_MS = 10_000L
 
+    /**
+     * Whether [callingUid] may use the helper: root, the helper's own uid, or the app's ([appUid], -1 when unknown).
+     * Pure, so it's unit tested.
+     */
+    fun isAllowedCaller(callingUid: Int, appUid: Int, helperUid: Int): Boolean =
+        callingUid == 0 || callingUid == helperUid || (appUid > 0 && callingUid == appUid)
+
     private const val BACKOFF_CAP_MS = 30_000L
 
     /** Delay before reconnect attempt [attempt] (0-based) after the helper dies: 1, 2, 4, 8, 16, then 30 s. */

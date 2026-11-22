@@ -305,10 +305,9 @@ class SettingsViewModel @Inject constructor(
     fun setReplayEnabled(enable: Boolean) {
         prefs.edit().putBoolean("replay_enabled", enable).apply()
         AssistantService.start(app)
-        app.sendBroadcast(
-            Intent(AssistantService.ACTION_REPLAY_SET_ENABLED).setPackage(app.packageName)
-                .putExtra(AssistantService.EXTRA_ENABLE, enable),
-        )
+        AssistantService.control(app, AssistantService.ACTION_REPLAY_SET_ENABLED) {
+            putExtra(AssistantService.EXTRA_ENABLE, enable)
+        }
         _state.value = _state.value.copy(replayEnabled = enable, replayMessage = app.getString(if (enable) R.string.msg_replay_arming else R.string.msg_replay_off))
     }
 
@@ -326,7 +325,7 @@ class SettingsViewModel @Inject constructor(
                 runCatching { c.unregisterReceiver(this) }
             }
         }, android.content.IntentFilter(AssistantService.ACTION_REPLAY_REARMED), android.content.Context.RECEIVER_NOT_EXPORTED)
-        app.sendBroadcast(Intent(AssistantService.ACTION_REPLAY_REARM).setPackage(app.packageName))
+        AssistantService.control(app, AssistantService.ACTION_REPLAY_REARM)
         return app.getString(R.string.msg_replay_rearming)
     }
 
@@ -454,7 +453,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveReplayClip() {
-        app.sendBroadcast(Intent(AssistantService.ACTION_REPLAY_SAVE).setPackage(app.packageName))
+        AssistantService.control(app, AssistantService.ACTION_REPLAY_SAVE)
         _state.value = _state.value.copy(replayMessage = app.getString(R.string.msg_replay_saving))
         // Surface the result the service broadcasts back.
         val filter = android.content.IntentFilter(AssistantService.ACTION_REPLAY_SAVED)

@@ -62,7 +62,8 @@ import dagger.hilt.android.AndroidEntryPoint
  * [OverlayHost], and runs the [AynButtonMachine].
  *
  * The AYN broadcast is registered dynamically (while the service lives), matching stock; it is never a manifest
- * receiver. `ACTION_SHOW_OVERLAY` / `ACTION_HIDE_OVERLAY` let the app (and tests, via `am broadcast`) drive it.
+ * receiver. The app drives the control actions (`ACTION_SHOW_OVERLAY`, `ACTION_HIDE_OVERLAY`, …) through [control];
+ * scripts and tests can still send them with `adb shell am broadcast` (see [CONTROL_PERMISSION]).
  */
 @AndroidEntryPoint
 class AssistantService : Service() {
@@ -124,96 +125,112 @@ class AssistantService : Service() {
         }
     }
 
-    private val aynReceiver = object : BroadcastReceiver() {
-        override fun onReceive(ctx: Context, intent: Intent) {
-            when (intent.action) {
-                ACTION_TCC_BUTTON -> {
-                    val extras = intent.extras
-                    // Read like BDSA: a missing key_action_down is a key-up, never a long press (#14).
-                    @Suppress("DEPRECATION")
-                    val event = AynButtonEvent.parse { key -> extras?.get(key) }
-                    val down = event.down
-                    val long = event.longPress
-                    val keys = extras?.keySet()?.sorted()?.joinToString(",").orEmpty()
-                    Log.d(TAG, "AYN button down=$down long=$long standby=$standby extras=[$keys]")
-                    // On standby the other replacement answers the button; a cheap (cached) re-check picks up its
-                    // being turned off.
-                    if (standby) {
-                        recheckStandby(force = false)
-                    } else {
-                        // The stock app also got this press if it's no longer frozen; take the button back.
-                        if (down) coexistence.ensureSuppressed()
-                        machine.onEvent(down, long)
+    /**
+     * The firmware's AYN button and volume-key broadcasts. Exported with no permission, since the vendor sender can't
+     * be told apart; a spoofed press can only do what a real press does.
+     */
+    private val firmwareReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) = handleIntent(intent)
+    }
+
+    /**
+     * Every other action, for `am broadcast` from adb (scripts, tests) and the system only: registered with
+     * [CONTROL_PERMISSION], which the shell and system hold and an installed app doesn't get on its own. The app itself
+     * sends these to the service directly with [control] instead (the service isn't exported).
+     */
+    private val controlReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) = handleIntent(intent)
+    }
+
+    /** Handles an action from either receiver or [onStartCommand]. */
+    private fun handleIntent(intent: Intent) {
+        when (intent.action) {
+            ACTION_TCC_BUTTON -> {
+                val extras = intent.extras
+                // Read like BDSA: a missing key_action_down is a key-up, never a long press (#14).
+                @Suppress("DEPRECATION")
+                val event = AynButtonEvent.parse { key -> extras?.get(key) }
+                val down = event.down
+                val long = event.longPress
+                val keys = extras?.keySet()?.sorted()?.joinToString(",").orEmpty()
+                Log.d(TAG, "AYN button down=$down long=$long standby=$standby extras=[$keys]")
+                // On standby the other replacement answers the button; a cheap (cached) re-check picks up its
+                // being turned off.
+                if (standby) {
+                    recheckStandby(force = false)
+                } else {
+                    // The stock app also got this press if it's no longer frozen; take the button back.
+                    if (down) coexistence.ensureSuppressed()
+                    machine.onEvent(down, long)
+                }
+            }
+            VolumeKeyChain.ACTION -> {
+                val keyType = intent.getStringExtra(VolumeKeyChain.EXTRA_KEY_TYPE)
+                val owns = stockReplaced()
+                Log.d(TAG, "volume key $keyType stockReplaced=$owns")
+                if (owns) repository.onVolumeKey(keyType)
+            }
+            ACTION_SHOW_OVERLAY -> showPanel(auto = intent.getBooleanExtra(EXTRA_AUTO, false))
+            ACTION_HIDE_OVERLAY -> overlay.hide()
+            ACTION_TOGGLE_OVERLAY -> togglePanel(EndReason.PANEL_REQUESTED)
+            ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+            ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
+            // Registered only in debug builds; checked again so a release build never acts on them.
+            ACTION_DEBUG_PLUGIN_START -> if (BuildConfig.DEBUG) debugStartPlugin(intent)
+            ACTION_DEBUG_PLUGIN_END -> if (BuildConfig.DEBUG) pluginSession.end(EndReason.DEBUG)
+            ACTION_DEBUG_HELPER_STOP -> if (BuildConfig.DEBUG) {
+                Log.i(TAG, "debug: stopping the root helper")
+                jr.brian.commandpannel.privileged.RootHelper.shutdown()
+            }
+            ACTION_DEBUG_HELPER_START -> if (BuildConfig.DEBUG) scope.launch {
+                Log.i(TAG, "debug: starting the root helper")
+                privileged.initialize(applicationContext)
+            }
+            // Opens Replay Studio's player on a clip ([EXTRA_CLIP_PATH]), for scripts; the activity isn't exported.
+            ACTION_DEBUG_OPEN_PLAYER -> if (BuildConfig.DEBUG) {
+                // Optional: set "Play on the recorded screen" (#47) first, so scripts can try both ways.
+                if (intent.hasExtra(EXTRA_PLAY_ON_SOURCE_SCREEN)) {
+                    Prefs.of(applicationContext).edit().putBoolean(
+                        jr.brian.commandpannel.replay.studio.PREF_PLAY_ON_SOURCE_SCREEN,
+                        intent.getBooleanExtra(EXTRA_PLAY_ON_SOURCE_SCREEN, false),
+                    ).commit()
+                }
+                intent.getStringExtra(EXTRA_CLIP_PATH)?.let {
+                    ReplayPlayerActivity.launch(applicationContext, it)
+                }
+            }
+            // The double press's save (toast and notification with View, #48), for scripts.
+            ACTION_DEBUG_SAVE_OR_ARM -> if (BuildConfig.DEBUG) saveOrArmReplay(SOURCE_DOUBLE_PRESS)
+            // The Mode tab's own path (dual / only top / only bottom), for scripts.
+            ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
+            // The Performance dialog's path (with its fan fallback), and opening a tile's dialog, for scripts (#59).
+            ACTION_DEBUG_SET_PERFORMANCE -> if (BuildConfig.DEBUG) repository.setPerformance(intent.getIntExtra(EXTRA_MODE, 0))
+            ACTION_DEBUG_OPEN_DIALOG -> if (BuildConfig.DEBUG) {
+                showPanel(auto = false)
+                jr.brian.commandpannel.ui.overlay.OverlayDebug.openDialog.value = intent.getStringExtra(EXTRA_TILE)
+            }
+            // Seeds (or removes) a look with a background image, or presses the Background image tile, for scripts (#57, #58).
+            ACTION_DEBUG_BACKGROUND -> if (BuildConfig.DEBUG) {
+                if (intent.getBooleanExtra(jr.brian.commandpannel.system.BackgroundImageDebug.EXTRA_PRESS_TILE, false)) {
+                    repository.onTileClick(QuickSettingTileId.BACKGROUND_IMAGE.key)
+                } else {
+                    scope.launch(Dispatchers.IO) {
+                        jr.brian.commandpannel.system.BackgroundImageDebug.handle(applicationContext, privileged, intent)
                     }
                 }
-                VolumeKeyChain.ACTION -> {
-                    val keyType = intent.getStringExtra(VolumeKeyChain.EXTRA_KEY_TYPE)
-                    val owns = stockReplaced()
-                    Log.d(TAG, "volume key $keyType stockReplaced=$owns")
-                    if (owns) repository.onVolumeKey(keyType)
-                }
-                ACTION_SHOW_OVERLAY -> showPanel(auto = intent.getBooleanExtra(EXTRA_AUTO, false))
-                ACTION_HIDE_OVERLAY -> overlay.hide()
-                ACTION_TOGGLE_OVERLAY -> togglePanel(EndReason.PANEL_REQUESTED)
-                ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
-                ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
-                // Registered only in debug builds; checked again so a release build never acts on them.
-                ACTION_DEBUG_PLUGIN_START -> if (BuildConfig.DEBUG) debugStartPlugin(intent)
-                ACTION_DEBUG_PLUGIN_END -> if (BuildConfig.DEBUG) pluginSession.end(EndReason.DEBUG)
-                ACTION_DEBUG_HELPER_STOP -> if (BuildConfig.DEBUG) {
-                    Log.i(TAG, "debug: stopping the root helper")
-                    jr.brian.commandpannel.privileged.RootHelper.shutdown()
-                }
-                ACTION_DEBUG_HELPER_START -> if (BuildConfig.DEBUG) scope.launch {
-                    Log.i(TAG, "debug: starting the root helper")
-                    privileged.initialize(applicationContext)
-                }
-                // Opens Replay Studio's player on a clip ([EXTRA_CLIP_PATH]), for scripts; the activity isn't exported.
-                ACTION_DEBUG_OPEN_PLAYER -> if (BuildConfig.DEBUG) {
-                    // Optional: set "Play on the recorded screen" (#47) first, so scripts can try both ways.
-                    if (intent.hasExtra(EXTRA_PLAY_ON_SOURCE_SCREEN)) {
-                        Prefs.of(applicationContext).edit().putBoolean(
-                            jr.brian.commandpannel.replay.studio.PREF_PLAY_ON_SOURCE_SCREEN,
-                            intent.getBooleanExtra(EXTRA_PLAY_ON_SOURCE_SCREEN, false),
-                        ).commit()
-                    }
-                    intent.getStringExtra(EXTRA_CLIP_PATH)?.let {
-                        ReplayPlayerActivity.launch(applicationContext, it)
-                    }
-                }
-                // The double press's save (toast and notification with View, #48), for scripts.
-                ACTION_DEBUG_SAVE_OR_ARM -> if (BuildConfig.DEBUG) saveOrArmReplay(SOURCE_DOUBLE_PRESS)
-                // The Mode tab's own path (dual / only top / only bottom), for scripts.
-                ACTION_DEBUG_SELECT_MODE -> if (BuildConfig.DEBUG) repository.selectMode(intent.getIntExtra(EXTRA_MODE, 0))
-                // The Performance dialog's path (with its fan fallback), and opening a tile's dialog, for scripts (#59).
-                ACTION_DEBUG_SET_PERFORMANCE -> if (BuildConfig.DEBUG) repository.setPerformance(intent.getIntExtra(EXTRA_MODE, 0))
-                ACTION_DEBUG_OPEN_DIALOG -> if (BuildConfig.DEBUG) {
-                    showPanel(auto = false)
-                    jr.brian.commandpannel.ui.overlay.OverlayDebug.openDialog.value = intent.getStringExtra(EXTRA_TILE)
-                }
-                // Seeds (or removes) a look with a background image, or presses the Background image tile, for scripts (#57, #58).
-                ACTION_DEBUG_BACKGROUND -> if (BuildConfig.DEBUG) {
-                    if (intent.getBooleanExtra(jr.brian.commandpannel.system.BackgroundImageDebug.EXTRA_PRESS_TILE, false)) {
-                        repository.onTileClick(QuickSettingTileId.BACKGROUND_IMAGE.key)
-                    } else {
-                        scope.launch(Dispatchers.IO) {
-                            jr.brian.commandpannel.system.BackgroundImageDebug.handle(applicationContext, privileged, intent)
-                        }
-                    }
-                }
-                ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
-                    if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
-                    else replay.applyEnabledState()
-                }
-                ACTION_REPLAY_REARM -> scope.launch(Dispatchers.IO) {
-                    val armed = Prefs.of(applicationContext).getBoolean("replay_enabled", false) && replay.rearm()
-                    sendBroadcast(Intent(ACTION_REPLAY_REARMED).setPackage(packageName).putExtra(EXTRA_REPLAY_ARMED, armed))
-                }
-                ACTION_REPLAY_SAVE -> scope.launch(Dispatchers.IO) {
-                    val result = replay.save()
-                    Log.i(TAG, "replay save: $result")
-                    sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
-                }
+            }
+            ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
+                if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
+                else replay.applyEnabledState()
+            }
+            ACTION_REPLAY_REARM -> scope.launch(Dispatchers.IO) {
+                val armed = Prefs.of(applicationContext).getBoolean("replay_enabled", false) && replay.rearm()
+                sendBroadcast(Intent(ACTION_REPLAY_REARMED).setPackage(packageName).putExtra(EXTRA_REPLAY_ARMED, armed))
+            }
+            ACTION_REPLAY_SAVE -> scope.launch(Dispatchers.IO) {
+                val result = replay.save()
+                Log.i(TAG, "replay save: $result")
+                sendBroadcast(Intent(ACTION_REPLAY_SAVED).setPackage(packageName).putExtra(EXTRA_REPLAY_RESULT, result))
             }
         }
     }
@@ -348,15 +365,14 @@ class AssistantService : Service() {
             // The companion's automatic preview on launch is skipped on standby, so it doesn't cover the other app's
             // overlay; an explicit show (preview button) still works.
             ACTION_SHOW_OVERLAY -> showPanel(auto = intent.getBooleanExtra(EXTRA_AUTO, false))
-            ACTION_HIDE_OVERLAY -> overlay.hide()
-            ACTION_TOGGLE_OVERLAY -> togglePanel(EndReason.PANEL_REQUESTED)
-            ACTION_SET_REPLACE_STOCK -> coexistence.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
-            ACTION_RECHECK_COEXISTENCE -> recheckStandby(force = true)
             // Only reachable through ExternalTriggerReceiver (the service isn't exported); a no-op on standby.
             ACTION_REPLAY_SAVE_OR_ARM -> saveOrArmReplay(SOURCE_EXTERNAL)
             // Sent by ReplayPlayerActivity (same app; the service isn't exported).
             ACTION_REPLAY_PLAYER_OPEN -> onReplayPlayer(open = true)
             ACTION_REPLAY_PLAYER_CLOSED -> onReplayPlayer(open = false)
+            // The app's own controls (hide, toggle, replace stock, replay on/off, save, re-arm, …), see [control].
+            null -> Unit
+            else -> handleIntent(intent)
         }
         return START_STICKY
     }
@@ -371,7 +387,8 @@ class AssistantService : Service() {
         Prefs.of(applicationContext).unregisterOnSharedPreferenceChangeListener(navPrefsListener)
         isRunning = false
         handler.removeCallbacksAndMessages(null)
-        runCatching { unregisterReceiver(aynReceiver) }
+        runCatching { unregisterReceiver(firmwareReceiver) }
+        runCatching { unregisterReceiver(controlReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
         runCatching { unregisterReceiver(packageReceiver) }
         coexistence.sibling.stop()
@@ -679,36 +696,36 @@ class AssistantService : Service() {
     }
 
     private fun registerAynReceiver() {
-        val filter = IntentFilter().apply {
+        val firmware = IntentFilter().apply {
             addAction(ACTION_TCC_BUTTON)
             addAction(VolumeKeyChain.ACTION)
-            addAction(ACTION_SHOW_OVERLAY)
-            addAction(ACTION_HIDE_OVERLAY)
-            addAction(ACTION_TOGGLE_OVERLAY)
-            addAction(ACTION_SET_REPLACE_STOCK)
-            addAction(ACTION_RECHECK_COEXISTENCE)
-            addAction(ACTION_REPLAY_SET_ENABLED)
-            addAction(ACTION_REPLAY_SAVE)
-            addAction(ACTION_REPLAY_REARM)
-            if (BuildConfig.DEBUG) {
-                addAction(ACTION_DEBUG_OPEN_PLAYER)
-                addAction(ACTION_DEBUG_SAVE_OR_ARM)
-                addAction(ACTION_DEBUG_PLUGIN_START)
-                addAction(ACTION_DEBUG_PLUGIN_END)
-                addAction(ACTION_DEBUG_HELPER_STOP)
-                addAction(ACTION_DEBUG_HELPER_START)
-                addAction(ACTION_DEBUG_SELECT_MODE)
-                addAction(ACTION_DEBUG_SET_PERFORMANCE)
-                addAction(ACTION_DEBUG_OPEN_DIALOG)
-                addAction(ACTION_DEBUG_BACKGROUND)
-            }
         }
-        // Exported so the firmware's system broadcast and `am broadcast` can reach it.
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(aynReceiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(aynReceiver, filter)
+        registerReceiver(firmwareReceiver, firmware, Context.RECEIVER_EXPORTED)
+        // Exported, but only to senders holding CONTROL_PERMISSION (adb shell, system). Any other app's broadcast is
+        // dropped by the system before it gets here, so it can't arm the replay buffer or turn off stock suppression.
+        registerReceiver(controlReceiver, controlFilter(), CONTROL_PERMISSION, null, Context.RECEIVER_EXPORTED)
+    }
+
+    private fun controlFilter() = IntentFilter().apply {
+        addAction(ACTION_SHOW_OVERLAY)
+        addAction(ACTION_HIDE_OVERLAY)
+        addAction(ACTION_TOGGLE_OVERLAY)
+        addAction(ACTION_SET_REPLACE_STOCK)
+        addAction(ACTION_RECHECK_COEXISTENCE)
+        addAction(ACTION_REPLAY_SET_ENABLED)
+        addAction(ACTION_REPLAY_SAVE)
+        addAction(ACTION_REPLAY_REARM)
+        if (BuildConfig.DEBUG) {
+            addAction(ACTION_DEBUG_OPEN_PLAYER)
+            addAction(ACTION_DEBUG_SAVE_OR_ARM)
+            addAction(ACTION_DEBUG_PLUGIN_START)
+            addAction(ACTION_DEBUG_PLUGIN_END)
+            addAction(ACTION_DEBUG_HELPER_STOP)
+            addAction(ACTION_DEBUG_HELPER_START)
+            addAction(ACTION_DEBUG_SELECT_MODE)
+            addAction(ACTION_DEBUG_SET_PERFORMANCE)
+            addAction(ACTION_DEBUG_OPEN_DIALOG)
+            addAction(ACTION_DEBUG_BACKGROUND)
         }
     }
 
@@ -734,6 +751,24 @@ class AssistantService : Service() {
         private const val TAG = "AssistantService"
         private const val CHANNEL_ID = "command_panel"
         private const val NOTIF_ID = 1
+
+        /**
+         * What a broadcast to the control actions must hold. `DUMP` is held by the adb shell and the system. An installed
+         * app can only get it through adb or root (it's a development permission), so `adb shell am broadcast …` keeps
+         * working for scripts while other apps on the device are refused.
+         */
+        const val CONTROL_PERMISSION = android.Manifest.permission.DUMP
+
+        /**
+         * Sends one of the control actions from inside the app, straight to the service (which isn't exported, so
+         * only this app, root and the system can start it). Use this rather than a broadcast: the control receiver
+         * requires [CONTROL_PERMISSION], which the app doesn't hold.
+         */
+        fun control(context: Context, action: String, configure: Intent.() -> Unit = {}) {
+            val intent = Intent(context, AssistantService::class.java).setAction(action).apply(configure)
+            runCatching { context.startService(intent) }
+                .onFailure { Log.w(TAG, "couldn't send $action to the service", it) }
+        }
 
         const val ACTION_TCC_BUTTON = "action.tcc.button.key.event"
 

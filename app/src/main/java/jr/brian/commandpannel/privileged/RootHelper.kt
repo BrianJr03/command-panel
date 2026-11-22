@@ -102,7 +102,9 @@ object RootHelper {
                 append("CLASSPATH=").append(appInfo.sourceDir).append(' ')
                 append("app_process /system/bin ")
                 append(HelperProtocol.MAIN_CLASS).append(' ')
-                append(context.packageName)
+                append(context.packageName).append(' ')
+                // The helper answers only this uid (and root); see RootHelperService.onTransact.
+                append(android.os.Process.myUid())
                 append(" >/dev/null 2>&1 &")
             }
             VendorRootShell.exec(cmd, wait = false)

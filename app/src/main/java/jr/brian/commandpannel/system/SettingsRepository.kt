@@ -547,9 +547,8 @@ class SettingsRepository(
                 val enable = !prefs.getBoolean("replay_enabled", false)
                 prefs.edit().putBoolean("replay_enabled", enable).apply()
                 // Let the service's replay controller arm/disarm to match the pref.
-                context.sendBroadcast(
-                    Intent(jr.brian.commandpannel.service.AssistantService.ACTION_REPLAY_SET_ENABLED)
-                        .setPackage(context.packageName),
+                jr.brian.commandpannel.service.AssistantService.control(
+                    context, jr.brian.commandpannel.service.AssistantService.ACTION_REPLAY_SET_ENABLED,
                 )
             }
             // focus_lock, performance, fan, controller, theme, trigger_mode, screenshot → modal dialogs (in the overlay)

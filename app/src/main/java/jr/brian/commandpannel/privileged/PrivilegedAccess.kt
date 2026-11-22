@@ -2,6 +2,7 @@ package jr.brian.commandpannel.privileged
 
 import android.content.Context
 import android.util.Log
+import jr.brian.commandpannel.privileged.helper.ShellRunner
 import jr.brian.commandpannel.privileged.helper.TaskFps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,10 +49,12 @@ class PrivilegedAccess @Inject constructor() {
     /** The helper's connection state, to act when it (re)connects. */
     val helperState: kotlinx.coroutines.flow.StateFlow<RootHelper.State> get() = RootHelper.state
 
-    /** Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout or null. */
+    /** Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout, or null on a timeout. */
     fun shell(command: String, timeoutMs: Int = 5_000): String? {
         RootHelper.binder?.let { h ->
-            return runCatching { h.exec(command, timeoutMs).getString("out") }.getOrNull()
+            return runCatching {
+                h.exec(command, timeoutMs).takeIf { it.getInt("exit") != ShellRunner.FAILED }?.getString("out")
+            }.getOrNull()
         }
         return VendorRootShell.exec(command)
     }

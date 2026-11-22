@@ -19,7 +19,11 @@ import kotlin.system.exitProcess
  * to come back and reattach (a crash restart). If the package is uninstalled, or the grace runs out, it restores the
  * stock assistant when recovery is armed (so a frozen stock process never leaves the AYN button dead) and exits.
  */
-class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
+class RootHelperService(
+    private val appPackage: String,
+    /** The app's uid as the app passed it at launch, or null (an older launch command): then it's looked up. */
+    private val launchUid: Int? = null,
+) : IRootHelper.Stub() {
     private val tag = "RootHelperService"
     private val main = Handler(Looper.getMainLooper())
 
@@ -89,6 +93,22 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
         if (owner == appPackage) RootHelperMain.runShell("settings delete global $key", 5_000)
     }
 
+    /**
+     * Every [IRootHelper] call comes through here, so one check covers them all: only the app itself (or root) may use
+     * the helper. It is published in ServiceManager, and without this any process that can look it up would get a root
+     * shell (`exec`), screen capture (`startDisplayMirror`) and the rest. Binder's own transactions (ping, interface,
+     * dump) stay open, so `isBinderAlive` and `service list` still work.
+     */
+    override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+        if (code in FIRST_CALL_TRANSACTION..LAST_CALL_TRANSACTION && !callerIsApp()) {
+            val uid = android.os.Binder.getCallingUid()
+            Log.w(tag, "refused transaction $code from uid $uid")
+            // Written back to the caller as a SecurityException (one-way calls are dropped).
+            throw SecurityException("uid $uid may not use the Command Panel root helper")
+        }
+        return super.onTransact(code, data, reply, flags)
+    }
+
     override fun protocolVersion(): Int = HelperProtocol.VERSION
 
     override fun identity(): Bundle = Bundle().apply {
@@ -130,15 +150,9 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
         exitProcess(0)
     }
 
-    override fun showBlankLayer(displayId: Int): Boolean {
-        if (!callerIsApp()) {
-            Log.w(tag, "showBlankLayer refused for uid ${android.os.Binder.getCallingUid()}")
-            return false
-        }
-        return BlankLayer.show(displayId)
-    }
+    override fun showBlankLayer(displayId: Int): Boolean = BlankLayer.show(displayId)
 
-    override fun hideBlankLayer(displayId: Int): Boolean = callerIsApp() && BlankLayer.hide(displayId)
+    override fun hideBlankLayer(displayId: Int): Boolean = BlankLayer.hide(displayId)
 
     override fun removeTask(taskId: Int): Boolean = runCatching {
         val atm = Class.forName("android.app.ActivityTaskManager")
@@ -157,29 +171,30 @@ class RootHelperService(private val appPackage: String) : IRootHelper.Stub() {
 
     override fun stopDisplayMirror() = DisplayMirror.stop()
 
-    override fun startAudioCapture(sink: android.os.ParcelFileDescriptor, game: Boolean, mic: Boolean): Boolean {
-        if (!callerIsApp()) {
-            Log.w(tag, "startAudioCapture refused for uid ${android.os.Binder.getCallingUid()}")
-            runCatching { sink.close() }
-            return false
-        }
-        return AudioCapture.start(sink, game, mic)
-    }
+    override fun startAudioCapture(sink: android.os.ParcelFileDescriptor, game: Boolean, mic: Boolean): Boolean =
+        AudioCapture.start(sink, game, mic)
 
-    override fun stopAudioCapture() {
-        if (callerIsApp()) AudioCapture.stop()
-    }
+    override fun stopAudioCapture() = AudioCapture.stop()
 
-    /** The app's uid, from `pm`, looked up once; -1 if it can't be found. */
-    private val appUid: Int by lazy {
+    /**
+     * The app's uid: the one it passed at launch, else from `pm`. A failed lookup is retried on the next call rather
+     * than cached, so one slow `pm` at boot doesn't lock the app out of its own helper.
+     */
+    @Volatile
+    private var resolvedAppUid: Int = launchUid?.takeIf { it > 0 } ?: -1
+
+    private fun appUid(): Int {
+        resolvedAppUid.takeIf { it > 0 }?.let { return it }
         val out = RootHelperMain.runShell("pm list packages -U $appPackage", 5_000).second
-        Regex("package:${Regex.escape(appPackage)} uid:(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+        val uid = Regex("package:${Regex.escape(appPackage)} uid:(\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+        if (uid > 0) resolvedAppUid = uid
+        return uid
     }
 
-    /** Audio capture can include the mic, so only the app itself (or root) may start or stop it. */
+    /** Only the app itself, root, or the helper's own uid may call the helper (see [onTransact]). */
     private fun callerIsApp(): Boolean {
         val uid = android.os.Binder.getCallingUid()
-        return uid == 0 || uid == appUid
+        return HelperProtocol.isAllowedCaller(uid, appUid = appUid(), helperUid = android.os.Process.myUid())
     }
 
     override fun taskFps(displayId: Int): Bundle = TaskFps.sample(preferredDisplayId = displayId)

@@ -142,10 +142,12 @@ class ReplayBufferController(
                 val path = taken?.let { ScreenRecorderEngine.pickFreeReplayClipPath(basePath, it) }
                     ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
                 val copied = path != null && privileged.shell(
-                    "cp ${shellQuote(tmp.absolutePath)} ${shellQuote(path)} && chmod 664 ${shellQuote(path)} && echo $COPY_OK",
+                    ClipCopy.command(tmp.absolutePath, path, COPY_OK),
+                    ClipCopy.TIMEOUT_MS,
                 )?.contains(COPY_OK) == true
                 if (!copied || path == null) {
                     Log.w(tag, "couldn't copy the clip into $parent (name ${path ?: "unavailable"})")
+                    path?.let { privileged.shell(ClipCopy.cleanupCommand(it)) }
                     runCatching { tmp.delete() }
                     return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 }
