@@ -11,6 +11,7 @@ import jr.brian.commandpannel.privileged.ReplayClipWriter
 import jr.brian.commandpannel.privileged.ReplayClipsLocation
 import jr.brian.commandpannel.privileged.ReplayVolumes
 import jr.brian.commandpannel.privileged.ReplayRingBuffer
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
 import jr.brian.commandpannel.replay.studio.ClipAutoDelete
 import jr.brian.commandpannel.replay.studio.ClipRepository
@@ -67,14 +68,11 @@ class ReplayBufferController(
             lastSaveFellBack = true
             return ReplayClipsLocation.DEFAULT
         }
-        if (privileged.shell("[ -d ${shellQuote(custom.path)} ] && echo yes || echo no")?.trim() != "no") return custom
+        if (privileged.shell("[ -d ${RootShell.q(custom.path)} ] && echo yes || echo no")?.trim() != "no") return custom
         Log.i(tag, "custom clips folder '${custom.path}' is gone; saving to the default folder")
         prefs.edit().remove(ClipRepository.PREF_CLIPS_DIR).apply()
         return ReplayClipsLocation.DEFAULT
     }
-
-    /** Single-quotes [s] for the shell; folder names may contain an apostrophe. */
-    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
     /** Arms or disarms capture to match the `replay_enabled` pref. */
     fun applyEnabledState() {
@@ -136,7 +134,7 @@ class ReplayBufferController(
                 val parent = basePath.substringBeforeLast('/')
                 // Root lists the folder (the app can't always see it), so a second save in the same second gets `_2`.
                 // The folder is made only while the volume's root is there (a card pulled since the check).
-                val taken = privileged.shell("${ReplayVolumes.mkdirsCommand(location.root, parent)} && ls -1 ${shellQuote(parent)} 2>/dev/null; echo $LIST_END")
+                val taken = privileged.shell("${ReplayVolumes.mkdirsCommand(location.root, parent)} && ls -1 ${RootShell.q(parent)} 2>/dev/null; echo $LIST_END")
                     ?.takeIf { it.contains(LIST_END) }
                     ?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
                 val path = taken?.let { ScreenRecorderEngine.pickFreeReplayClipPath(basePath, it) }
@@ -154,7 +152,7 @@ class ReplayBufferController(
                 // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI. The media scanner
                 // indexes it on whichever volume it's on, so SD card clips show in the gallery too.
                 val uri = android.net.Uri.fromFile(File(path))
-                privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${shellQuote(uri.toString())} >/dev/null 2>&1")
+                privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${RootShell.q(uri.toString())} >/dev/null 2>&1")
                 val bytes = tmp.length()
                 runCatching { tmp.delete() }
                 // Replay Studio keeps listing this folder after the user picks another one.

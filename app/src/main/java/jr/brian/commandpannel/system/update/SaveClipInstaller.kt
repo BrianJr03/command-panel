@@ -2,7 +2,9 @@ package jr.brian.commandpannel.system.update
 
 import android.content.Context
 import android.content.pm.PackageManager
+import jr.brian.commandpannel.plugin.PanelPluginTrust
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.system.Http
 import org.json.JSONObject
 import java.io.File
@@ -50,7 +52,10 @@ object SaveClipInstaller {
             ?.let { a -> a.optString("browser_download_url").takeIf { it.startsWith("https://") }?.let { SaveClipAsset(it, a.optLong("size")) } }
     }
 
-    /** Downloads [asset] into the updates cache (shared with Android's installer) and checks it's TCP Save Clip. */
+    /**
+     * Downloads [asset] into the updates cache (shared with Android's installer) and [verify]s it. A file that fails the
+     * check is deleted.
+     */
     fun download(context: Context, asset: SaveClipAsset): File {
         val dest = File(File(context.cacheDir, "updates"), "tcp-sc.apk")
         Http.download(asset.url, dest, MAX_APK_BYTES)
@@ -58,20 +63,45 @@ object SaveClipInstaller {
             dest.delete()
             error("download incomplete")
         }
-        @Suppress("DEPRECATION")
-        val info = context.packageManager.getPackageArchiveInfo(dest.path, 0) ?: error("not a valid APK")
-        require(info.packageName == PACKAGE) { "the APK is for ${info.packageName}" }
+        runCatching { verify(context, dest) }.onFailure { dest.delete(); throw it }
         return dest
     }
 
     /**
-     * Installs [apk] through the root shell. [replace] first removes an installed copy, so one signed with another key,
-     * or installed before Command Panel, is installed fresh and gets the permission. Returns the installer's output, or
-     * null when the root shell isn't available.
+     * Checks [apk] is TCP Save Clip signed with this build's own key. The trigger permission is signature-level, so
+     * only a copy signed like Command Panel can work anyway, and this pins what root may install (and may replace an
+     * installed copy with) to the developer's key, the way ThorKBM's installer pins ThorKBM's.
+     */
+    fun verify(context: Context, apk: File) {
+        val pm = context.packageManager
+        @Suppress("DEPRECATION")
+        val info = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: error("not a valid APK")
+        val own = runCatching { pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
+        check(info.packageName, PanelPluginTrust.signerDigests(info), PanelPluginTrust.signerDigests(own))
+    }
+
+    /** [verify]'s rules, without Android: the package and signers an APK reported, and this build's own signers. */
+    internal fun check(packageName: String?, signers: List<String>, ownSigners: List<String>) {
+        require(packageName == PACKAGE) { "the APK is for $packageName" }
+        require(ownSigners.isNotEmpty()) { "couldn't read this build's signing key" }
+        require(PanelPluginTrust.isTrusted(signers, ownSigners.map(PanelPluginTrust::normalizeDigest).toSet())) { "the APK isn't signed with Command Panel's key" }
+    }
+
+    /**
+     * Installs [apk] (already [verify]d) through the root shell. The staged copy must hash the same as [apk], so what
+     * root installs is the APK that was checked. [replace] first removes an installed copy, so one installed before
+     * Command Panel (or signed with another key) is installed fresh and gets the permission. Returns the installer's
+     * output, or null when the root shell isn't available.
      */
     fun installWithRoot(privileged: PrivilegedAccess, apk: File, replace: Boolean): String? {
-        val staged = privileged.shell("cp '${apk.absolutePath}' $STAGED && chmod 644 $STAGED && echo ok", timeoutMs = 30_000)?.trim()
-        if (staged != "ok") return null
+        val sha = ApkDigest.sha256(apk)
+        val staged = privileged.shell(
+            "cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,
+        )?.trim() ?: return null
+        if (staged.substringBefore(' ') != sha) {
+            privileged.shell("rm -f $STAGED")
+            return if (staged.isEmpty()) null else "staged copy doesn't match"
+        }
         val uninstall = if (replace) "pm uninstall $PACKAGE >/dev/null 2>&1; " else ""
         return privileged.shell("${uninstall}pm install -r -t $STAGED 2>&1; rm -f $STAGED", timeoutMs = 60_000)?.trim()
     }

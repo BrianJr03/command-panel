@@ -68,15 +68,12 @@ object ReplayVolumes {
     fun storageRoots(mounted: Collection<String>): List<String> =
         PrivilegedHelperMain.DEFAULT_STORAGE_ROOTS + mounted.filter(::isRemovableId).distinct().sorted().map { "/storage/$it" }
 
-    /** Single-quotes [s] for the root shell; folder names may contain an apostrophe. */
-    fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
-
     /**
      * A root shell command that creates [dir] (under [root]) only while [root] exists, so a card pulled after the
      * mounted check never gets a plain folder made in its place under `/storage`. Succeeds (exit 0) only if [dir] exists.
      */
     fun mkdirsCommand(root: String, dir: String): String =
-        "[ -d ${shellQuote(root)} ] && mkdir -p ${shellQuote(dir)}"
+        "[ -d ${RootShell.q(root)} ] && mkdir -p ${RootShell.q(dir)}"
 
     /** A volume as [android.os.storage.StorageManager] reports it, reduced to what [stateOf] needs. */
     data class Snapshot(val id: String?, val state: String, val removable: Boolean, val primary: Boolean)

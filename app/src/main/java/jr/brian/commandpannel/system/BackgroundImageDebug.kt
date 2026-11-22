@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.ui.theme.LookRef
 import java.io.File
 
@@ -75,8 +76,8 @@ object BackgroundImageDebug {
         }
         val path = intent.getStringExtra(EXTRA_PATH) ?: return
         val staged = File(context.cacheDir, File(path).name)
-        val src = ThemeFolder.q(path)
-        val dest = ThemeFolder.q(staged.absolutePath)
+        val src = RootShell.q(path)
+        val dest = RootShell.q(staged.absolutePath)
         val copied = privileged.shell("cp $src $dest && chmod 644 $dest && echo ok")?.trim() == "ok"
         val result = if (copied) BackgroundImageStore.importFile(context, staged, BackgroundImageSetting.animationsOn(prefs))
         else Result.failure(IllegalStateException("copy failed"))

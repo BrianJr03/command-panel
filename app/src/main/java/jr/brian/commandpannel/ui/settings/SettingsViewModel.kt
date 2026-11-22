@@ -398,7 +398,7 @@ class SettingsViewModel @Inject constructor(
             val custom = _state.value.replayClipsLocation
             val resolved = jr.brian.commandpannel.system.ReplayStorage.resolve(app, custom)
             if (custom != null && !resolved.fellBack &&
-                privileged.shell("[ -d ${volumes.shellQuote(custom.path)} ] && echo yes || echo no")?.trim() == "no"
+                privileged.shell("[ -d ${jr.brian.commandpannel.privileged.RootShell.q(custom.path)} ] && echo yes || echo no")?.trim() == "no"
             ) {
                 prefs.edit().remove(jr.brian.commandpannel.replay.studio.ClipRepository.PREF_CLIPS_DIR).apply()
                 _state.value = withReplayLocation(_state.value, null)
@@ -1234,7 +1234,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setThemeMode(mode: Int) {
-        settings.putInt(SystemSettings.Keys.THEME_MODE, mode)
+        // A root write: off the main thread.
+        viewModelScope.launch(Dispatchers.IO) { settings.putInt(SystemSettings.Keys.THEME_MODE, mode) }
         _state.value = _state.value.copy(themeMode = mode)
     }
 

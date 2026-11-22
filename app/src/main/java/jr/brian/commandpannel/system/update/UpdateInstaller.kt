@@ -9,6 +9,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.system.Http
 import java.io.File
 
@@ -74,7 +75,7 @@ object UpdateInstaller {
         val pkg = context.packageName
         val activity = "$pkg/jr.brian.commandpannel.MainActivity"
         val staged = privileged.shell(
-            "rm -f $INSTALL_LOG; cp '${apk.absolutePath}' $STAGED && chmod 644 $STAGED && echo ok", timeoutMs = 30_000,
+            "rm -f $INSTALL_LOG; cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && echo ok", timeoutMs = 30_000,
         )?.trim()
         if (staged != "ok") return false
         privileged.shell(

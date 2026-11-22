@@ -8,10 +8,10 @@ import android.net.Uri
 import android.view.Display
 import jr.brian.commandpannel.plugin.PanelPluginTrust
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.system.Http
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * Which ThorKBM builds (the Thor keyboard and mouse app) are installed, by version, or null when absent. Install
@@ -150,9 +150,9 @@ object ThorKbmInstaller {
      */
     fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): String? {
         if (DebugOverrides.read(context).noRoot) return null
-        val sha = sha256(apk)
+        val sha = ApkDigest.sha256(apk)
         val staged = privileged.shell(
-            "cp '${apk.absolutePath}' $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,
+            "cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,
         )?.trim() ?: return null
         if (staged.substringBefore(' ') != sha) {
             privileged.shell("rm -f $STAGED")
@@ -197,18 +197,5 @@ object ThorKbmInstaller {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle()
         return runCatching { context.startActivity(intent, opts) }.isSuccess
-    }
-
-    private fun sha256(file: File): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
 }

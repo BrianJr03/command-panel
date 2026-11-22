@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.annotation.StringRes
 import jr.brian.commandpannel.R
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -254,7 +255,7 @@ class ClipTrimmer(
         val base = ScreenRecorderEngine.replayTrimClipPath(clip.path)
             ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
             ?: throw PlaceError(TrimError.INVALID_PATH)
-        val parent = shellQuote(clip.dir)
+        val parent = RootShell.q(clip.dir)
         // Root lists the folder (the app can't always see it), the same way a save picks `_2`.
         val taken = privileged.shell("ls -1 $parent 2>/dev/null; echo $LIST_END")
             ?.takeIf { it.contains(LIST_END) }
@@ -273,13 +274,10 @@ class ClipTrimmer(
             privileged.shell(jr.brian.commandpannel.system.ClipCopy.cleanupCommand(path))
             return null
         }
-        val uri = shellQuote(Uri.fromFile(File(path)).toString())
+        val uri = RootShell.q(Uri.fromFile(File(path)).toString())
         privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d $uri >/dev/null 2>&1")
         return path
     }
-
-    /** Single-quotes [s] for the shell; folder names may contain an apostrophe. */
-    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
     companion object {
         private const val TAG = "ClipTrimmer"

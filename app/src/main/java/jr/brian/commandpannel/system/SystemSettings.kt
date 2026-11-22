@@ -3,6 +3,7 @@ package jr.brian.commandpannel.system
 import android.content.ContentResolver
 import android.provider.Settings
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 
 /**
  * Typed access to the vendor `Settings.System` keys the stock assistant uses (see the teardown, NOTES.md §4).
@@ -32,9 +33,8 @@ class SystemSettings(
         privileged.shell("settings put system $key $value")
     }
 
-    /** Single-quoted for the shell; callers pass plain values such as `"1,1"` (no single quotes). */
     fun putString(key: String, value: String) {
-        privileged.shell("settings put system $key '$value'")
+        privileged.shell("settings put system $key ${RootShell.q(value)}")
     }
 
     fun uriFor(key: String) = Settings.System.getUriFor(key)

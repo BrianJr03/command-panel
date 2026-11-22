@@ -107,6 +107,27 @@ class SettingsRepository(
         }
     }
     private var scope: CoroutineScope? = null
+
+    /**
+     * Root writes (settings, `svc`, `cmd`, `input`, …) each start a root shell, which can take 100 ms or more, so they
+     * never run on the main thread: [offMain] runs them here, one at a time in the order they were asked for, so a
+     * read-then-toggle can't race a second tap. Writes asked for before [start] (or after [stop]) still run.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val rootWrites = Dispatchers.IO.limitedParallelism(1)
+    private val detached = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    /** Runs [block] on [rootWrites]; with [refreshAfter], refreshes the panel on the main thread once it's done. */
+    private fun offMain(refreshAfter: Boolean = false, block: suspend () -> Unit) {
+        writeScope().launch(rootWrites) {
+            runCatching { block() }.onFailure { android.util.Log.w("SettingsRepository", "root write failed", it) }
+            if (refreshAfter) main.post { refreshFromSettings() }
+        }
+    }
+
+    /** The service scope once it has started (and isn't cancelled), so writes stop with it; else [detached]. */
+    private fun writeScope(): CoroutineScope = scope?.takeIf { it.isActive } ?: detached
+
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
     private var lastRxTime = System.currentTimeMillis()
 
@@ -416,7 +437,7 @@ class SettingsRepository(
 
     override fun setTopBrightness(fraction: Float, committed: Boolean) {
         privileged.setDisplayBrightness(0, fraction.coerceIn(0f, 1f), temporary = !committed)
-        if (committed) settings.putInt(Keys.SCREEN_BRIGHTNESS, (fraction * 255).toInt())
+        if (committed) offMain { settings.putInt(Keys.SCREEN_BRIGHTNESS, (fraction * 255).toInt()) }
         _uiState.update { it.copy(topBrightness = fraction) }
     }
 
@@ -428,7 +449,7 @@ class SettingsRepository(
     override fun setDualBrightness(fraction: Float, committed: Boolean) {
         setTopBrightness(fraction, committed)
         setBottomBrightness(fraction, committed)
-        if (committed) settings.putInt(Keys.DUAL_BRIGHTNESS, (fraction * 100).toInt())
+        if (committed) offMain { settings.putInt(Keys.DUAL_BRIGHTNESS, (fraction * 100).toInt()) }
         _uiState.update { it.copy(dualBrightness = fraction) }
     }
 
@@ -518,8 +539,10 @@ class SettingsRepository(
 
     override fun toggleRefreshRate() {
         val to = if (uiState.value.is120Hz) 60f else 120f
-        settings.putFloat(Keys.MIN_REFRESH, to)
-        settings.putFloat(Keys.PEAK_REFRESH, to)
+        offMain {
+            settings.putFloat(Keys.MIN_REFRESH, to)
+            settings.putFloat(Keys.PEAK_REFRESH, to)
+        }
     }
 
     override fun onTileClick(id: String) {
@@ -530,9 +553,15 @@ class SettingsRepository(
             "ambient_led" -> toggleAmbientLight()
             "stick_led" -> toggleStickLight()
             "clear_memory" -> cleanMemory()
-            "wifi" -> privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
-            "bluetooth" -> privileged.shell("svc bluetooth ${if (bluetoothConnected()) "disable" else "enable"}")
-            "do_not_disturb" -> privileged.shell("cmd notification set_dnd ${if (settings.getInt("zen_mode", 0) != 0) "off" else "priority"}")
+            "wifi" -> offMain(refreshAfter = true) {
+                privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
+            }
+            "bluetooth" -> offMain(refreshAfter = true) {
+                privileged.shell("svc bluetooth ${if (bluetoothConnected()) "disable" else "enable"}")
+            }
+            "do_not_disturb" -> offMain(refreshAfter = true) {
+                privileged.shell("cmd notification set_dnd ${if (settings.getInt("zen_mode", 0) != 0) "off" else "priority"}")
+            }
             "airplane_mode" -> toggleAirplane()
             "keep_screen_on" -> toggleIntKey("keep_screen_on", 0)
             "prevent_accidental_home" -> toggleIntKey("prevent_press_home_accidentally", 0)
@@ -558,7 +587,7 @@ class SettingsRepository(
         refreshFromSettings()
     }
 
-    override fun setTriggerMode(value: Int) = settings.putInt("trigger_input_mode", value)
+    override fun setTriggerMode(value: Int) = offMain { settings.putInt("trigger_input_mode", value) }
 
     override fun takeScreenshot(target: Int) {
         val t = Screenshotter.Target.entries.getOrElse(target) { Screenshotter.Target.BOTH }
@@ -569,31 +598,34 @@ class SettingsRepository(
         }
     }
 
-    private fun toggleAirplane() {
+    private fun toggleAirplane() = offMain(refreshAfter = true) {
         val on = android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1
         privileged.shell("cmd connectivity airplane-mode ${if (on) "disable" else "enable"}")
     }
 
-    override fun setFocusLock(value: Int) = settings.putInt(Keys.FOCUS_LOCK, value)
+    override fun setFocusLock(value: Int) = offMain { settings.putInt(Keys.FOCUS_LOCK, value) }
 
     override fun setPerformance(value: Int) {
-        settings.putInt(Keys.PERFORMANCE_MODE, value)
+        offMain { settings.putInt(Keys.PERFORMANCE_MODE, value) }
         // The firmware's FanTile resets fan_mode itself when performance_mode is written (when its "quick set
         // performance and fan" option is on). Give it a moment, then only fix a mode the new level still hides
         // (Custom below High, Off or Quiet at High), so we don't race its write.
         scope?.launch(Dispatchers.IO) {
             delay(FAN_FALLBACK_DELAY_MS)
-            if (settings.getInt(Keys.PERFORMANCE_MODE, 0) != value) return@launch
-            val fan = settings.getInt(Keys.FAN_MODE, 1)
-            val next = FanControl.modeAfterPerformanceChange(value, fan)
-            if (next != fan) settings.putInt(Keys.FAN_MODE, next)
+            // Queued, so it runs after the performance write and reads any fan change the user made before it.
+            offMain {
+                if (settings.getInt(Keys.PERFORMANCE_MODE, 0) != value) return@offMain
+                val fan = settings.getInt(Keys.FAN_MODE, 1)
+                val next = FanControl.modeAfterPerformanceChange(value, fan)
+                if (next != fan) settings.putInt(Keys.FAN_MODE, next)
+            }
         }
     }
 
-    override fun setFanMode(value: Int) = settings.putInt(Keys.FAN_MODE, value)
-    override fun setFanSpeed(value: Int) = settings.putInt(Keys.FAN_SPEED, value)
+    override fun setFanMode(value: Int) = offMain { settings.putInt(Keys.FAN_MODE, value) }
+    override fun setFanSpeed(value: Int) = offMain { settings.putInt(Keys.FAN_SPEED, value) }
 
-    override fun setControllerStyle(value: Int) {
+    override fun setControllerStyle(value: Int) = offMain {
         settings.putInt(Keys.CONTROLLER_STYLE, value)
         when (value) {
             0 -> { settings.putInt(Keys.FLIP_BUTTON_LAYOUT, 1); settings.putInt(Keys.NO_CREATE_GAMEPAD, 0) } // Xbox
@@ -602,9 +634,9 @@ class SettingsRepository(
         }
     }
 
-    override fun setThemeMode(value: Int) = settings.putInt(Keys.THEME_MODE, value)
+    override fun setThemeMode(value: Int) = offMain { settings.putInt(Keys.THEME_MODE, value) }
 
-    override fun toggleAmbientLight() {
+    override fun toggleAmbientLight() = offMain(refreshAfter = true) {
         val isOn = ambientLightShown() == true
         privileged.shell("am broadcast -a com.ro.external.request.light.adj.action --ez isShow ${!isOn}")
     }
@@ -621,10 +653,11 @@ class SettingsRepository(
      * "Joystick Lights" switch uses. In case the LED daemon doesn't act on a write from outside, the SN3112 nodes are
      * then written directly: black for off; the saved color for on, unless Ambient LED is switched off.
      */
-    private fun toggleStickLight() {
+    private fun toggleStickLight() = offMain {
         val on = !SystemSettings.StickLight.isOn(settings.getString(Keys.JOYSTICK_LIGHT))
         settings.putString(Keys.JOYSTICK_LIGHT, SystemSettings.StickLight.valueFor(on))
-        scope?.launch(Dispatchers.IO) {
+        // The fallback waits on its own, so the next queued write isn't held up behind the delay.
+        writeScope().launch(Dispatchers.IO) {
             delay(STICK_LED_FALLBACK_DELAY_MS) // let the daemon apply the key first
             if (!on || ambientLightShown() != false) {
                 jr.brian.commandpannel.privileged.ThorRgbController.setSticksLit(context, on)
@@ -634,7 +667,7 @@ class SettingsRepository(
 
     override fun cleanMemory() {
         // Full stock exclusion logic is a later refinement; the root kill is the core action.
-        privileged.shell("am kill-all")
+        offMain { privileged.shell("am kill-all") }
     }
 
     /**
@@ -687,7 +720,7 @@ class SettingsRepository(
         // Stock opens bottom-screen recents via IOverviewProxy txn 6, which a user app can't bind (SecurityException);
         // KEYCODE_APP_SWITCH through the root shell opens the system recents instead. Dismiss the panel first, as stock.
         onHideOverlay()
-        privileged.shell("input keyevent 187")
+        offMain { privileged.shell("input keyevent 187") }
     }
 
     override fun setOverlayLayout(layout: OverlayLayout) {
@@ -724,7 +757,8 @@ class SettingsRepository(
         }
     }
 
-    private fun toggleIntKey(key: String, default: Int) {
+    /** Read and written on [rootWrites], so two quick taps toggle twice instead of both reading the old value. */
+    private fun toggleIntKey(key: String, default: Int) = offMain(refreshAfter = true) {
         val cur = settings.getInt(key, default)
         settings.putInt(key, if (cur == 0) 1 else 0)
     }

@@ -4,6 +4,7 @@ import jr.brian.commandpannel.system.update.SaveClipInstaller
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class SaveClipInstallerTest {
@@ -40,5 +41,34 @@ class SaveClipInstallerTest {
     @Test
     fun `only https downloads are used`() {
         assertNull(SaveClipInstaller.parseAsset(release("tcp-sc-0.7.1.apk" to "http://github.com/x/tcp-sc-0.7.1.apk"), "0.7.1"))
+    }
+
+    private val ours = "ab".repeat(32)
+    private val theirs = "cd".repeat(32)
+
+    @Test
+    fun `accepts Save Clip signed with this build's key`() {
+        SaveClipInstaller.check(SaveClipInstaller.PACKAGE, listOf(ours), listOf(ours))
+        // Digests compare however they're written (colons, case).
+        SaveClipInstaller.check(SaveClipInstaller.PACKAGE, listOf(ours), listOf(ours.uppercase().chunked(2).joinToString(":")))
+    }
+
+    @Test
+    fun `refuses another key, an extra key, another package or an unreadable own key`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            SaveClipInstaller.check(SaveClipInstaller.PACKAGE, listOf(theirs), listOf(ours))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SaveClipInstaller.check(SaveClipInstaller.PACKAGE, listOf(ours, theirs), listOf(ours))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SaveClipInstaller.check(SaveClipInstaller.PACKAGE, emptyList(), listOf(ours))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SaveClipInstaller.check("com.example.other", listOf(ours), listOf(ours))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SaveClipInstaller.check(SaveClipInstaller.PACKAGE, listOf(ours), emptyList())
+        }
     }
 }

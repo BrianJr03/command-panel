@@ -3,6 +3,7 @@ package jr.brian.commandpannel.system
 import android.content.Context
 import android.media.MediaScannerConnection
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.ui.settings.RailLayout
 import org.json.JSONObject
 import java.io.File
@@ -81,7 +82,7 @@ object SettingsBackup {
         // Stage in app storage, then copy to the visible folder as root.
         val staged = File(context.cacheDir, name).apply { writeText(json) }
         val dest = "$DIR/$name"
-        val q = ThemeFolder::q
+        val q = RootShell::q
         privileged.shell("mkdir -p ${q(DIR)} && cp ${q(staged.absolutePath)} ${q(dest)} && chmod 644 ${q(dest)}")
         staged.delete()
         MediaScannerConnection.scanFile(context, arrayOf(dest), arrayOf("application/json"), null)
@@ -99,7 +100,7 @@ object SettingsBackup {
 
     /** Backups in the folder, newest first, as full paths. Files not named like a backup are skipped. */
     fun list(privileged: PrivilegedAccess): List<String> =
-        names(privileged.shell("ls -1t ${ThemeFolder.q(DIR)} 2>/dev/null").orEmpty()).map { "$DIR/$it" }
+        names(privileged.shell("ls -1t ${RootShell.q(DIR)} 2>/dev/null").orEmpty()).map { "$DIR/$it" }
 
     /** The backup names in `ls -1` output, in order. Pure, so it's unit tested. */
     fun names(lsOutput: String): List<String> =
@@ -108,7 +109,7 @@ object SettingsBackup {
     fun import(context: Context, privileged: PrivilegedAccess, path: String): Int {
         // Only a backup in our folder, by its exact name; quoted all the same.
         if (path.substringBeforeLast('/') != DIR || !isBackupName(path.substringAfterLast('/'))) return 0
-        val json = privileged.shell("cat ${ThemeFolder.q(path)}") ?: return 0
+        val json = privileged.shell("cat ${RootShell.q(path)}") ?: return 0
         val values = decode(json) ?: return 0
         val editor = Prefs.of(context).edit()
         for ((k, v) in values) when (v) {

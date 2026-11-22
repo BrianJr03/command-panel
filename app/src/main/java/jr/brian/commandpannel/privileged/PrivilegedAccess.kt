@@ -49,8 +49,15 @@ class PrivilegedAccess @Inject constructor() {
     /** The helper's connection state, to act when it (re)connects. */
     val helperState: kotlinx.coroutines.flow.StateFlow<RootHelper.State> get() = RootHelper.state
 
-    /** Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout, or null on a timeout. */
+    /**
+     * Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout, or null on a timeout.
+     * Blocking (a root process, often 100 ms or more): never call it on the main thread. Debug builds log any that do,
+     * with the stack, so a new one shows up in logcat under `PrivilegedAccess`.
+     */
     fun shell(command: String, timeoutMs: Int = 5_000): String? {
+        if (jr.brian.commandpannel.BuildConfig.DEBUG && android.os.Looper.getMainLooper().isCurrentThread) {
+            Log.w("PrivilegedAccess", "root shell on the main thread: ${command.take(80)}", Throwable("called from"))
+        }
         RootHelper.binder?.let { h ->
             return runCatching {
                 h.exec(command, timeoutMs).takeIf { it.getInt("exit") != ShellRunner.FAILED }?.getString("out")

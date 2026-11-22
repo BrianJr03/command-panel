@@ -162,7 +162,8 @@ class ExternalDisplayTapWaker(
     private fun onTouchDown() {
         if (watchers.isEmpty()) return
         Log.d(TAG, "tap detected; waking handheld screens")
-        privileged.shell("settings put system $KEY 0")
+        // A root write: off the main thread (this runs from the touch listener).
+        scope.launch(Dispatchers.IO) { privileged.shell("settings put system $KEY 0") }
         detachWatchers()
     }
 }
