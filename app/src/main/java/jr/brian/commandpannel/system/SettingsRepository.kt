@@ -136,6 +136,9 @@ class SettingsRepository(
         observed.forEach {
             context.contentResolver.registerContentObserver(settings.uriFor(it), false, observer)
         }
+        listOf(GLOBAL_BLUETOOTH_ON, GLOBAL_ZEN_MODE).forEach {
+            context.contentResolver.registerContentObserver(android.provider.Settings.Global.getUriFor(it), false, observer)
+        }
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
         refreshFromSettings()
         telemetry.start(scope)
@@ -359,8 +362,8 @@ class SettingsRepository(
                 QuickSettingTileId.FORCE_LANDSCAPE -> str(R.string.tile_force_landscape) to (settings.getInt(Keys.FORCE_LANDSCAPE, 0) == 1)
                 QuickSettingTileId.THEME -> themeTitle(theme) to true
                 QuickSettingTileId.WIFI -> str(R.string.tile_name_wifi) to (wifiLevel() >= 0)
-                QuickSettingTileId.BLUETOOTH -> str(R.string.tile_name_bluetooth) to bluetoothConnected()
-                QuickSettingTileId.DO_NOT_DISTURB -> str(R.string.tile_do_not_disturb) to (settings.getInt("zen_mode", 0) != 0)
+                QuickSettingTileId.BLUETOOTH -> str(R.string.tile_name_bluetooth) to bluetoothEnabled()
+                QuickSettingTileId.DO_NOT_DISTURB -> str(R.string.tile_do_not_disturb) to doNotDisturbOn()
                 QuickSettingTileId.AIRPLANE -> str(R.string.tile_airplane_mode) to (android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1)
                 QuickSettingTileId.KEEP_SCREEN_ON -> str(R.string.tile_keep_screen_on) to (settings.getInt("keep_screen_on", 0) == 1)
                 QuickSettingTileId.DOUBLE_TAP_HOME -> str(R.string.tile_double_tap_home) to (settings.getInt("prevent_press_home_accidentally", 0) == 1)
@@ -424,6 +427,14 @@ class SettingsRepository(
             adapter.isEnabled && adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothAdapter.STATE_CONNECTED
         }.getOrDefault(false)
     }
+
+    /** Whether the radio is on, connected or not (2 is on through airplane mode). Needs no Bluetooth permission. */
+    private fun bluetoothEnabled(): Boolean =
+        android.provider.Settings.Global.getInt(context.contentResolver, GLOBAL_BLUETOOTH_ON, 0) != 0
+
+    /** `zen_mode` is a global setting, not one of the vendor's system keys. */
+    private fun doNotDisturbOn(): Boolean =
+        android.provider.Settings.Global.getInt(context.contentResolver, GLOBAL_ZEN_MODE, 0) != 0
 
     // ---- OverlayActions (writes) ----
 
@@ -557,10 +568,10 @@ class SettingsRepository(
                 privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
             }
             "bluetooth" -> offMain(refreshAfter = true) {
-                privileged.shell("svc bluetooth ${if (bluetoothConnected()) "disable" else "enable"}")
+                privileged.shell("svc bluetooth ${if (bluetoothEnabled()) "disable" else "enable"}")
             }
             "do_not_disturb" -> offMain(refreshAfter = true) {
-                privileged.shell("cmd notification set_dnd ${if (settings.getInt("zen_mode", 0) != 0) "off" else "priority"}")
+                privileged.shell("cmd notification set_dnd ${if (doNotDisturbOn()) "off" else "priority"}")
             }
             "airplane_mode" -> toggleAirplane()
             "keep_screen_on" -> toggleIntKey("keep_screen_on", 0)
@@ -769,6 +780,8 @@ class SettingsRepository(
         const val ECHO_HOLD_MS = 400L
         /** How long after a performance change the firmware gets to reset fan_mode before we check it. */
         const val FAN_FALLBACK_DELAY_MS = 1500L
+        private const val GLOBAL_BLUETOOTH_ON = "bluetooth_on"
+        private const val GLOBAL_ZEN_MODE = "zen_mode"
         // AudioManager's hidden VOLUME_CHANGED_ACTION and its stream extra.
         const val ACTION_VOLUME_CHANGED = "android.media.VOLUME_CHANGED_ACTION"
         const val EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE"

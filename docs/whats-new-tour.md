@@ -6,6 +6,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+- **Bluetooth and Do Not Disturb tiles**
+  - Where: panel: Bluetooth and Do Not Disturb tiles
+  - Spot: none
+  - Callout: The Bluetooth and Do Not Disturb tiles in the panel's Quick Tiles now turn off as well as on, and light up whenever they're on.
+
 ## v0.13.0
 
 - **Gradient backgrounds and their library** (#67)
