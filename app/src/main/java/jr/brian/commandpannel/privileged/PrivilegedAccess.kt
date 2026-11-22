@@ -5,6 +5,7 @@ import android.util.Log
 import jr.brian.commandpannel.privileged.helper.ShellRunner
 import jr.brian.commandpannel.privileged.helper.TaskFps
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,20 +51,28 @@ class PrivilegedAccess @Inject constructor() {
     val helperState: kotlinx.coroutines.flow.StateFlow<RootHelper.State> get() = RootHelper.state
 
     /**
-     * Root shell: helper fast path when connected, PServerBinder otherwise. Returns stdout, or null on a timeout.
-     * Blocking (a root process, often 100 ms or more): never call it on the main thread. Debug builds log any that do,
-     * with the stack, so a new one shows up in logcat under `PrivilegedAccess`.
+     * Runs one command as root, with each of [argv] quoted ([RootShell.command]), so nothing in an argument (a path,
+     * a package, a value) is read as shell syntax. Prefer this to [shell] whenever the command needs no pipes,
+     * redirects, `&&` or loops. Returns stdout, or null on a timeout or when root isn't available.
      */
-    fun shell(command: String, timeoutMs: Int = 5_000): String? {
-        if (jr.brian.commandpannel.BuildConfig.DEBUG && android.os.Looper.getMainLooper().isCurrentThread) {
-            Log.w("PrivilegedAccess", "root shell on the main thread: ${command.take(80)}", Throwable("called from"))
-        }
+    suspend fun run(vararg argv: String, timeoutMs: Int = 5_000): String? = shell(RootShell.command(*argv), timeoutMs)
+
+    /**
+     * Runs a shell script as root: helper fast path when connected, PServerBinder otherwise. Returns stdout, or null
+     * on a timeout. Every value put into [script] goes through [RootShell.q] (`RootShellTest` checks the literals).
+     *
+     * A root process takes 100 ms or more, so this suspends and runs on [Dispatchers.IO]: it can't be called from the
+     * main thread by accident. Code that truly must wait (teardown) says so with `runBlocking`.
+     *
+     * Not cancellable: a root command can't be interrupted anyway, and cleanup after a canceled caller must still run.
+     */
+    suspend fun shell(script: String, timeoutMs: Int = 5_000): String? = withContext(Dispatchers.IO + NonCancellable) {
         RootHelper.binder?.let { h ->
-            return runCatching {
-                h.exec(command, timeoutMs).takeIf { it.getInt("exit") != ShellRunner.FAILED }?.getString("out")
+            return@withContext runCatching {
+                h.exec(script, timeoutMs).takeIf { it.getInt("exit") != ShellRunner.FAILED }?.getString("out")
             }.getOrNull()
         }
-        return VendorRootShell.exec(command)
+        VendorRootShell.exec(script)
     }
 
     fun getDisplayBrightness(displayId: Int): Float? =

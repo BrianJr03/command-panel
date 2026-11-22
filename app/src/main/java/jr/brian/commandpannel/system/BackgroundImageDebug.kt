@@ -36,7 +36,7 @@ object BackgroundImageDebug {
     const val EXTRA_GRADIENT = "gradient"
     const val EXTRA_GRADIENT_DELETE = "gradient_delete"
 
-    fun handle(context: Context, privileged: PrivilegedAccess, intent: Intent) {
+    suspend fun handle(context: Context, privileged: PrivilegedAccess, intent: Intent) {
         val prefs = Prefs.of(context)
         if (intent.hasExtra(EXTRA_ANIMATIONS)) {
             val on = intent.getBooleanExtra(EXTRA_ANIMATIONS, false)
@@ -76,9 +76,9 @@ object BackgroundImageDebug {
         }
         val path = intent.getStringExtra(EXTRA_PATH) ?: return
         val staged = File(context.cacheDir, File(path).name)
-        val src = RootShell.q(path)
-        val dest = RootShell.q(staged.absolutePath)
-        val copied = privileged.shell("cp $src $dest && chmod 644 $dest && echo ok")?.trim() == "ok"
+        val copied = privileged.shell(
+            "cp ${RootShell.q(path)} ${RootShell.q(staged.absolutePath)} && chmod 644 ${RootShell.q(staged.absolutePath)} && echo ok",
+        )?.trim() == "ok"
         val result = if (copied) BackgroundImageStore.importFile(context, staged, BackgroundImageSetting.animationsOn(prefs))
         else Result.failure(IllegalStateException("copy failed"))
         staged.delete()

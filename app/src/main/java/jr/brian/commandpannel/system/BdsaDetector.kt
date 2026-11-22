@@ -3,6 +3,9 @@ package jr.brian.commandpannel.system
 import android.content.Context
 import android.content.pm.PackageManager
 import jr.brian.commandpannel.privileged.PrivilegedAccess
+import jr.brian.commandpannel.privileged.RootShell
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Whether Better Dual Screen Assistant is around, and whether it currently claims the AYN button. */
 enum class BdsaPresence { NONE, INSTALLED_INACTIVE, ACTIVE }
@@ -30,18 +33,20 @@ data class BdsaStatus(val presence: BdsaPresence, val packageName: String? = nul
  */
 class BdsaDetector(private val context: Context, private val privileged: PrivilegedAccess) {
 
-    private var cached: BdsaStatus? = null
-    private var cachedAt = 0L
+    @Volatile private var cached: BdsaStatus? = null
+    @Volatile private var cachedAt = 0L
 
-    /** Blocking (root shell); call off the main thread. Results are reused for [CACHE_MS] unless [force]. */
-    @Synchronized
-    fun detect(force: Boolean = false): BdsaStatus {
+    /** One detection at a time, so callers share a result instead of each reading BDSA's prefs. */
+    private val lock = Mutex()
+
+    /** Reads BDSA's prefs with the root shell. Results are reused for [CACHE_MS] unless [force]. */
+    suspend fun detect(force: Boolean = false): BdsaStatus = lock.withLock {
         val now = System.currentTimeMillis()
-        cached?.let { if (!force && now - cachedAt < CACHE_MS) return it }
-        return compute().also { cached = it; cachedAt = now }
+        cached?.let { if (!force && now - cachedAt < CACHE_MS) return@withLock it }
+        compute().also { cached = it; cachedAt = now }
     }
 
-    private fun compute(): BdsaStatus {
+    private suspend fun compute(): BdsaStatus {
         val pm = context.packageManager
         var inactive: BdsaStatus? = null
         for (pkg in PACKAGES) {
@@ -64,22 +69,22 @@ class BdsaDetector(private val context: Context, private val privileged: Privile
         }
 
     /** BDSA's pref, or null when it can't be read (no root, file missing): callers treat null as BDSA's default (on). */
-    private fun readReplaceStock(pkg: String): Boolean? {
-        val xml = privileged.shell("cat /data/user_de/0/$pkg/shared_prefs/$PREFS_FILE 2>/dev/null") ?: return null
+    private suspend fun readReplaceStock(pkg: String): Boolean? {
+        val xml = privileged.shell("cat ${RootShell.q("/data/user_de/0/$pkg/shared_prefs/$PREFS_FILE")} 2>/dev/null") ?: return null
         return parseReplaceStock(xml)
     }
 
     /** Disables [pkg] for user 0 via root. BDSA's helper restores the stock assistant and screens when this happens. */
-    fun disable(pkg: String): Boolean {
+    suspend fun disable(pkg: String): Boolean {
         require(pkg in PACKAGES)
-        privileged.shell("pm disable-user --user 0 $pkg")
+        privileged.run("pm", "disable-user", "--user", "0", pkg)
         return isDisabledNow(pkg).also { invalidate() }
     }
 
     /** Re-enables a BDSA install that Command Panel disabled. */
-    fun enable(pkg: String): Boolean {
+    suspend fun enable(pkg: String): Boolean {
         require(pkg in PACKAGES)
-        privileged.shell("pm enable --user 0 $pkg")
+        privileged.run("pm", "enable", "--user", "0", pkg)
         return !isDisabledNow(pkg).also { invalidate() }
     }
 
@@ -87,7 +92,7 @@ class BdsaDetector(private val context: Context, private val privileged: Privile
         runCatching { context.packageManager.getApplicationEnabledSetting(pkg) }.getOrNull()
             ?.let { it == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER || it == PackageManager.COMPONENT_ENABLED_STATE_DISABLED } ?: false
 
-    @Synchronized
+    /** Drops the cached result; the next [detect] reads again. */
     fun invalidate() {
         cached = null
     }

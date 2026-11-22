@@ -26,7 +26,7 @@ object PackInstaller {
      * Imports any fonts [looks] need from `TCP Themes/fonts` and reports the rest. Call before [install] and offer
      * [FontNeeds.downloadable] to the user.
      */
-    fun prepareFonts(context: Context, privileged: PrivilegedAccess, pack: LookPack, looks: List<CustomLook> = pack.looks): FontNeeds {
+    suspend fun prepareFonts(context: Context, privileged: PrivilegedAccess, pack: LookPack, looks: List<CustomLook> = pack.looks): FontNeeds {
         val missing = LookPackJson.fontFiles(looks).filter { file ->
             UserFontStore.findByFileName(context, file) == null &&
                 !(ThemeFolder.hasFont(privileged, file) && ThemeFolder.importFont(context, privileged, file).isSuccess)
@@ -35,7 +35,7 @@ object PackInstaller {
     }
 
     /** Downloads [file] from [source] (https only), installs it, and drops a copy in `TCP Themes/fonts`. */
-    fun downloadFont(context: Context, privileged: PrivilegedAccess, file: String, source: FontSource): Result<UserFont> = runCatching {
+    suspend fun downloadFont(context: Context, privileged: PrivilegedAccess, file: String, source: FontSource): Result<UserFont> = runCatching {
         val bytes = Http.getBytes(source.url, maxBytes = 5 * 1024 * 1024)
         UserFontStore.register(context, ByteArrayInputStream(bytes), file, source.url, source.license).getOrThrow()
     }.onSuccess { ThemeFolder.exportFont(context, privileged, it) }
@@ -81,7 +81,7 @@ object PackInstaller {
     }
 
     /** Builds a pack from saved looks, copying the imported fonts they use into `TCP Themes/fonts`. */
-    fun exportPack(context: Context, privileged: PrivilegedAccess, name: String, looks: List<CustomLook>): String? {
+    suspend fun exportPack(context: Context, privileged: PrivilegedAccess, name: String, looks: List<CustomLook>): String? {
         val installed = UserFontStore.all(context)
         val used = LookPackJson.fontFiles(looks).mapNotNull { file -> installed.firstOrNull { it.fileName.equals(file, ignoreCase = true) } }
         used.forEach { ThemeFolder.exportFont(context, privileged, it) }

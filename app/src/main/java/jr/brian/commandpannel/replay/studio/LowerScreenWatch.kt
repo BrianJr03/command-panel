@@ -42,8 +42,8 @@ class LowerScreenWatch(private val context: Context, private val privileged: Pri
     private var displayListener: DisplayManager.DisplayListener? = null
     private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
-    /** The current blockers. Blocking (it may run the root shell); call off the main thread. */
-    fun blockers(): LowerScreenBlockers {
+    /** The current blockers. Suspends: the ThorKBM check runs the root shell. */
+    suspend fun blockers(): LowerScreenBlockers {
         val display = topology.bottomDisplay
         return fastBlockers(display).copy(keyboardApp = display != null && keyboardAppOn(display.displayId))
     }
@@ -56,8 +56,8 @@ class LowerScreenWatch(private val context: Context, private val privileged: Pri
         pluginSession = prefs.getString(PanelPluginSession.PREF_SESSION, null) != null,
     )
 
-    private fun keyboardAppOn(displayId: Int): Boolean {
-        val dump = runCatching { privileged.shell("dumpsys activity activities") }.getOrNull() ?: return false
+    private suspend fun keyboardAppOn(displayId: Int): Boolean {
+        val dump = runCatching { privileged.run("dumpsys", "activity", "activities") }.getOrNull() ?: return false
         val tasks = ClearTasksPolicy.parseActivitiesDump(dump) ?: return false
         return tasks.any { task ->
             task.displayId == displayId && task.visible && task.packages.any { it in KeyboardTile.THORKBM_PACKAGES }

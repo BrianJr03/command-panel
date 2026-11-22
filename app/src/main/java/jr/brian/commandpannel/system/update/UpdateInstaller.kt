@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import jr.brian.commandpannel.plugin.PanelPluginTrust
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.system.Http
@@ -51,42 +52,82 @@ object UpdateInstaller {
     }
 
     /**
-     * Checks [apk] is an installable update for this app: it parses, has this package name, and (when given) the
-     * expected version. Returns the APK's versionName.
+     * Checks [apk] is an installable update for this app: it parses, has this package name, is signed with this
+     * build's own key, and (when given) is the expected version. Returns the APK's versionName.
+     *
+     * Android refuses an update signed with another key anyway; checking here means root never stages one, and the
+     * user sees why instead of a bare `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
      */
     fun verify(context: Context, apk: File, expectedVersion: String?): String {
+        val pm = context.packageManager
         @Suppress("DEPRECATION")
-        val info = context.packageManager.getPackageArchiveInfo(apk.path, 0) ?: error("not a valid APK")
-        require(info.packageName == context.packageName) { "the APK is for ${info.packageName}" }
+        val info = pm.getPackageArchiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: error("not a valid APK")
+        val own = runCatching { pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
         val version = info.versionName.orEmpty()
-        if (expectedVersion != null) {
-            require(version.substringBefore('-') == expectedVersion.substringBefore('-')) { "the APK is version $version" }
-        }
+        check(
+            packageName = info.packageName,
+            ownPackage = context.packageName,
+            signers = PanelPluginTrust.signerDigests(info),
+            ownSigners = PanelPluginTrust.signerDigests(own),
+            version = version,
+            expectedVersion = expectedVersion,
+        )
         return version
     }
 
+    /** [verify]'s rules, without Android. */
+    internal fun check(
+        packageName: String?,
+        ownPackage: String,
+        signers: List<String>,
+        ownSigners: List<String>,
+        version: String,
+        expectedVersion: String?,
+    ) {
+        require(packageName == ownPackage) { "the APK is for $packageName" }
+        require(ownSigners.isNotEmpty()) { "couldn't read this build's signing key" }
+        require(PanelPluginTrust.isTrusted(signers, ownSigners.map(PanelPluginTrust::normalizeDigest).toSet())) {
+            "the APK isn't signed with Command Panel's key"
+        }
+        if (expectedVersion != null) {
+            require(version.substringBefore('-') == expectedVersion.substringBefore('-')) { "the APK is version $version" }
+        }
+    }
+
     /**
-     * Installs [apk] through the root shell and relaunches the companion. The install replaces this app, which kills
-     * this process, so the work runs as a detached root command. Returns false when the root shell isn't available.
+     * Installs [apk] (already [verify]d) through the root shell and relaunches the companion. The staged copy must hash
+     * the same as [apk], so what root installs is the APK that was checked; the detached install checks it once more
+     * right before `pm install`. The install replaces this app, which kills this process, so the work runs as a
+     * detached root command. Returns false when the root shell isn't available or the staged copy doesn't match.
      */
-    fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): Boolean {
+    suspend fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): Boolean {
         // Debug device checks: the same no-root override as ThorKBM's, so updates go through Android's installer.
         if (ThorKbmInstaller.DebugOverrides.read(context).noRoot) return false
-        val pkg = context.packageName
-        val activity = "$pkg/jr.brian.commandpannel.MainActivity"
+        val sha = ApkDigest.sha256(apk)
         val staged = privileged.shell(
-            "rm -f $INSTALL_LOG; cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && echo ok", timeoutMs = 30_000,
+            "rm -f $INSTALL_LOG; cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && sha256sum $STAGED",
+            timeoutMs = 30_000,
         )?.trim()
-        if (staged != "ok") return false
-        privileged.shell(
-            "nohup sh -c 'pm install -r -t $STAGED > $INSTALL_LOG 2>&1 && rm -f $STAGED && am start -n $activity' " +
-                ">/dev/null 2>&1 &",
-        ) ?: return false
+        if (staged?.substringBefore(' ') != sha) {
+            privileged.run("rm", "-f", STAGED)
+            return false
+        }
+        val script = detachedInstallScript(sha, "${context.packageName}/jr.brian.commandpannel.MainActivity")
+        privileged.shell("nohup sh -c ${RootShell.q(script)} >/dev/null 2>&1 &") ?: return false
         return true
     }
 
+    /**
+     * The script the detached root shell runs: install the staged APK only if it still hashes to [sha], then remove it
+     * and open [activity]. Its output goes to [INSTALL_LOG]. Pure, so it's unit tested.
+     */
+    internal fun detachedInstallScript(sha: String, activity: String): String =
+        "if [ \"\$(sha256sum $STAGED | cut -d ' ' -f 1)\" = ${RootShell.q(sha)} ]; " +
+            "then pm install -r -t $STAGED; else echo 'Failure [staged copy changed]'; false; fi > $INSTALL_LOG 2>&1 && " +
+            "rm -f $STAGED && am start -n ${RootShell.q(activity)}"
+
     /** The detached install's output so far, or null if there's none (yet). */
-    fun installLog(privileged: PrivilegedAccess): String? = privileged.shell("cat $INSTALL_LOG 2>/dev/null")?.trim()?.ifEmpty { null }
+    suspend fun installLog(privileged: PrivilegedAccess): String? = privileged.run("cat", INSTALL_LOG)?.trim()?.ifEmpty { null }
 
     /** True when Android's installer can be used now; otherwise [installerPermissionIntent] lets the user allow it. */
     fun canUseSystemInstaller(context: Context): Boolean = context.packageManager.canRequestPackageInstalls()

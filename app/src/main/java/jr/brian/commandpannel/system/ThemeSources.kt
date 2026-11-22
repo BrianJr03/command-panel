@@ -127,7 +127,7 @@ object ThemeSources {
      * removes looks the source dropped, and copies each pack into `TCP Themes/themes/<repo>/`. Blocking; call off
      * the main thread.
      */
-    fun sync(context: Context, privileged: PrivilegedAccess, prefs: SharedPreferences, source: ThemeSource): Result<SyncResult> = runCatching {
+    suspend fun sync(context: Context, privileged: PrivilegedAccess, prefs: SharedPreferences, source: ThemeSource): Result<SyncResult> = runCatching {
         val remote: Map<String, String>
         val downloadUrls: Map<String, String>
         val prefetched = mutableMapOf<String, String>()

@@ -249,15 +249,14 @@ class ClipTrimmer(
      * path, or `null` when the copy failed. Throws [PlaceError] with [TrimError.INVALID_PATH] when no valid name is
      * free.
      */
-    private fun place(clip: ReplayClip, tmp: File): String? {
+    private suspend fun place(clip: ReplayClip, tmp: File): String? {
         // A trim goes next to its clip, which may be on a mounted SD card (#75).
         val mounted = jr.brian.commandpannel.system.ReplayStorage.mountedIds(app)
         val base = ScreenRecorderEngine.replayTrimClipPath(clip.path)
             ?.takeIf { ScreenRecorderEngine.isValidReplayClipOutputPath(it, mounted) }
             ?: throw PlaceError(TrimError.INVALID_PATH)
-        val parent = RootShell.q(clip.dir)
         // Root lists the folder (the app can't always see it), the same way a save picks `_2`.
-        val taken = privileged.shell("ls -1 $parent 2>/dev/null; echo $LIST_END")
+        val taken = privileged.shell("ls -1 ${RootShell.q(clip.dir)} 2>/dev/null; echo $LIST_END")
             ?.takeIf { it.contains(LIST_END) }
             ?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
             ?: return null
@@ -274,8 +273,8 @@ class ClipTrimmer(
             privileged.shell(jr.brian.commandpannel.system.ClipCopy.cleanupCommand(path))
             return null
         }
-        val uri = RootShell.q(Uri.fromFile(File(path)).toString())
-        privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d $uri >/dev/null 2>&1")
+        val uri = Uri.fromFile(File(path)).toString()
+        privileged.run("am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", uri)
         return path
     }
 

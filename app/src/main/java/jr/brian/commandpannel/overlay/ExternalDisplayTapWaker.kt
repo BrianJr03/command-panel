@@ -163,7 +163,7 @@ class ExternalDisplayTapWaker(
         if (watchers.isEmpty()) return
         Log.d(TAG, "tap detected; waking handheld screens")
         // A root write: off the main thread (this runs from the touch listener).
-        scope.launch(Dispatchers.IO) { privileged.shell("settings put system $KEY 0") }
+        scope.launch { privileged.run("settings", "put", "system", KEY, "0") }
         detachWatchers()
     }
 }

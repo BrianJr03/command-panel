@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /**
@@ -38,7 +39,7 @@ class StockCoexistence(
     }
 
     private val prefs = Prefs.of(context)
-    private val suppressor = StockSuppressor(privileged::shell)
+    private val suppressor = StockSuppressor { privileged.shell(it) }
     /** The other build (debug / release); only one of the two replaces stock at a time. */
     val sibling = SiblingBuild(context, privileged)
 
@@ -111,23 +112,27 @@ class StockCoexistence(
 
     /** Restore stock when the app is stopping, so the AYN button is never left dead. */
     fun onStop() {
-        if (_enabled.value && !standby) {
-            // Best-effort synchronous restore on teardown.
-            runCatching { restoreAndDisarm() }
+        // Teardown has to finish before the process can go, so this one waits (on purpose: the AYN button is never left
+        // dead). The root calls still run on IO; only this caller waits for them.
+        runBlocking {
+            if (_enabled.value && !standby) {
+                // Best-effort synchronous restore on teardown.
+                runCatching { restoreAndDisarm() }
+            }
+            // Nothing is replacing stock from here any more; the pref stays on and claims again on the next start.
+            if (_enabled.value) runCatching { sibling.release() }
         }
-        // Nothing is replacing stock from here any more; the pref stays on and claims again on the next start.
-        if (_enabled.value) runCatching { sibling.release() }
     }
 
     /** Arms the helper's stock recovery first, so there is no window where stock is frozen but not covered. */
-    private fun suppressAndArm(): Boolean {
+    private suspend fun suppressAndArm(): Boolean {
         privileged.setStockRecoveryArmed(true)
         val ok = suppressor.suppress()
         scheduleRecheck()
         return ok
     }
 
-    private fun restoreAndDisarm(): Boolean {
+    private suspend fun restoreAndDisarm(): Boolean {
         recheckJob?.cancel()
         privileged.setStockRecoveryArmed(false)
         return suppressor.restore()

@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.Display
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.abs
 
@@ -80,7 +82,8 @@ class TelemetryMonitor(
         if (job?.isActive == true) return
         job = scope.launch {
             while (isActive) {
-                _state.value = sample()
+                // File reads, binder calls and (without the helper) a root shell: never on the caller's main thread.
+                _state.value = withContext(Dispatchers.IO) { sample() }
                 delay(intervalMs)
             }
         }
@@ -93,7 +96,7 @@ class TelemetryMonitor(
 
     private fun read(path: String): String = runCatching { File(path).readText() }.getOrDefault("")
 
-    private fun sample(): Telemetry {
+    private suspend fun sample(): Telemetry {
         val tempC = TelemetryReader.parseTempC(read(TEMP)) ?: 0
         val cpuGhz = TelemetryReader.kHzToGhz(read(CPU_CUR)) ?: 0f
         val cpuFrac = TelemetryReader.fraction(read(CPU_CUR), read(CPU_MAX)) ?: 0f
@@ -122,7 +125,7 @@ class TelemetryMonitor(
         )
     }
 
-    private fun sampleFps(): TelemetryReader.FpsReading {
+    private suspend fun sampleFps(): TelemetryReader.FpsReading {
         val cap = refreshRateCap()
         // The global counter is sampled every time so its delta is ready the moment the task source drops out.
         val globalFps = sampleGlobalFps(cap)
@@ -132,11 +135,11 @@ class TelemetryMonitor(
         return TelemetryReader.chooseFps(task?.fps, task?.ageMs, globalFps, cap)
     }
 
-    private fun sampleGlobalFps(cap: Int): Int {
+    private suspend fun sampleGlobalFps(cap: Int): Int {
         // Timestamp each read at the midpoint of the call itself, so binder or fork latency doesn't skew the interval.
         // The helper's direct binder transaction is sub-millisecond; the shell fallback forks `sh` + `service`.
         val (frames, now) = timed { privileged.surfaceFlingerFrameCount() }
-            ?: timed { privileged.shell("service call SurfaceFlinger 1013")?.let(TelemetryReader::parseSurfaceFlingerFrames) }
+            ?: timed { privileged.run("service", "call", "SurfaceFlinger", "1013")?.let(TelemetryReader::parseSurfaceFlingerFrames) }
             ?: return _state.value.fps
         val delta = TelemetryReader.frameDelta(lastFrames, frames)
         val dt = now - lastFrameTime

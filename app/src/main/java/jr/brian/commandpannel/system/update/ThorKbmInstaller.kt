@@ -148,14 +148,14 @@ object ThorKbmInstaller {
      * root installs is the APK that was checked. Never replaces an installed ThorKBM. Returns the installer's output,
      * or null when the root shell isn't available.
      */
-    fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): String? {
+    suspend fun installWithRoot(context: Context, privileged: PrivilegedAccess, apk: File): String? {
         if (DebugOverrides.read(context).noRoot) return null
         val sha = ApkDigest.sha256(apk)
         val staged = privileged.shell(
             "cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,
         )?.trim() ?: return null
         if (staged.substringBefore(' ') != sha) {
-            privileged.shell("rm -f $STAGED")
+            privileged.run("rm", "-f", STAGED)
             return if (staged.isEmpty()) null else "staged copy doesn't match"
         }
         // A copy installed in the meantime is left alone: ThorKBM's own updater owns updates.

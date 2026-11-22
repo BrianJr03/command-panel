@@ -45,4 +45,33 @@ class RootShellTest {
             .toList()
         assertEquals("quote with RootShell.q instead", emptyList<String>(), offenders)
     }
+
+    @Test
+    fun everyValueInAShellLiteralIsQuoted() {
+        val violations = ShellLiteralGuard.scan(File("src/main/java"))
+        assertEquals(
+            "quote these with RootShell.q, or use privileged.run(…) (see RootShell)",
+            emptyList<ShellLiteralGuard.Violation>(),
+            violations,
+        )
+    }
+
+    @Test
+    fun theGuardCatchesUnquotedValues() {
+        val code = """
+            fun shell(script: String) = Unit
+            suspend fun f() {
+                privileged.shell("cp ${'$'}src ${'$'}{RootShell.q(dst)} && ${'$'}{a.b}" +
+                    " ${'$'}LIST_END ${'$'}{if (on) "disable" else "enable"}")
+                shell("ok ${'$'}{LookPackJson.EXTENSION} ${'$'}{ReplayVolumes.mkdirsCommand(r, p)} \${'$'}d")
+                VendorRootShell.exec("pm grant ${'$'}pkg x")
+                privileged.shell(RootShell.command("rm", path))
+            }
+        """.trimIndent()
+        val found = ShellLiteralGuard.scan("T.kt", code).map { it.line to it.expression }
+        assertEquals(
+            listOf(3 to "src", 3 to "a.b", 4 to "if (on) \"disable\" else \"enable\"", 6 to "pkg"),
+            found,
+        )
+    }
 }

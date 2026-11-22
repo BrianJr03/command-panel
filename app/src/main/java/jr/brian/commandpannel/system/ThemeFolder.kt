@@ -29,7 +29,7 @@ object ThemeFolder {
     private const val README = "README.txt"
 
     /** Creates the folder layout and its README if missing. Returns false when the root shell isn't available. */
-    fun ensure(context: Context, privileged: PrivilegedAccess): Boolean {
+    suspend fun ensure(context: Context, privileged: PrivilegedAccess): Boolean {
         val ok = privileged.shell("mkdir -p ${RootShell.q(THEMES)} ${RootShell.q(FONTS)} && echo ok")?.trim() == "ok"
         if (ok && privileged.shell("[ -f ${RootShell.q("$ROOT/$README")} ] && echo yes")?.trim() != "yes") {
             writeText(context, privileged, "$ROOT/$README", context.getString(jr.brian.commandpannel.R.string.theme_folder_readme))
@@ -38,25 +38,25 @@ object ThemeFolder {
     }
 
     /** Every pack under `themes/` (including synced repo folders), newest first. */
-    fun listPacks(privileged: PrivilegedAccess): List<FolderPack> =
+    suspend fun listPacks(privileged: PrivilegedAccess): List<FolderPack> =
         privileged.shell("find ${RootShell.q(THEMES)} -type f \\( -name '*${LookPackJson.EXTENSION}' -o -name '*.cplook.json' \\) 2>/dev/null")
-            .orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.sorted()
-            .map { path -> FolderPack(path, readPack(privileged, path)) }.toList()
+            .orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.sorted().toList()
+            .map { path -> FolderPack(path, readPack(privileged, path)) }
 
-    fun readPack(privileged: PrivilegedAccess, path: String): LookPack? {
-        val text = privileged.shell("head -c ${LookPackJson.MAX_BYTES + 1} ${RootShell.q(path)}") ?: return null
+    suspend fun readPack(privileged: PrivilegedAccess, path: String): LookPack? {
+        val text = privileged.run("head", "-c", (LookPackJson.MAX_BYTES + 1).toString(), path) ?: return null
         return LookPackJson.decode(text, File(path).name.substringBefore('.'))
     }
 
     /** Writes [pack] to `themes/[subdir]/<file>` and returns the absolute path. */
-    fun writePack(context: Context, privileged: PrivilegedAccess, pack: LookPack, fileName: String = LookPackJson.fileName(pack.name), subdir: String? = null): String? {
+    suspend fun writePack(context: Context, privileged: PrivilegedAccess, pack: LookPack, fileName: String = LookPackJson.fileName(pack.name), subdir: String? = null): String? {
         val dir = if (subdir == null) THEMES else "$THEMES/$subdir"
         val dest = "$dir/$fileName"
         return if (writeText(context, privileged, dest, LookPackJson.encode(pack))) dest else null
     }
 
     /** Stages [text] in app storage, then copies it into place as root (as [SettingsBackup.export] does). */
-    fun writeText(context: Context, privileged: PrivilegedAccess, dest: String, text: String): Boolean {
+    suspend fun writeText(context: Context, privileged: PrivilegedAccess, dest: String, text: String): Boolean {
         val staged = File(context.cacheDir, "theme-stage-${System.nanoTime()}").apply { writeText(text) }
         val dir = dest.substringBeforeLast('/')
         val ok = privileged.shell("mkdir -p ${RootShell.q(dir)} && cp ${RootShell.q(staged.absolutePath)} ${RootShell.q(dest)} && chmod 644 ${RootShell.q(dest)} && echo ok")?.trim() == "ok"
@@ -65,15 +65,15 @@ object ThemeFolder {
         return ok
     }
 
-    fun deletePath(privileged: PrivilegedAccess, path: String) {
-        if (path.startsWith("$THEMES/")) privileged.shell("rm -f ${RootShell.q(path)}")
+    suspend fun deletePath(privileged: PrivilegedAccess, path: String) {
+        if (path.startsWith("$THEMES/")) privileged.run("rm", "-f", path)
     }
 
-    fun hasFont(privileged: PrivilegedAccess, fileName: String): Boolean =
+    suspend fun hasFont(privileged: PrivilegedAccess, fileName: String): Boolean =
         privileged.shell("[ -f ${RootShell.q("$FONTS/${safeName(fileName)}")} ] && echo yes")?.trim() == "yes"
 
     /** Imports `fonts/[fileName]` into the app's font store (root copies it somewhere the app can read first). */
-    fun importFont(context: Context, privileged: PrivilegedAccess, fileName: String): Result<UserFont> {
+    suspend fun importFont(context: Context, privileged: PrivilegedAccess, fileName: String): Result<UserFont> {
         val staged = File(context.cacheDir, "font-stage-${System.nanoTime()}")
         return runCatching {
             val src = "$FONTS/${safeName(fileName)}"
@@ -84,7 +84,7 @@ object ThemeFolder {
     }
 
     /** Copies an imported font out to `fonts/<its file name>`, so exported packs travel with their fonts. */
-    fun exportFont(context: Context, privileged: PrivilegedAccess, font: UserFont): Boolean {
+    suspend fun exportFont(context: Context, privileged: PrivilegedAccess, font: UserFont): Boolean {
         val dest = "$FONTS/${safeName(font.fileName)}"
         val src = UserFontStore.fileOf(context, font.id).absolutePath
         return privileged.shell("mkdir -p ${RootShell.q(FONTS)} && cp ${RootShell.q(src)} ${RootShell.q(dest)} && chmod 644 ${RootShell.q(dest)} && echo ok")?.trim() == "ok"

@@ -24,7 +24,8 @@ import kotlinx.coroutines.withContext
 class QuickLaunchReturnWatcher(
     private val context: Context,
     private val scope: CoroutineScope,
-    private val shell: (String) -> String?,
+    /** The root shell ([jr.brian.commandpannel.privileged.PrivilegedAccess.shell]). */
+    private val shell: suspend (String) -> String?,
     /** Screen on and keyguard unlocked. */
     private val isDeviceAwake: () -> Boolean,
     private val isPanelShowing: () -> Boolean,

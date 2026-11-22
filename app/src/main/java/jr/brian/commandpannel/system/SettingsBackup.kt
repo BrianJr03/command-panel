@@ -72,7 +72,7 @@ object SettingsBackup {
         return out
     }
 
-    fun export(context: Context, privileged: PrivilegedAccess): String? {
+    suspend fun export(context: Context, privileged: PrivilegedAccess): String? {
         val prefs = Prefs.of(context)
         val version = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -82,8 +82,10 @@ object SettingsBackup {
         // Stage in app storage, then copy to the visible folder as root.
         val staged = File(context.cacheDir, name).apply { writeText(json) }
         val dest = "$DIR/$name"
-        val q = RootShell::q
-        privileged.shell("mkdir -p ${q(DIR)} && cp ${q(staged.absolutePath)} ${q(dest)} && chmod 644 ${q(dest)}")
+        privileged.shell(
+            "mkdir -p ${RootShell.q(DIR)} && cp ${RootShell.q(staged.absolutePath)} ${RootShell.q(dest)} && " +
+                "chmod 644 ${RootShell.q(dest)}",
+        )
         staged.delete()
         MediaScannerConnection.scanFile(context, arrayOf(dest), arrayOf("application/json"), null)
         return dest
@@ -99,17 +101,17 @@ object SettingsBackup {
     fun isBackupName(name: String): Boolean = BACKUP_NAME.matches(name)
 
     /** Backups in the folder, newest first, as full paths. Files not named like a backup are skipped. */
-    fun list(privileged: PrivilegedAccess): List<String> =
+    suspend fun list(privileged: PrivilegedAccess): List<String> =
         names(privileged.shell("ls -1t ${RootShell.q(DIR)} 2>/dev/null").orEmpty()).map { "$DIR/$it" }
 
     /** The backup names in `ls -1` output, in order. Pure, so it's unit tested. */
     fun names(lsOutput: String): List<String> =
         lsOutput.lineSequence().map { it.trim() }.filter(::isBackupName).toList()
 
-    fun import(context: Context, privileged: PrivilegedAccess, path: String): Int {
+    suspend fun import(context: Context, privileged: PrivilegedAccess, path: String): Int {
         // Only a backup in our folder, by its exact name; quoted all the same.
         if (path.substringBeforeLast('/') != DIR || !isBackupName(path.substringAfterLast('/'))) return 0
-        val json = privileged.shell("cat ${RootShell.q(path)}") ?: return 0
+        val json = privileged.run("cat", path) ?: return 0
         val values = decode(json) ?: return 0
         val editor = Prefs.of(context).edit()
         for ((k, v) in values) when (v) {

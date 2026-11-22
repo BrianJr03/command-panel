@@ -50,10 +50,9 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
      */
     suspend fun list(): List<ReplayClip>? = withContext(Dispatchers.IO) {
         val dirs = searchDirs()
-        val quoted = dirs.joinToString(" ") { RootShell.q(it) }
         // The end marker tells an empty listing from a failed or cut-short call.
         val out = privileged.shell(
-            "for d in $quoted; do [ -d \"\$d\" ] && find \"\$d\" -maxdepth 2 -type f -name 'Replay_*.mp4' " +
+            "for d in ${RootShell.command(*dirs.toTypedArray())}; do [ -d \"\$d\" ] && find \"\$d\" -maxdepth 2 -type f -name 'Replay_*.mp4' " +
                 "-exec stat -c '%s|%Y|%n' {} + 2>/dev/null; done; echo $END_MARKER",
             LIST_TIMEOUT_MS,
         )
@@ -103,11 +102,10 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
             Log.w(TAG, "refusing to delete ${clip.path}")
             return@withContext false
         }
-        val path = RootShell.q(clip.path)
-        val uri = RootShell.q(Uri.fromFile(File(clip.path)).toString())
+        val uri = Uri.fromFile(File(clip.path)).toString()
         val out = privileged.shell(
-            "rm -f $path; [ -e $path ] || echo $GONE_MARKER; " +
-                "am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d $uri >/dev/null 2>&1",
+            "rm -f ${RootShell.q(clip.path)}; [ -e ${RootShell.q(clip.path)} ] || echo $GONE_MARKER; " +
+                "am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${RootShell.q(uri)} >/dev/null 2>&1",
         )
         val gone = out?.contains(GONE_MARKER) == true
         if (gone) {
@@ -123,7 +121,7 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
         thumbs.cached(clip) ?: decodeSlots.withPermit { thumbs.cached(clip) ?: decode(clip) }
     }
 
-    private fun decode(clip: ReplayClip): ThumbnailCache.Entry? {
+    private suspend fun decode(clip: ReplayClip): ThumbnailCache.Entry? {
         // Decoding gets its own temporary copy, so trimming the player's copies never pulls one out from under it.
         val direct = File(clip.path)
         val source = if (canRead(direct)) direct else {
@@ -138,13 +136,13 @@ class ClipRepository(context: Context, private val privileged: PrivilegedAccess)
     }
 
     /** Root-copies [clip] to [dest] in our cache, owned by our uid. Returns [dest] if we can read it, else `null`. */
-    private fun rootCopy(clip: ReplayClip, dest: File): File? {
+    private suspend fun rootCopy(clip: ReplayClip, dest: File): File? {
         val uid = android.os.Process.myUid()
-        val dst = RootShell.q(dest.absolutePath)
+        val dst = dest.absolutePath
         // The marker, not just a readable file: a copy cut off by the timeout is readable but incomplete.
         val copied = privileged.shell(
-            "cp ${RootShell.q(clip.path)} $dst && chown $uid:$uid $dst && chmod 600 $dst && " +
-                "(restorecon $dst >/dev/null 2>&1; true) && echo $COPIED_MARKER",
+            "cp ${RootShell.q(clip.path)} ${RootShell.q(dst)} && chown ${RootShell.q("$uid:$uid")} ${RootShell.q(dst)} && " +
+                "chmod 600 ${RootShell.q(dst)} && (restorecon ${RootShell.q(dst)} >/dev/null 2>&1; true) && echo $COPIED_MARKER",
             jr.brian.commandpannel.system.ClipCopy.TIMEOUT_MS,
         )?.contains(COPIED_MARKER) == true
         if (copied && canRead(dest)) return dest

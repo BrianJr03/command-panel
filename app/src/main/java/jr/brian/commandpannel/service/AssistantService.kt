@@ -634,8 +634,8 @@ class AssistantService : Service() {
         }
     }
 
-    /** Blocking. Whether BDSA or the other Command Panel build currently replaces the stock assistant. */
-    private fun otherInControl(force: Boolean): Boolean = bdsa.detect(force).active || coexistence.sibling.siblingOwns()
+    /** Whether BDSA or the other Command Panel build currently replaces the stock assistant (reads with root). */
+    private suspend fun otherInControl(force: Boolean): Boolean = bdsa.detect(force).active || coexistence.sibling.siblingOwns()
 
     /**
      * The other build claimed (or released) the stock replacement. A claim turns this build's "Replace stock

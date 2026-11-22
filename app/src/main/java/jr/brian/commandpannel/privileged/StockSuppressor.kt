@@ -1,5 +1,9 @@
 package jr.brian.commandpannel.privileged
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
 /**
  * Ephemerally suppresses the stock `com.odin.dualscreen.assistant` so Command Panel can own the AYN button, and
  * restores it cleanly. Opt-in only.
@@ -12,9 +16,10 @@ package jr.brian.commandpannel.privileged
  * disabled across an uninstall or reboot. Restore kills the frozen process and lets AMS respawn it normally.
  *
  * All process control goes through the root [shell] (the app passes [PrivilegedAccess.shell]; the root helper passes
- * its own shell to run [restore] after the app is gone). Pure helpers are unit-tested.
+ * its own shell to run [restore] after the app is gone). It suspends, so none of it can run on the main thread; the
+ * helper and the app's teardown, which must wait, call it from `runBlocking`. Pure helpers are unit-tested.
  */
-class StockSuppressor(private val shell: (String) -> String?) {
+class StockSuppressor(private val shell: suspend (String) -> String?) {
 
     companion object {
         const val STOCK_PKG = "com.odin.dualscreen.assistant"
@@ -29,49 +34,52 @@ class StockSuppressor(private val shell: (String) -> String?) {
         fun isStoppedStat(stat: String?): Boolean = stat?.contains(") T ") == true
     }
 
-    private fun pids(): List<String> = parsePids(shell("pidof $STOCK_PKG"))
+    /** One command with each argument quoted ([RootShell.command]). */
+    private suspend fun run(vararg argv: String): String? = shell(RootShell.command(*argv))
 
-    fun suppress(): Boolean {
-        shell("am stopservice -n $TCC_SERVICE")
-        shell("pm disable $TCC_SERVICE")
-        shell("pm enable $STOCK_PKG")
+    /** Sends [signal] (`-9`, `-STOP`, `-CONT`) to [pids], if there are any. */
+    private suspend fun kill(signal: String, pids: List<String>) {
+        if (pids.isNotEmpty()) run("kill", signal, *pids.toTypedArray())
+    }
+
+    private suspend fun pids(): List<String> = parsePids(run("pidof", STOCK_PKG))
+
+    suspend fun suppress(): Boolean {
+        run("am", "stopservice", "-n", TCC_SERVICE)
+        run("pm", "disable", TCC_SERVICE)
+        run("pm", "enable", STOCK_PKG)
 
         pids().takeIf { it.isNotEmpty() }?.let {
-            shell("kill -9 ${it.joinToString(" ")}")
-            Thread.sleep(RESPAWN_WAIT_MS)
+            kill("-9", it)
+            // A cancel here would leave TccServices disabled on disk, and the AYN button dead.
+            withContext(NonCancellable) { delay(RESPAWN_WAIT_MS) }
         }
-        val fresh = pids()
-        if (fresh.isNotEmpty()) shell("kill -STOP ${fresh.joinToString(" ")}")
+        kill("-STOP", pids())
 
         // Never leave anything disabled on disk.
-        shell("pm enable $STOCK_PKG")
-        shell("pm enable $TCC_SERVICE")
+        run("pm", "enable", STOCK_PKG)
+        run("pm", "enable", TCC_SERVICE)
 
         // The freshly stopped process may have respawned again; make sure the live one is stopped.
-        val verify = pids()
-        if (verify.isNotEmpty()) shell("kill -STOP ${verify.joinToString(" ")}")
+        kill("-STOP", pids())
         return isSuppressed()
     }
 
-    fun restore(): Boolean {
-        shell("pm enable $STOCK_PKG")
-        shell("pm enable $TCC_SERVICE")
-        pids().takeIf { it.isNotEmpty() }?.let { shell("kill -9 ${it.joinToString(" ")}") }
-        shell("am startservice -n $TCC_SERVICE")
+    suspend fun restore(): Boolean {
+        run("pm", "enable", STOCK_PKG)
+        run("pm", "enable", TCC_SERVICE)
+        kill("-9", pids())
+        run("am", "startservice", "-n", TCC_SERVICE)
         return !isSuppressed()
     }
 
-    fun isSuppressed(): Boolean {
+    suspend fun isSuppressed(): Boolean {
         val pid = pids().firstOrNull() ?: return false
-        return isStoppedStat(shell("cat /proc/$pid/stat"))
+        return isStoppedStat(run("cat", "/proc/$pid/stat"))
     }
 
     /** Fork fix: unfreeze briefly so the frozen process can drain a queued broadcast (e.g. SCREEN_OFF) without ANR. */
-    fun continueProcess() {
-        pids().takeIf { it.isNotEmpty() }?.let { shell("kill -CONT ${it.joinToString(" ")}") }
-    }
+    suspend fun continueProcess() = kill("-CONT", pids())
 
-    fun stopProcess() {
-        pids().takeIf { it.isNotEmpty() }?.let { shell("kill -STOP ${it.joinToString(" ")}") }
-    }
+    suspend fun stopProcess() = kill("-STOP", pids())
 }

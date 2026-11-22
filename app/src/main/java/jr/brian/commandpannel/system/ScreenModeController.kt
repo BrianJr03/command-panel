@@ -20,6 +20,7 @@ import jr.brian.commandpannel.system.SystemSettings.Keys
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -60,6 +61,19 @@ class ScreenModeController(
     private var blank = ScreenModePlan.NONE
     private var running = false
     private var helperWatch: Job? = null
+
+    /**
+     * Settings writes (root shell) leave the main thread here, one at a time and in order, so a restore never lands
+     * before the save it undoes. The flags that decide the next plan ([KEY_FOCUS_SAVED], [KEY_BLANK]) are still set on
+     * the main thread right away; only the vendor settings, and the focus values read from them, wait in this queue.
+     * Not tied to [start]/[stop], so a hand-over's restore still finishes after [stop].
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val writes = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+
+    private fun write(block: suspend () -> Unit) {
+        writes.launch { runCatching { block() }.onFailure { Log.w(TAG, "settings write failed", it) } }
+    }
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == KEY_BLANK) main.post { apply(prefs.getInt(KEY_BLANK, ScreenModePlan.NONE)) }
@@ -133,10 +147,12 @@ class ScreenModeController(
     private fun adoptVendorMode() {
         val adopted = ScreenModePlan.adoptVendorMode(settings.getInt(Keys.DISPLAY_MODE, 0)) ?: return
         Log.i(TAG, "vendor mode $adopted adopted as our blank state; vendor mode back to 0")
-        // An older version also set touch off for the blanked panel; the cover eats touches now.
-        privileged.shell("setprop sys.temp.disabled.touch 0,0")
-        settings.putInt(Keys.DISPLAY_MODE, 0)
         prefs.edit().putInt(KEY_BLANK, adopted).apply()
+        write {
+            // An older version also set touch off for the blanked panel; the cover eats touches now.
+            privileged.run("setprop", "sys.temp.disabled.touch", "0,0")
+            settings.putInt(Keys.DISPLAY_MODE, 0)
+        }
     }
 
     private fun apply(target: Int, starting: Boolean = false, force: Boolean = false) {
@@ -158,9 +174,11 @@ class ScreenModeController(
             }
             else -> {
                 onHideOverlay()
-                plan.focusLock?.let {
-                    settings.putInt(Keys.FOCUS_LOCK, it)
-                    settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
+                plan.focusLock?.let { lock ->
+                    write {
+                        settings.putInt(Keys.FOCUS_LOCK, lock)
+                        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 1)
+                    }
                 }
                 removeCover(if (plan.cover == Panel.BOTTOM) Panel.TOP else Panel.BOTTOM, animate = false)
                 showCover(plan.cover, animate = !starting)
@@ -172,24 +190,30 @@ class ScreenModeController(
         if (plan.restoreFocus) restoreFocusState()
     }
 
+    /**
+     * Marks the focus state saved now (so the next plan sees it), and saves the values in [writes]: after any focus
+     * write still on its way, so [ScreenModePlan.FocusSave.CURRENT] reads what the user actually had.
+     */
     private fun saveFocusState(source: ScreenModePlan.FocusSave) {
-        val (focus, sysKey) = when (source) {
-            ScreenModePlan.FocusSave.NONE -> return
-            ScreenModePlan.FocusSave.CURRENT ->
-                settings.getInt(Keys.FOCUS_LOCK, 0) to settings.getInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 0)
-            ScreenModePlan.FocusSave.DEFAULT -> 0 to 0
+        if (source == ScreenModePlan.FocusSave.NONE) return
+        prefs.edit().putBoolean(KEY_FOCUS_SAVED, true).apply()
+        write {
+            val (focus, sysKey) = when (source) {
+                ScreenModePlan.FocusSave.CURRENT ->
+                    settings.getInt(Keys.FOCUS_LOCK, 0) to settings.getInt(Keys.SYSTEM_KEY_FOCUS_LOCK, 0)
+                else -> 0 to 0
+            }
+            prefs.edit().putInt(KEY_FOCUS_LOCK, focus).putInt(KEY_SYS_KEY_LOCK, sysKey).apply()
         }
-        prefs.edit()
-            .putInt(KEY_FOCUS_LOCK, focus)
-            .putInt(KEY_SYS_KEY_LOCK, sysKey)
-            .putBoolean(KEY_FOCUS_SAVED, true)
-            .apply()
     }
 
+    /** Puts back what [saveFocusState] saved; queued behind it, so it reads the saved values, not older ones. */
     private fun restoreFocusState() {
-        settings.putInt(Keys.FOCUS_LOCK, prefs.getInt(KEY_FOCUS_LOCK, 0))
-        settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt(KEY_SYS_KEY_LOCK, 0))
         prefs.edit().remove(KEY_FOCUS_SAVED).apply()
+        write {
+            settings.putInt(Keys.FOCUS_LOCK, prefs.getInt(KEY_FOCUS_LOCK, 0))
+            settings.putInt(Keys.SYSTEM_KEY_FOCUS_LOCK, prefs.getInt(KEY_SYS_KEY_LOCK, 0))
+        }
     }
 
     // ---- brightness levels saved by older versions ----
@@ -222,7 +246,10 @@ class ScreenModeController(
         }
         prefs.edit().remove(key).apply()
         if (applied) {
-            if (panel == Panel.TOP) settings.putInt(Keys.SCREEN_BRIGHTNESS, ScreenModePlan.toScreenBrightnessSetting(saved))
+            if (panel == Panel.TOP) {
+                val level = ScreenModePlan.toScreenBrightnessSetting(saved)
+                write { settings.putInt(Keys.SCREEN_BRIGHTNESS, level) }
+            }
             Log.i(TAG, "$panel brightness restored to $saved (saved by an older version)")
         }
         return applied

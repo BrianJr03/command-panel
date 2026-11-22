@@ -565,13 +565,13 @@ class SettingsRepository(
             "stick_led" -> toggleStickLight()
             "clear_memory" -> cleanMemory()
             "wifi" -> offMain(refreshAfter = true) {
-                privileged.shell("svc wifi ${if (wifiLevel() >= 0) "disable" else "enable"}")
+                privileged.run("svc", "wifi", if (wifiLevel() >= 0) "disable" else "enable")
             }
             "bluetooth" -> offMain(refreshAfter = true) {
-                privileged.shell("svc bluetooth ${if (bluetoothEnabled()) "disable" else "enable"}")
+                privileged.run("svc", "bluetooth", if (bluetoothEnabled()) "disable" else "enable")
             }
             "do_not_disturb" -> offMain(refreshAfter = true) {
-                privileged.shell("cmd notification set_dnd ${if (doNotDisturbOn()) "off" else "priority"}")
+                privileged.run("cmd", "notification", "set_dnd", if (doNotDisturbOn()) "off" else "priority")
             }
             "airplane_mode" -> toggleAirplane()
             "keep_screen_on" -> toggleIntKey("keep_screen_on", 0)
@@ -611,7 +611,7 @@ class SettingsRepository(
 
     private fun toggleAirplane() = offMain(refreshAfter = true) {
         val on = android.provider.Settings.Global.getInt(context.contentResolver, "airplane_mode_on", 0) == 1
-        privileged.shell("cmd connectivity airplane-mode ${if (on) "disable" else "enable"}")
+        privileged.run("cmd", "connectivity", "airplane-mode", if (on) "disable" else "enable")
     }
 
     override fun setFocusLock(value: Int) = offMain { settings.putInt(Keys.FOCUS_LOCK, value) }
@@ -649,11 +649,11 @@ class SettingsRepository(
 
     override fun toggleAmbientLight() = offMain(refreshAfter = true) {
         val isOn = ambientLightShown() == true
-        privileged.shell("am broadcast -a com.ro.external.request.light.adj.action --ez isShow ${!isOn}")
+        privileged.run("am", "broadcast", "-a", "com.ro.external.request.light.adj.action", "--ez", "isShow", (!isOn).toString())
     }
 
     /** The vendor daemon's ambient-light switch (`sys.light.curr.is.show`), or `null` if it can't be read. */
-    private fun ambientLightShown(): Boolean? = when (privileged.shell("getprop sys.light.curr.is.show")?.trim()) {
+    private suspend fun ambientLightShown(): Boolean? = when (privileged.run("getprop", "sys.light.curr.is.show")?.trim()) {
         "1", "true" -> true
         "0", "false" -> false
         else -> null
@@ -678,7 +678,7 @@ class SettingsRepository(
 
     override fun cleanMemory() {
         // Full stock exclusion logic is a later refinement; the root kill is the core action.
-        offMain { privileged.shell("am kill-all") }
+        offMain { privileged.run("am", "kill-all") }
     }
 
     /**
@@ -691,11 +691,11 @@ class SettingsRepository(
         scope?.launch(Dispatchers.IO) {
             kotlinx.coroutines.delay(300)
             val policy = jr.brian.commandpannel.privileged.ClearTasksPolicy
-            val recents = policy.parseRecentsDump(privileged.shell("dumpsys activity recents").orEmpty()) ?: return@launch
-            val onScreen = policy.parseActivitiesDump(privileged.shell("dumpsys activity activities").orEmpty()).orEmpty()
+            val recents = policy.parseRecentsDump(privileged.run("dumpsys", "activity", "recents").orEmpty()) ?: return@launch
+            val onScreen = policy.parseActivitiesDump(privileged.run("dumpsys", "activity", "activities").orEmpty()).orEmpty()
             val home = policy.filterHomePackages(
                 Regex("""([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/""")
-                    .findAll(privileged.shell("cmd package resolve-activity -c android.intent.category.HOME").orEmpty())
+                    .findAll(privileged.run("cmd", "package", "resolve-activity", "-c", "android.intent.category.HOME").orEmpty())
                     .map { it.groupValues[1] }.toList()
             )
             val plan = policy.selectTasksToClear(
@@ -731,7 +731,7 @@ class SettingsRepository(
         // Stock opens bottom-screen recents via IOverviewProxy txn 6, which a user app can't bind (SecurityException);
         // KEYCODE_APP_SWITCH through the root shell opens the system recents instead. Dismiss the panel first, as stock.
         onHideOverlay()
-        offMain { privileged.shell("input keyevent 187") }
+        offMain { privileged.run("input", "keyevent", "187") }
     }
 
     override fun setOverlayLayout(layout: OverlayLayout) {

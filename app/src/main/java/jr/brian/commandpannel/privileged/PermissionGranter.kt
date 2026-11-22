@@ -31,7 +31,7 @@ object PermissionGranter {
             if (context.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED) {
                 held++; continue
             }
-            if (VendorRootShell.exec("pm grant $pkg $perm") != null &&
+            if (VendorRootShell.exec(RootShell.command("pm", "grant", pkg, perm)) != null &&
                 context.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED
             ) granted.add(perm) else failed.add(perm)
         }
@@ -39,16 +39,16 @@ object PermissionGranter {
         if (canWriteSystemSettings(context)) {
             held++
         } else {
-            VendorRootShell.exec("appops set $pkg WRITE_SETTINGS allow")
+            VendorRootShell.exec(RootShell.command("appops", "set", pkg, "WRITE_SETTINGS", "allow"))
             if (canWriteSystemSettings(context)) granted.add("appop:WRITE_SETTINGS") else failed.add("appop:WRITE_SETTINGS")
         }
         for (op in APPOPS.filter { it != "WRITE_SETTINGS" }) {
-            VendorRootShell.exec("appops set $pkg $op allow")
+            VendorRootShell.exec(RootShell.command("appops", "set", pkg, op, "allow"))
             granted.add("appop:$op")
         }
 
         // Keep the app process off the Doze idle list so the overlay service is not frozen.
-        VendorRootShell.exec("dumpsys deviceidle whitelist +$pkg")
+        VendorRootShell.exec(RootShell.command("dumpsys", "deviceidle", "whitelist", "+$pkg"))
 
         return Result(granted, failed, held)
     }

@@ -3,14 +3,13 @@ package jr.brian.commandpannel.system
 import android.content.ContentResolver
 import android.provider.Settings
 import jr.brian.commandpannel.privileged.PrivilegedAccess
-import jr.brian.commandpannel.privileged.RootShell
 
 /**
  * Typed access to the vendor `Settings.System` keys the stock assistant uses (see the teardown, NOTES.md §4).
  *
  * Reads go through the `ContentResolver` directly. Writes go through the root shell (`settings put system …`): the
  * app's own uid may be refused on vendor keys even with `WRITE_SETTINGS`, but root always succeeds, and this keeps
- * one code path for every key.
+ * one code path for every key. A write starts a root process, so the `put…` functions suspend (they run on IO).
  */
 class SystemSettings(
     private val resolver: ContentResolver,
@@ -25,16 +24,16 @@ class SystemSettings(
     fun getString(key: String): String? =
         runCatching { Settings.System.getString(resolver, key) }.getOrNull()
 
-    fun putInt(key: String, value: Int) {
-        privileged.shell("settings put system $key $value")
+    suspend fun putInt(key: String, value: Int) {
+        privileged.run("settings", "put", "system", key, value.toString())
     }
 
-    fun putFloat(key: String, value: Float) {
-        privileged.shell("settings put system $key $value")
+    suspend fun putFloat(key: String, value: Float) {
+        privileged.run("settings", "put", "system", key, value.toString())
     }
 
-    fun putString(key: String, value: String) {
-        privileged.shell("settings put system $key ${RootShell.q(value)}")
+    suspend fun putString(key: String, value: String) {
+        privileged.run("settings", "put", "system", key, value)
     }
 
     fun uriFor(key: String) = Settings.System.getUriFor(key)

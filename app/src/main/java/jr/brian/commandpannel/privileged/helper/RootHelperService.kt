@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import jr.brian.commandpannel.privileged.StockSuppressor
+import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 
 /**
@@ -80,7 +81,8 @@ class RootHelperService(
     private fun recoverStock() {
         Log.i(tag, "restoring the stock assistant")
         val restored = runCatching {
-            StockSuppressor { RootHelperMain.runShell(it, 5_000).second }.restore()
+            // The helper has no coroutines of its own; this thread just waits for the restore.
+            runBlocking { StockSuppressor { RootHelperMain.runShell(it, 5_000).second }.restore() }
         }.getOrElse { Log.w(tag, "stock restore failed", it); false }
         Log.i(tag, "stock restored=$restored")
         releaseStockOwner()

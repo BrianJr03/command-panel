@@ -93,16 +93,18 @@ object SaveClipInstaller {
      * Command Panel (or signed with another key) is installed fresh and gets the permission. Returns the installer's
      * output, or null when the root shell isn't available.
      */
-    fun installWithRoot(privileged: PrivilegedAccess, apk: File, replace: Boolean): String? {
+    suspend fun installWithRoot(privileged: PrivilegedAccess, apk: File, replace: Boolean): String? {
         val sha = ApkDigest.sha256(apk)
         val staged = privileged.shell(
             "cp ${RootShell.q(apk.absolutePath)} $STAGED && chmod 644 $STAGED && sha256sum $STAGED", timeoutMs = 30_000,
         )?.trim() ?: return null
         if (staged.substringBefore(' ') != sha) {
-            privileged.shell("rm -f $STAGED")
+            privileged.run("rm", "-f", STAGED)
             return if (staged.isEmpty()) null else "staged copy doesn't match"
         }
-        val uninstall = if (replace) "pm uninstall $PACKAGE >/dev/null 2>&1; " else ""
-        return privileged.shell("${uninstall}pm install -r -t $STAGED 2>&1; rm -f $STAGED", timeoutMs = 60_000)?.trim()
+        // One script, so the install can't be lost after the uninstall, and both get the long timeout.
+        val install = "pm install -r -t $STAGED 2>&1; rm -f $STAGED"
+        val script = if (replace) "pm uninstall $PACKAGE >/dev/null 2>&1; $install" else install
+        return privileged.shell(script, timeoutMs = 60_000)?.trim()
     }
 }

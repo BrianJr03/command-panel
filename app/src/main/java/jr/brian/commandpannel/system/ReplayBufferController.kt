@@ -60,7 +60,7 @@ class ReplayBufferController(
      * the app is dropped (pref cleared) rather than silently recreated. If the check itself fails, the folder is kept.
      * A folder on a removable volume that isn't mounted now (#75) is kept, and this save goes to TCP Clips.
      */
-    private fun clipsLocation(mounted: Set<String>): ReplayClipsLocation {
+    private suspend fun clipsLocation(mounted: Set<String>): ReplayClipsLocation {
         val custom = ReplayClipsLocation.parse(prefs.getString(ClipRepository.PREF_CLIPS_DIR, null))
             ?: return ReplayClipsLocation.DEFAULT
         if (custom.volume != null && custom.volume !in mounted) {
@@ -103,8 +103,8 @@ class ReplayBufferController(
     /** How long a clip saved now would be: what's buffered, up to the save window, and at least 1 s. */
     fun clipSeconds(): Int = bufferedSeconds().coerceIn(1, windowSeconds())
 
-    /** Saves the buffered clip. Blocking; call off the main thread. Returns the saved path, or `error:<code>`. */
-    fun save(): String {
+    /** Saves the buffered clip (it waits on audio and the root copy). Returns the saved path, or `error:<code>`. */
+    suspend fun save(): String {
         if (!engine.isRunning) return "error:${ScreenRecorderEngine.REPLAY_ERR_NOT_ARMED}"
         val format = engine.videoFormat ?: return "error:${ScreenRecorderEngine.REPLAY_ERR_START_FAILED}"
         // A save right after arming would otherwise beat the first audio packet and come out video only.
@@ -152,7 +152,7 @@ class ReplayBufferController(
                 // Percent-encoded, so a folder name with spaces ("TCP Clips") still makes a valid URI. The media scanner
                 // indexes it on whichever volume it's on, so SD card clips show in the gallery too.
                 val uri = android.net.Uri.fromFile(File(path))
-                privileged.shell("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${RootShell.q(uri.toString())} >/dev/null 2>&1")
+                privileged.run("am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", uri.toString())
                 val bytes = tmp.length()
                 runCatching { tmp.delete() }
                 // Replay Studio keeps listing this folder after the user picks another one.

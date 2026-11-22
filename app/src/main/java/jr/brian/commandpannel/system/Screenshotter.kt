@@ -28,16 +28,17 @@ class Screenshotter(
         }
     }
 
-    fun capture(target: Target): List<String> {
-        val ids = parseDisplayIds(privileged.shell("dumpsys SurfaceFlinger --display-id").orEmpty())
+    suspend fun capture(target: Target): List<String> {
+        val ids = parseDisplayIds(privileged.run("dumpsys", "SurfaceFlinger", "--display-id").orEmpty())
         val top = ids[131]
         val bottom = ids[132]
         val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val saved = mutableListOf<String>()
-        fun shot(displayId: Long?, name: String) {
+        suspend fun shot(displayId: Long?, name: String) {
             displayId ?: return
             val path = "$dir/Screenshot_${ts}_$name.png"
-            privileged.shell("mkdir -p $dir && screencap -p -d $displayId $path")
+            privileged.run("mkdir", "-p", dir)
+            privileged.run("screencap", "-p", "-d", displayId.toString(), path)
             saved.add(path)
         }
         when (target) {

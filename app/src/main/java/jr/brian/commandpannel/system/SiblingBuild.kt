@@ -41,24 +41,27 @@ class SiblingBuild(private val context: Context, private val privileged: Privile
     }.getOrNull()
 
     /** Records this build as the one replacing the stock assistant; the sibling sees the change and stands down. */
-    fun claim() {
+    suspend fun claim() {
         if (owner() == self) return
         write(self)
     }
 
     /** Clears the record if it still names this build (a newer claim by the sibling is left alone). */
-    fun release() {
+    suspend fun release() {
         if (owner() == self) write(null)
     }
 
     /** Clears a record naming [pkg] (its owner was uninstalled). */
-    fun clearIfOwner(pkg: String) {
+    suspend fun clearIfOwner(pkg: String) {
         if (owner() == pkg) write(null)
     }
 
-    private fun write(value: String?) {
+    private suspend fun write(value: String?) {
         val ok = runCatching { Settings.Global.putString(context.contentResolver, KEY, value) }.getOrDefault(false)
-        if (!ok) privileged.shell(if (value == null) "settings delete global $KEY" else "settings put global $KEY $value")
+        if (!ok) {
+            if (value == null) privileged.run("settings", "delete", "global", KEY)
+            else privileged.run("settings", "put", "global", KEY, value)
+        }
         Log.i(TAG, "owner -> ${value ?: "none"} (api=$ok)")
     }
 
