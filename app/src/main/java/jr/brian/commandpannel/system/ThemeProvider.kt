@@ -1,0 +1,200 @@
+package jr.brian.commandpannel.system
+
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.content.Context
+import android.content.SharedPreferences
+import android.content.res.Configuration
+import android.database.ContentObserver
+import android.database.Cursor
+import android.database.MatrixCursor
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.util.Log
+import androidx.compose.ui.graphics.toArgb
+import jr.brian.commandpannel.privileged.ThorRgbController
+import jr.brian.commandpannel.ui.settings.companionPaletteFrom
+import jr.brian.commandpannel.ui.theme.CustomLookJson
+import jr.brian.commandpannel.ui.theme.LookRef
+import jr.brian.commandpannel.ui.theme.PinnedColors
+import jr.brian.commandpannel.ui.theme.TccColors
+import jr.brian.commandpannel.ui.theme.resolveLookPalette
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Publishes the overlay's resolved colors, read-only, so another app (Jarn FE) can match them ([SharedThemeContract]).
+ * It's the same palette the companion gets when it follows the look, whether or not that setting is on, and never
+ * Theme Studio's unsaved draft. Colors aren't secret, so the provider is open to any app.
+ *
+ * Android creates providers before `Application.onCreate`, so nothing is read until the first query or the posted
+ * [watch].
+ */
+class ThemeProvider : ContentProvider() {
+
+    private val main = Handler(Looper.getMainLooper())
+    private val pinnedColors = ActiveLookPinnedColors()
+    private val refreshQueued = AtomicBoolean(false)
+
+    // One short-lived thread keeps theme reads off the main thread, so the overlay never waits on them.
+    private val worker = ThreadPoolExecutor(1, 1, WORKER_IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue())
+        .apply { allowCoreThreadTimeOut(true) }
+
+    // Only touched on [worker].
+    private var published: Map<String, Int>? = null
+
+    private val observer = object : ContentObserver(main) {
+        override fun onChange(selfChange: Boolean) = queueRefresh()
+    }
+
+    // Held here because SharedPreferences only keeps a weak reference to its listeners.
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key in WATCHED_PREFS) queueRefresh()
+    }
+
+    override fun onCreate(): Boolean {
+        main.post { worker.execute(::watch) }
+        return true
+    }
+
+    /** Registers before taking the baseline, so a change landing between the two still gets compared. */
+    private fun watch() {
+        val ctx = context ?: return
+        runCatching {
+            Prefs.of(ctx).registerOnSharedPreferenceChangeListener(prefListener)
+            WATCHED_SETTINGS.forEach {
+                ctx.contentResolver.registerContentObserver(Settings.System.getUriFor(it), false, observer)
+            }
+            published = currentRow(ctx)
+        }.onFailure { Log.w(TAG, "couldn't watch the theme", it) }
+    }
+
+    private fun queueRefresh() {
+        if (!refreshQueued.compareAndSet(false, true)) return
+        worker.execute {
+            refreshQueued.set(false)
+            publishIfChanged()
+        }
+    }
+
+    /** Tells clients only when the row really changed: most LED and pref changes don't touch the palette. */
+    private fun publishIfChanged() {
+        val ctx = context ?: return
+        val row = runCatching { currentRow(ctx) }.getOrElse { Log.w(TAG, "couldn't read the theme", it); return }
+        if (row == published) return
+        published = row
+        ctx.contentResolver.notifyChange(uri(ctx), null)
+    }
+
+    // Follow-system theme mode changes with the night setting.
+    override fun onConfigurationChanged(newConfig: Configuration) = queueRefresh()
+
+    /** The current row, or `null` (no cursor) if the theme can't be read. An unknown column is still the caller's error. */
+    override fun query(
+        uri: Uri,
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?,
+    ): Cursor? {
+        val ctx = context ?: return null
+        if (uri.pathSegments != listOf(SharedThemeContract.PATH)) return null
+        val columns = projection ?: SharedThemeContract.COLUMNS.toTypedArray()
+        val row = runCatching { currentRow(ctx) }.getOrElse { Log.w(TAG, "couldn't read the theme", it); return null }
+        val values = selectSharedThemeColumns(row, columns)
+        return MatrixCursor(columns, 1).apply { addRow(values) }
+    }
+
+    override fun getType(uri: Uri): String? =
+        if (uri.pathSegments == listOf(SharedThemeContract.PATH)) MIME_TYPE else null
+
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = throw UnsupportedOperationException(READ_ONLY)
+
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int =
+        throw UnsupportedOperationException(READ_ONLY)
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int =
+        throw UnsupportedOperationException(READ_ONLY)
+
+    /** The overlay's palette from its stored inputs, resolved the way the overlay and companion resolve it. */
+    private fun currentRow(ctx: Context): Map<String, Int> {
+        val prefs = Prefs.of(ctx)
+        val themeMode = runCatching {
+            Settings.System.getInt(ctx.contentResolver, SystemSettings.Keys.THEME_MODE, 4)
+        }.getOrDefault(4)
+        val night = (ctx.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        val accent = ThorRgbController.accentOverride(ctx, prefs.getBoolean(ACCENT_SYNC_PREF, false))
+        return sharedThemeRow(resolveLookPalette(themeMode, night, accent, pinnedColors.of(prefs)))
+    }
+
+    private companion object {
+        const val TAG = "ThemeProvider"
+        const val WORKER_IDLE_SECONDS = 30L
+        const val READ_ONLY = "the shared theme is read-only"
+        const val MIME_TYPE = "vnd.android.cursor.item/vnd.jr.brian.commandpanel.theme"
+        const val ACCENT_SYNC_PREF = "rgb_accent_sync"
+        val WATCHED_PREFS = setOf(CustomLookStore.LOOK_KEY, CustomLookStore.KEY, ACCENT_SYNC_PREF)
+        val WATCHED_SETTINGS = listOf(SystemSettings.Keys.THEME_MODE, ThorRgbController.PICKER_COLOR_KEY)
+
+        fun uri(ctx: Context): Uri = Uri.Builder()
+            .scheme("content")
+            .authority(ctx.packageName + SharedThemeContract.AUTHORITY_SUFFIX)
+            .path(SharedThemeContract.PATH)
+            .build()
+    }
+}
+
+/**
+ * The active saved look's pinned colors. Reads only the applied look and the saved looks, never Theme Studio's draft
+ * (`studio_draft`). Decoding is remembered until either pref changes, so repeated queries stay cheap.
+ */
+internal class ActiveLookPinnedColors {
+    private class Decoded(val lookKey: String?, val looksJson: String?, val colors: PinnedColors?)
+
+    @Volatile
+    private var last: Decoded? = null
+
+    fun of(prefs: SharedPreferences): PinnedColors? {
+        val lookKey = prefs.getString(CustomLookStore.LOOK_KEY, null)
+        val looksJson = prefs.getString(CustomLookStore.KEY, null)
+        last?.takeIf { it.lookKey == lookKey && it.looksJson == looksJson }?.let { return it.colors }
+        val ref = LookRef.parse(lookKey)
+        val colors = (ref as? LookRef.Custom)?.let { custom ->
+            CustomLookJson.decodeList(looksJson).firstOrNull { it.id == custom.id }?.colors
+        }
+        last = Decoded(lookKey, looksJson, colors)
+        return colors
+    }
+}
+
+/** The contract's row for [colors], through the same mapping the companion uses. */
+internal fun sharedThemeRow(colors: TccColors): Map<String, Int> {
+    val palette = companionPaletteFrom(colors)
+    return mapOf(
+        SharedThemeContract.COLUMN_VERSION to SharedThemeContract.VERSION,
+        SharedThemeContract.COLUMN_IS_DARK to if (colors.isDark) 1 else 0,
+        SharedThemeContract.COLUMN_BG to palette.bg.toArgb(),
+        SharedThemeContract.COLUMN_RAIL to palette.rail.toArgb(),
+        SharedThemeContract.COLUMN_SURFACE to palette.surface.toArgb(),
+        SharedThemeContract.COLUMN_SURFACE_HIGH to palette.surfaceHigh.toArgb(),
+        SharedThemeContract.COLUMN_BORDER to palette.border.toArgb(),
+        SharedThemeContract.COLUMN_ACCENT to palette.accent.toArgb(),
+        SharedThemeContract.COLUMN_ACCENT_SOFT to palette.accentSoft.toArgb(),
+        SharedThemeContract.COLUMN_ACCENT_FOCUSED to palette.accentFocused.toArgb(),
+        SharedThemeContract.COLUMN_ON_ACCENT to palette.onAccent.toArgb(),
+        SharedThemeContract.COLUMN_TEXT_PRIMARY to palette.textPrimary.toArgb(),
+        SharedThemeContract.COLUMN_TEXT_SECONDARY to palette.textSecondary.toArgb(),
+        SharedThemeContract.COLUMN_TEXT_TERTIARY to palette.textTertiary.toArgb(),
+        SharedThemeContract.COLUMN_DANGER to palette.danger.toArgb(),
+        SharedThemeContract.COLUMN_SUCCESS to palette.success.toArgb(),
+    )
+}
+
+/** [row]'s values for [columns], in that order. An unknown column is the caller's error. */
+internal fun selectSharedThemeColumns(row: Map<String, Int>, columns: Array<out String>): Array<Any> =
+    Array(columns.size) { i -> row[columns[i]] ?: throw IllegalArgumentException("unknown column: ${columns[i]}") }

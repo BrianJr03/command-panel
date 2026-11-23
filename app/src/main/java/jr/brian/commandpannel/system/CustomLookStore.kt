@@ -12,7 +12,7 @@ import jr.brian.commandpannel.ui.theme.TccUiLook
  */
 object CustomLookStore {
     const val KEY = "custom_looks"
-    private const val LOOK_KEY = "overlay_look"
+    const val LOOK_KEY = "overlay_look"
 
     fun all(prefs: SharedPreferences): List<CustomLook> = CustomLookJson.decodeList(prefs.getString(KEY, null))
 

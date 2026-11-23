@@ -79,6 +79,12 @@
                 android:resource="@xml/clip_paths" />
         </provider>
 
+        <!-- The overlay's resolved colors, read-only, for apps that match the theme (docs/SHARED_THEME.md). -->
+        <provider
+            android:name=".system.ThemeProvider"
+            android:authorities="${applicationId}.theme"
+            android:exported="true" />
+
 
         <activity
             android:name=".MainActivity"
