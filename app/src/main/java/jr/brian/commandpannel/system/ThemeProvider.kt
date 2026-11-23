@@ -20,6 +20,7 @@ import jr.brian.commandpannel.ui.theme.CustomLookJson
 import jr.brian.commandpannel.ui.theme.LookRef
 import jr.brian.commandpannel.ui.theme.PinnedColors
 import jr.brian.commandpannel.ui.theme.TccColors
+import jr.brian.commandpannel.ui.theme.TccUiLook
 import jr.brian.commandpannel.ui.theme.resolveLookPalette
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -28,8 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Publishes the overlay's resolved colors, read-only, so another app (Jarn FE) can match them ([SharedThemeContract]).
- * It's the same palette the companion gets when it follows the look, whether or not that setting is on, and never
- * Theme Studio's unsaved draft. Colors aren't secret, so the provider is open to any app.
+ * It starts from the palette the companion gets when it follows the look, whether or not that setting is on, adds the
+ * built-in look's colors ([publishedLookPalette]), and never uses Theme Studio's unsaved draft. Colors aren't secret,
+ * so the provider is open to any app.
  *
  * Android creates providers before `Application.onCreate`, so nothing is read until the first query or the posted
  * [watch].
@@ -37,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ThemeProvider : ContentProvider() {
 
     private val main = Handler(Looper.getMainLooper())
-    private val pinnedColors = ActiveLookPinnedColors()
+    private val activeLook = ActiveSharedLook()
     private val refreshQueued = AtomicBoolean(false)
 
     // One short-lived thread keeps theme reads off the main thread, so the overlay never waits on them.
@@ -129,7 +131,7 @@ class ThemeProvider : ContentProvider() {
         val night = (ctx.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
         val accent = ThorRgbController.accentOverride(ctx, prefs.getBoolean(ACCENT_SYNC_PREF, false))
-        return sharedThemeRow(resolveLookPalette(themeMode, night, accent, pinnedColors.of(prefs)))
+        return sharedThemeRow(publishedPalette(themeMode, night, accent, activeLook.of(prefs)))
     }
 
     private companion object {
@@ -149,27 +151,38 @@ class ThemeProvider : ContentProvider() {
     }
 }
 
+/** What the applied look adds to the shared palette: a [builtIn] look's colors, or a saved look's [pinned] ones. */
+internal data class SharedLook(val builtIn: TccUiLook?, val pinned: PinnedColors?)
+
 /**
- * The active saved look's pinned colors. Reads only the applied look and the saved looks, never Theme Studio's draft
- * (`studio_draft`). Decoding is remembered until either pref changes, so repeated queries stay cheap.
+ * The applied look. Reads only the applied look and the saved looks, never Theme Studio's draft (`studio_draft`).
+ * Decoding is remembered until either pref changes, so repeated queries stay cheap.
  */
-internal class ActiveLookPinnedColors {
-    private class Decoded(val lookKey: String?, val looksJson: String?, val colors: PinnedColors?)
+internal class ActiveSharedLook {
+    private class Decoded(val lookKey: String?, val looksJson: String?, val look: SharedLook)
 
     @Volatile
     private var last: Decoded? = null
 
-    fun of(prefs: SharedPreferences): PinnedColors? {
+    fun of(prefs: SharedPreferences): SharedLook {
         val lookKey = prefs.getString(CustomLookStore.LOOK_KEY, null)
         val looksJson = prefs.getString(CustomLookStore.KEY, null)
-        last?.takeIf { it.lookKey == lookKey && it.looksJson == looksJson }?.let { return it.colors }
-        val ref = LookRef.parse(lookKey)
-        val colors = (ref as? LookRef.Custom)?.let { custom ->
-            CustomLookJson.decodeList(looksJson).firstOrNull { it.id == custom.id }?.colors
+        last?.takeIf { it.lookKey == lookKey && it.looksJson == looksJson }?.let { return it.look }
+        val look = when (val ref = LookRef.parse(lookKey)) {
+            is LookRef.BuiltIn -> SharedLook(ref.look, null)
+            is LookRef.Custom -> CustomLookJson.decodeList(looksJson).firstOrNull { it.id == ref.id }
+                ?.let { SharedLook(null, it.colors) }
+                ?: SharedLook(TccUiLook.DEFAULT, null)
         }
-        last = Decoded(lookKey, looksJson, colors)
-        return colors
+        last = Decoded(lookKey, looksJson, look)
+        return look
     }
+}
+
+/** The palette to publish: theme mode, then the saved look's pins or the built-in look's colors, with the LED accent on top. */
+internal fun publishedPalette(themeMode: Int, nightActive: Boolean, ledAccent: Int?, look: SharedLook): TccColors {
+    val colors = resolveLookPalette(themeMode, nightActive, ledAccent, look.pinned)
+    return look.builtIn?.let { publishedLookPalette(colors, it, ledAccent = ledAccent != null) } ?: colors
 }
 
 /** The contract's row for [colors], through the same mapping the companion uses. */

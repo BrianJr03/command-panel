@@ -24,8 +24,11 @@ either case as "no shared theme". Inserts, updates and deletes are refused.
 | `text_primary`, `text_secondary`, `text_tertiary` | Text |
 | `danger`, `success` | Status colors |
 
-Colors are ARGB ints, and `accent_soft` is translucent. They're fully resolved: theme mode, LED accent sync and Theme Studio's pinned colors are already
-applied. Theme Studio's unsaved draft is never published, and "Companion follows overlay look" doesn't affect the result.
+Colors are ARGB ints, and `accent_soft` is translucent. They're fully resolved: theme mode, the built-in look's colors,
+LED accent sync and Theme Studio's pinned colors are already applied. Soft Console, Soft Console OLED, Segment LCD,
+Bloom, Neon Arcade, Terminal, Cockpit, Industrial, Comic Panel and E-Ink supply their own palette. Other built-in looks
+differ only in how they draw, so they publish the base colors, and so does a saved look apart from its pinned colors.
+Theme Studio's unsaved draft is never published, and "Companion follows overlay look" doesn't affect the result.
 
 `text_primary` and `text_secondary` meet 4.5:1 on `surface`. `text_tertiary`, `accent`, `danger` and `success` only
 meet 3:1, so a client with a stricter rule must clamp them.
@@ -56,7 +59,6 @@ meet 3:1, so a client with a stricter rule must clamp them.
 Version 1 is frozen: one row, these 16 integer columns (`version`, `is_dark` and 14 color roles). Never add, remove,
 rename or reorder a column. Any change to the row means a new `VERSION`. Read columns by name.
 
-Which colors a look resolves to can change without a new version, for example when built-in looks start supplying their
-own palette. The roles and their meaning stay the same.
+Which colors a look resolves to can change without a new version. The roles and their meaning stay the same.
 
 The first version shares colors only. Shapes, fonts and look renderers stay in Command Panel.

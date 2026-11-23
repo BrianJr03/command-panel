@@ -81,7 +81,7 @@ class SharedThemeTest {
     @Test
     fun `the applied custom look's colors are published`() {
         val prefs = prefsOf(CustomLookStore.LOOK_KEY to saved.ref.key, CustomLookStore.KEY to savedJson)
-        assertEquals(saved.colors, ActiveLookPinnedColors().of(prefs))
+        assertEquals(saved.colors, ActiveSharedLook().of(prefs).pinned)
     }
 
     @Test
@@ -94,24 +94,24 @@ class SharedThemeTest {
             CustomLookStore.KEY to savedJson,
             STUDIO_DRAFT_KEY to draftJson,
         )
-        assertNull(ActiveLookPinnedColors().of(onBuiltIn))
-        assertEquals(saved.colors, ActiveLookPinnedColors().of(onSaved))
+        assertNull(ActiveSharedLook().of(onBuiltIn).pinned)
+        assertEquals(saved.colors, ActiveSharedLook().of(onSaved).pinned)
     }
 
     @Test
     fun `a deleted look publishes no pinned colors`() {
         val prefs = prefsOf(CustomLookStore.LOOK_KEY to LookRef.Custom("gone").key, CustomLookStore.KEY to savedJson)
-        assertNull(ActiveLookPinnedColors().of(prefs))
+        assertNull(ActiveSharedLook().of(prefs).pinned)
     }
 
     @Test
     fun `switching looks is picked up right away`() {
         val values = mutableMapOf(CustomLookStore.LOOK_KEY to saved.ref.key, CustomLookStore.KEY to savedJson)
         val prefs = prefsBackedBy(values)
-        val pinned = ActiveLookPinnedColors()
-        assertEquals(saved.colors, pinned.of(prefs))
+        val active = ActiveSharedLook()
+        assertEquals(saved.colors, active.of(prefs).pinned)
         values.remove(CustomLookStore.LOOK_KEY)
-        assertNull(pinned.of(prefs))
+        assertNull(active.of(prefs).pinned)
     }
 
     private val saved = CustomLook(id = "saved", name = "saved", colors = PinnedColors(background = Color(0xFF102030)))

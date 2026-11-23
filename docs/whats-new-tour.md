@@ -6,6 +6,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+- **Share your colors with Jarn** (#84, #85)
+  - Where: Appearance, any look
+  - Spot: none
+  - Callout: Jarn, the new Jarngreipr frontend, can now match your Command Panel colors, including your built-in look. Turn it on in Jarn's Look settings.
+
 - **Bluetooth and Do Not Disturb tiles**
   - Where: panel: Bluetooth and Do Not Disturb tiles
   - Spot: none
