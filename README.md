@@ -100,6 +100,7 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 - ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video. Save clips to internal storage or a folder on an **SD card or USB drive**; if the card is out, clips go to TCP Clips until it's back.
 - 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
+- ⏯️ **Media controls**: turn on **Media Controls** in General for previous, play/pause and next buttons in the middle of the panel's status bar. They control whatever is playing.
 - 🔋 **Battery time estimate** and an option to **hide the network-speed** readout.
 - 💾 **Settings backup & restore.**
 - ⬆️ **In-app updates** — checks GitHub for new releases, shows the patch notes, and installs the update in one press (silently with root, otherwise through Android's installer). Skip a version if you like; What's New shows once after updating, with a **Tour** button that shows where each new feature lives.

@@ -1016,6 +1016,11 @@
     <string name="tour_new_tile_rename_body">The panel\'s Background Image tile is now called Background, since it turns gradients on and off too.</string>
     <string name="tour_new_fixes_title">Smoother GIFs, working links</string>
     <string name="tour_new_fixes_body">Animated GIF and WebP backgrounds play in full color, and links in What\'s new open with the D-pad and A.</string>
+    <string name="tour_new_media_controls_body">Turn on Media Controls to get previous, play/pause and next buttons in the middle of the panel\'s status bar. They control whatever is playing.</string>
+    <string name="tour_new_jarn_colors_title">Share your colors with Jarn</string>
+    <string name="tour_new_jarn_colors_body">Jarn, the new Jarngreipr frontend, can now match your Command Panel colors, from built-in looks and your own. Turn it on in Jarn\'s Look settings.</string>
+    <string name="tour_new_fixes_v014_title">CPU gauge and tiles fixed</string>
+    <string name="tour_new_fixes_v014_body">The panel\'s CPU gauge shows your processor speed again, and the Bluetooth and Do Not Disturb tiles turn off as well as on.</string>
     <plurals name="msg_restored_settings">
         <item quantity="one">Restored %1$d setting</item>
         <item quantity="other">Restored %1$d settings</item>
