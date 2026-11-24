@@ -16,6 +16,16 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Spot: none
   - Callout: The Bluetooth and Do Not Disturb tiles in the panel's Quick Tiles now turn off as well as on, and light up whenever they're on.
 
+- **CPU reading works again** (#87)
+  - Where: panel: Settings tab, CPU gauge
+  - Spot: none
+  - Callout: The CPU gauge on the panel's Settings tab shows your processor speed again instead of 0.
+
+- **Media controls in the status bar** (#88)
+  - Where: General, Media Controls switch
+  - Spot: OVERLAY_EXTRAS
+  - Callout: Turn on Media Controls to get previous, play/pause and next buttons in the middle of the panel's status bar. They control whatever is playing.
+
 ## v0.13.0
 
 - **Gradient backgrounds and their library** (#67)

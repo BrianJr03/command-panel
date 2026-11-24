@@ -143,7 +143,7 @@ fun OverlayRoot(
                     .longPressToArrange(arrange),
             ) {
                 Spacer(Modifier.height(10.dp))
-                if (showStatusBar) StatusBar(state)
+                if (showStatusBar) StatusBar(state, actions)
                 if (navAtTop) { if (showStatusBar) Spacer(Modifier.height(8.dp)); navBar() }
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 15.dp, vertical = 5.dp)

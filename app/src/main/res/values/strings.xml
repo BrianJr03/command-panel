@@ -19,6 +19,10 @@
     <!-- Overlay: status bar -->
     <string name="overlay_bluetooth">Bluetooth</string>
     <string name="overlay_wifi">Wi-Fi</string>
+    <string name="overlay_media_previous">Previous track</string>
+    <string name="overlay_media_play">Play</string>
+    <string name="overlay_media_pause">Pause</string>
+    <string name="overlay_media_next">Next track</string>
     <string name="overlay_battery_estimate">· %1$s</string>
 
     <!-- Overlay: nav bar -->
@@ -201,6 +205,8 @@
     <string name="settings_battery_estimate_desc">Show the estimated time to empty (or to full / the 80% limit while charging) after the battery percentage in the overlay status bar.</string>
     <string name="settings_hide_net_speed">Hide Network Speed</string>
     <string name="settings_hide_net_speed_desc">Hide the download-speed readout in the overlay status bar.</string>
+    <string name="settings_media_controls">Media Controls</string>
+    <string name="settings_media_controls_desc">Show previous, play/pause and next buttons in the middle of the overlay status bar. They control whatever is playing.</string>
     <string name="settings_keep_on_screen">Keep Apps That Are On Screen</string>
     <string name="settings_keep_on_screen_desc">When Clear All Tasks runs, keep apps showing on either screen, their companion screens and the home app. Turn off to clear everything except this app, the stock assistant and the system.</string>
     <string name="settings_show_new_dots">Show New Dots</string>

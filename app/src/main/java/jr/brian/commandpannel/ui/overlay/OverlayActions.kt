@@ -51,6 +51,9 @@ interface OverlayActions {
     /** Opens the Panel plugin [key] in the panel's place (its nav button). The service handles it; a no-op elsewhere. */
     fun openPanelPlugin(key: String) {}
 
+    /** Status-bar media controls (#88): sends [keyCode] (a `KEYCODE_MEDIA_*`) to whatever is playing. */
+    fun mediaKey(keyCode: Int) {}
+
     object None : OverlayActions {
         override fun selectMode(mode: Int) {}
         override fun setTopBrightness(fraction: Float, committed: Boolean) {}

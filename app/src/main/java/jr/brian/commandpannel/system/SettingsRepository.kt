@@ -17,6 +17,7 @@ import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import jr.brian.commandpannel.privileged.PrivilegedAccess
 import jr.brian.commandpannel.system.SystemSettings.Keys
 import jr.brian.commandpannel.ui.overlay.OverlayActions
@@ -322,6 +323,8 @@ class SettingsRepository(
                 charging = charging,
                 netSpeed = formatSpeed(bps),
                 hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
+                mediaControls = prefs.getBoolean("header_media_controls", false),
+                musicActive = musicActive(it.musicActive),
                 hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
                 wifiLevel = wifiLevel(),
                 bluetoothOn = bluetoothConnected(),
@@ -727,6 +730,32 @@ class SettingsRepository(
         if (QuickLaunch.launch(context)) onQuickLaunched()
     }
 
+    /** Until this uptime, the status-bar play/pause icon keeps the state it was flipped to on a press. */
+    @Volatile private var musicHoldUntil = 0L
+
+    /**
+     * The play/pause icon's state for this refresh. Right after a press, players take a moment to start or stop, so
+     * `isMusicActive` still reads the old state; the pressed state is held until the player catches up or
+     * [MUSIC_HOLD_MS] passes, so the icon doesn't flash back and forth.
+     */
+    private fun musicActive(shown: Boolean): Boolean {
+        val actual = audio.isMusicActive
+        if (android.os.SystemClock.uptimeMillis() < musicHoldUntil && actual != shown) return shown
+        musicHoldUntil = 0L
+        return actual
+    }
+
+    override fun mediaKey(keyCode: Int) {
+        // Goes to the active media session, the same way a headset button does; no permission needed.
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+        // Flip the icon now rather than on the next one-second refresh; the hold corrects it if the player didn't react.
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+            musicHoldUntil = android.os.SystemClock.uptimeMillis() + MUSIC_HOLD_MS
+            _uiState.update { it.copy(musicActive = !it.musicActive) }
+        }
+    }
+
     override fun openRecents() {
         // Stock opens bottom-screen recents via IOverviewProxy txn 6, which a user app can't bind (SecurityException);
         // KEYCODE_APP_SWITCH through the root shell opens the system recents instead. Dismiss the panel first, as stock.
@@ -780,6 +809,8 @@ class SettingsRepository(
         const val ECHO_HOLD_MS = 400L
         /** How long after a performance change the firmware gets to reset fan_mode before we check it. */
         const val FAN_FALLBACK_DELAY_MS = 1500L
+        /** How long a play/pause press holds the icon while the player starts or stops (#88). */
+        const val MUSIC_HOLD_MS = 3000L
         private const val GLOBAL_BLUETOOTH_ON = "bluetooth_on"
         private const val GLOBAL_ZEN_MODE = "zen_mode"
         // AudioManager's hidden VOLUME_CHANGED_ACTION and its stream extra.

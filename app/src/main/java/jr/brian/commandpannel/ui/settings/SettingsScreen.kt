@@ -1083,6 +1083,12 @@ private fun General(state: SettingsState, vm: SettingsViewModel) {
         Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
     )
     SwitchCard(
+        stringResource(R.string.settings_media_controls),
+        stringResource(R.string.settings_media_controls_desc),
+        state.mediaControls, vm::setMediaControls,
+        Modifier.tourTarget(TourSpot.OVERLAY_EXTRAS),
+    )
+    SwitchCard(
         stringResource(R.string.settings_keep_on_screen),
         stringResource(R.string.settings_keep_on_screen_desc),
         state.keepOnScreen, vm::setKeepOnScreen,

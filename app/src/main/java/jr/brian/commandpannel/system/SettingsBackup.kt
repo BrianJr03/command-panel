@@ -23,7 +23,7 @@ object SettingsBackup {
 
     /** Prefs that are safe and useful to carry across devices/reinstalls. */
     private val EXPORTED = setOf(
-        "replace_stock_assistant", "battery_estimate", "hide_net_speed", "clear_tasks_keep_on_screen",
+        "replace_stock_assistant", "battery_estimate", "hide_net_speed", "header_media_controls", "clear_tasks_keep_on_screen",
         "suppress_bottom_tip", "rgb_accent_sync", "qs_enabled_tiles", "qs_hide_labels",
         "quick_launch_component", "quick_launch_display", "quick_launch_after",
         "overlay_look", CustomLookStore.KEY, BackgroundImageTile.PREF, BackgroundImageSetting.KEY_FILE, BackgroundImageSetting.KEY_ANIMATED, BackgroundImageSetting.KEY_ANIMATIONS_ON, BackgroundSetting.KEY_SOURCE, GradientStore.KEY, ThemeSources.KEY, "companion_follow_look", "nav_bar_order", "quick_launch_show_app",

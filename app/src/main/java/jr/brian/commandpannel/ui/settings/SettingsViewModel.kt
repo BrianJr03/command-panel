@@ -75,6 +75,8 @@ data class SettingsState(
     /** Experimental: per-game FPS from the root helper instead of the compositor's count (#4). */
     val taskFps: Boolean = false,
     val hideNetSpeed: Boolean = false,
+    /** Previous / play-pause / next in the overlay status bar (#88). */
+    val mediaControls: Boolean = false,
     val hideTileLabels: Boolean = false,
     val keepOnScreen: Boolean = true,
     /** The "new" corner dots and rail bubbles (#54). Off hides them without marking anything seen. */
@@ -236,6 +238,7 @@ class SettingsViewModel @Inject constructor(
         batteryEstimate = prefs.getBoolean("battery_estimate", false),
         taskFps = prefs.getBoolean(jr.brian.commandpannel.system.TelemetryMonitor.PREF_TASK_FPS, false),
         hideNetSpeed = prefs.getBoolean("hide_net_speed", false),
+        mediaControls = prefs.getBoolean("header_media_controls", false),
         hideTileLabels = prefs.getBoolean("qs_hide_labels", false),
         keepOnScreen = prefs.getBoolean("clear_tasks_keep_on_screen", true),
         showNewDots = prefs.getBoolean(KEY_SHOW_NEW_DOTS, true),
@@ -959,6 +962,11 @@ class SettingsViewModel @Inject constructor(
     fun setHideNetSpeed(enable: Boolean) {
         prefs.edit().putBoolean("hide_net_speed", enable).apply()
         _state.value = _state.value.copy(hideNetSpeed = enable)
+    }
+
+    fun setMediaControls(enable: Boolean) {
+        prefs.edit().putBoolean("header_media_controls", enable).apply()
+        _state.value = _state.value.copy(mediaControls = enable)
     }
 
     fun setHideTileLabels(enable: Boolean) {
