@@ -18,6 +18,12 @@ object TelemetryReader {
     /** CPU `cpuinfo_cur_freq` is kHz; prime-core clock shown in GHz. */
     fun kHzToGhz(raw: String): Float? = raw.trim().toLongOrNull()?.let { it / 1_000_000f }
 
+    /**
+     * The first of [raws] that holds a number, or "" if none does. Newer Thor firmware makes `cpuinfo_cur_freq`
+     * root-only (the app's read comes back empty), so the CPU clock falls back to `scaling_cur_freq` (#87).
+     */
+    fun firstReading(vararg raws: String): String = raws.firstOrNull { it.trim().toLongOrNull() != null } ?: ""
+
     /** GPU `cur_freq` is Hz; shown in MHz. */
     fun hzToMhz(raw: String): Int? = raw.trim().toLongOrNull()?.let { (it / 1_000_000L).toInt() }
 

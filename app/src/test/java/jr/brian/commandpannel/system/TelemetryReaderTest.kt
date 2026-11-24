@@ -21,6 +21,14 @@ class TelemetryReaderTest {
     }
 
     @Test
+    fun cpuFallsBackToScalingFreqWhenCpuinfoIsUnreadable() {
+        assertEquals("1843200", TelemetryReader.firstReading("", "1843200"))            // cpuinfo root-only (#87)
+        assertEquals("2400000\n", TelemetryReader.firstReading("2400000\n", "1843200")) // cpuinfo still wins
+        assertEquals("1843200", TelemetryReader.firstReading("garbage", "1843200"))
+        assertEquals("", TelemetryReader.firstReading("", ""))
+    }
+
+    @Test
     fun powerWattsAndFraction() {
         // -1.485 A * 3.9 V ≈ -5.79 W
         val w = TelemetryReader.powerWatts("-1485022", "3900000")!!

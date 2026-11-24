@@ -60,6 +60,8 @@ class TelemetryMonitor(
     companion object {
         private const val TEMP = "/sys/devices/virtual/thermal/thermal_zone48/temp"
         private const val CPU_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_cur_freq"
+        /** World-readable on firmware where [CPU_CUR] is root-only (#87). */
+        private const val CPU_SCALING_CUR = "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq"
         private const val CPU_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq"
         private const val GPU_CUR = "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"
         private const val GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq"
@@ -98,8 +100,9 @@ class TelemetryMonitor(
 
     private suspend fun sample(): Telemetry {
         val tempC = TelemetryReader.parseTempC(read(TEMP)) ?: 0
-        val cpuGhz = TelemetryReader.kHzToGhz(read(CPU_CUR)) ?: 0f
-        val cpuFrac = TelemetryReader.fraction(read(CPU_CUR), read(CPU_MAX)) ?: 0f
+        val cpuCur = TelemetryReader.firstReading(read(CPU_CUR), read(CPU_SCALING_CUR))
+        val cpuGhz = TelemetryReader.kHzToGhz(cpuCur) ?: 0f
+        val cpuFrac = TelemetryReader.fraction(cpuCur, read(CPU_MAX)) ?: 0f
         val gpuMhz = TelemetryReader.hzToMhz(read(GPU_CUR)) ?: 0
         val gpuFrac = TelemetryReader.fraction(read(GPU_CUR), read(GPU_MAX)) ?: 0f
         val watts = TelemetryReader.powerWatts(read(CURRENT_NOW), read(VOLTAGE_NOW)) ?: 0f
