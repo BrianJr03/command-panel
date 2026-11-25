@@ -6,6 +6,13 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+## v0.15.0
+
+- **Share your fonts with Jarn** (#89)
+  - Where: Appearance, any look
+  - Spot: none
+  - Callout: Jarn can now use your look's fonts as well as its colors, including fonts you imported.
+
 ## v0.14.0
 
 - **Share your colors with Jarn** (#84, #85)

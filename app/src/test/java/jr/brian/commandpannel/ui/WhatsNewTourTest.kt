@@ -45,9 +45,16 @@ class WhatsNewTourTest {
     }
 
     @Test
-    fun `the 0_14_0 tour covers its notes`() {
+    fun `the 0_15_0 tour covers its notes`() {
         val steps = whatsNewTourFor(WHATS_NEW_TOUR_VERSION)!!
-        assertEquals("0.14.0", WHATS_NEW_TOUR_VERSION)
+        assertEquals("0.15.0", WHATS_NEW_TOUR_VERSION)
+        // The Jarn fonts change is in Jarn and the shared theme, so it's a text step.
+        assertTrue(steps.any { it.titleRes == R.string.tour_new_jarn_fonts_title && it.spot == null })
+    }
+
+    @Test
+    fun `the 0_14_0 tour still covers its notes`() {
+        val steps = whatsNewTourFor("0.14.0")!!
         // Media Controls in General, then text steps for the Jarn colors and the panel fixes.
         assertEquals(SettingsCategory.GENERAL, steps.single { it.spot == TourSpot.OVERLAY_EXTRAS }.section)
         assertTrue(steps.any { it.titleRes == R.string.tour_new_jarn_colors_title && it.spot == null })
