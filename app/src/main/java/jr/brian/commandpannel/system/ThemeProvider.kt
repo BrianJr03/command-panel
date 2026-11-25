@@ -191,7 +191,7 @@ class ThemeProvider : ContentProvider() {
     }
 
     private fun currentFontsRow(ctx: Context): Map<String, Any?> =
-        sharedFontsRow(activeLook.of(Prefs.of(ctx))) { UserFontStore.sha256(ctx, it) }
+        sharedFontsRow(activeLook.of(Prefs.of(ctx)), { ctx.getString(it.labelRes) }) { UserFontStore.sha256(ctx, it) }
 
     private companion object {
         const val TAG = "ThemeProvider"

@@ -29,6 +29,9 @@ object SharedFontsContract {
     /** The applied look: a built-in look's name (`TERMINAL`) or `custom:<id>` for a saved look. */
     const val COLUMN_LOOK_ID = "look_id"
 
+    /** The applied look's name as the user sees it: a saved look's own name, or a built-in look's display name. */
+    const val COLUMN_LOOK_NAME = "look_name"
+
     /** Font for big numbers and titles, as a font value (see [PREFIX_BUNDLED] and [PREFIX_USER]), or null. */
     const val COLUMN_DISPLAY_FONT = "display_font"
 
@@ -43,7 +46,7 @@ object SharedFontsContract {
 
     /** Every column, in the order a query without a projection returns them. */
     val COLUMNS = listOf(
-        COLUMN_VERSION, COLUMN_LOOK_ID,
+        COLUMN_VERSION, COLUMN_LOOK_ID, COLUMN_LOOK_NAME,
         COLUMN_DISPLAY_FONT, COLUMN_DISPLAY_FONT_SHA256,
         COLUMN_LABEL_FONT, COLUMN_LABEL_FONT_SHA256,
     )

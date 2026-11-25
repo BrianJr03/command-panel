@@ -21,7 +21,9 @@ class SharedFontsTest {
         assertEquals("fonts", SharedFontsContract.PATH)
         assertEquals("fonts", SharedFontsContract.FILE_PATH)
         assertEquals(
-            listOf("version", "look_id", "display_font", "display_font_sha256", "label_font", "label_font_sha256"),
+            listOf(
+                "version", "look_id", "look_name", "display_font", "display_font_sha256", "label_font", "label_font_sha256",
+            ),
             SharedFontsContract.COLUMNS,
         )
         assertEquals("bundled:", SharedFontsContract.PREFIX_BUNDLED)
@@ -49,6 +51,7 @@ class SharedFontsTest {
         val row = rowFor(SharedLook(TccUiLook.SEGMENT_LCD, null))
         assertEquals(2, row[SharedFontsContract.COLUMN_VERSION])
         assertEquals("SEGMENT_LCD", row[SharedFontsContract.COLUMN_LOOK_ID])
+        assertEquals("name of SEGMENT_LCD", row[SharedFontsContract.COLUMN_LOOK_NAME])
         assertEquals("bundled:segment", row[SharedFontsContract.COLUMN_DISPLAY_FONT])
         assertEquals("bundled:mono", row[SharedFontsContract.COLUMN_LABEL_FONT])
         assertNull(row[SharedFontsContract.COLUMN_DISPLAY_FONT_SHA256])
@@ -71,9 +74,10 @@ class SharedFontsTest {
 
     @Test
     fun `a saved look's imported font is published with its digest`() {
-        val look = CustomLook(id = "mine", name = "mine", baseLook = TccUiLook.TERMINAL, labelFont = userFont(FONT_ID))
+        val look = CustomLook(id = "mine", name = "Mine", baseLook = TccUiLook.TERMINAL, labelFont = userFont(FONT_ID))
         val row = rowFor(SharedLook(null, look.colors, look))
         assertEquals("custom:mine", row[SharedFontsContract.COLUMN_LOOK_ID])
+        assertEquals("Mine", row[SharedFontsContract.COLUMN_LOOK_NAME])
         assertEquals("user:$FONT_ID", row[SharedFontsContract.COLUMN_LABEL_FONT])
         assertEquals(FONT_SHA, row[SharedFontsContract.COLUMN_LABEL_FONT_SHA256])
         assertEquals("bundled:mono", row[SharedFontsContract.COLUMN_DISPLAY_FONT])
@@ -113,6 +117,7 @@ class SharedFontsTest {
         val prefs = prefsOf(CustomLookStore.LOOK_KEY to LookRef.Custom("gone").key)
         val row = rowFor(ActiveSharedLook().of(prefs))
         assertEquals(TccUiLook.DEFAULT.name, row[SharedFontsContract.COLUMN_LOOK_ID])
+        assertEquals("name of ${TccUiLook.DEFAULT.name}", row[SharedFontsContract.COLUMN_LOOK_NAME])
         assertNull(row[SharedFontsContract.COLUMN_LABEL_FONT])
     }
 
@@ -191,7 +196,8 @@ class SharedFontsTest {
         )
     }
 
-    private fun rowFor(look: SharedLook) = sharedFontsRow(look) { id -> FONT_SHA.takeIf { id == FONT_ID } }
+    private fun rowFor(look: SharedLook) =
+        sharedFontsRow(look, { "name of ${it.name}" }) { id -> FONT_SHA.takeIf { id == FONT_ID } }
 
     private fun userFont(id: String) = FontRef.User(id, "Orbitron")
 

@@ -47,6 +47,7 @@ results and the refused writes work as for `/palette`.
 |---|---|
 | `version` | Integer, contract version 2 |
 | `look_id` | The applied look: a built-in look's name (`TERMINAL`) or `custom:<id>` for a saved look |
+| `look_name` | The applied look's name as the user sees it: a saved look's own name, or a built-in look's display name in Command Panel's language |
 | `display_font` | Font for big numbers and titles, or null |
 | `display_font_sha256` | SHA-256 of the display font's file (lowercase hex) for a `user:` font, otherwise null |
 | `label_font` | Font for labels and body text, or null |
@@ -115,7 +116,7 @@ served.
 Version 1 is frozen: one row, these 16 integer columns (`version`, `is_dark` and 14 color roles). Never add, remove,
 rename or reorder a column. Any change to the row means a new `VERSION`. Read columns by name.
 
-The fonts row is version 2 and frozen the same way: these 6 columns, in this order. A bundled key is never renamed or
+The fonts row is version 2 and frozen the same way: these 7 columns, in this order. A bundled key is never renamed or
 reused; a new bundled family only adds a key, which older clients treat as null.
 
 Which colors and fonts a look resolves to can change without a new version. The roles and their meaning stay the same.

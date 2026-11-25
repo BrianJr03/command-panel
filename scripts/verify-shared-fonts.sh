@@ -8,7 +8,7 @@
 #
 # Checks:
 #   - /palette still answers with version 1 and its 16 columns;
-#   - /fonts answers with version 2 and the six contract columns;
+#   - /fonts answers with version 2 and the seven contract columns, look_name included;
 #   - switching looks changes the row: SEGMENT_LCD gives bundled:segment / bundled:mono, E_INK bundled:serif twice,
 #     AURORA_GLASS null fonts;
 #   - an applied saved look with an imported font shows user:<id> and a 64-char sha256 (only if one is applied);
@@ -54,7 +54,7 @@ step "fonts row (version 2)"
 fonts="$(query fonts)"
 echo "  info  $fonts"
 expect_col "$fonts" version 2
-for c in look_id display_font display_font_sha256 label_font label_font_sha256; do
+for c in look_id look_name display_font display_font_sha256 label_font label_font_sha256; do
   echo "$fonts" | grep -qE "(^| )$c=" && pass "has $c" || fail "missing $c"
 done
 
@@ -87,6 +87,7 @@ if [ "$PKG" = "jr.brian.commandpannel.debug" ]; then
   set_look SEGMENT_LCD
   row="$(query fonts)"
   expect_col "$row" look_id SEGMENT_LCD
+  expect_col "$row" look_name "Segment LCD"
   expect_col "$row" display_font bundled:segment
   expect_col "$row" label_font bundled:mono
   set_look E_INK

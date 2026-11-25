@@ -46,15 +46,20 @@ private fun FontRef?.toShared(userFontSha256: (String) -> String?): SharedFontVa
 /**
  * The fonts row for [look]. A role without its own font falls back to the label font, as the overlay's text styles do,
  * so a client never has to know the fallback rule. [userFontSha256] gives an imported font's digest, or `null` when its
- * file is gone.
+ * file is gone. [builtInName] gives a built-in look's display name.
  */
-internal fun sharedFontsRow(look: SharedLook, userFontSha256: (String) -> String?): Map<String, Any?> {
+internal fun sharedFontsRow(
+    look: SharedLook,
+    builtInName: (TccUiLook) -> String,
+    userFontSha256: (String) -> String?,
+): Map<String, Any?> {
     val (labelRef, displayRef) = look.fontRefs()
     val label = labelRef.toShared(userFontSha256)
     val display = displayRef.toShared(userFontSha256) ?: label
     return mapOf(
         SharedFontsContract.COLUMN_VERSION to SharedFontsContract.VERSION,
         SharedFontsContract.COLUMN_LOOK_ID to look.id,
+        SharedFontsContract.COLUMN_LOOK_NAME to (look.custom?.name ?: builtInName(look.builtIn ?: TccUiLook.DEFAULT)),
         SharedFontsContract.COLUMN_DISPLAY_FONT to display?.value,
         SharedFontsContract.COLUMN_DISPLAY_FONT_SHA256 to display?.sha256,
         SharedFontsContract.COLUMN_LABEL_FONT to label?.value,
