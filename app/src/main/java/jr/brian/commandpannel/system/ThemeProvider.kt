@@ -4,24 +4,31 @@ import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.database.ContentObserver
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import android.os.Binder
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.util.Log
 import androidx.compose.ui.graphics.toArgb
+import jr.brian.commandpannel.BuildConfig
+import jr.brian.commandpannel.plugin.PanelPluginTrust
 import jr.brian.commandpannel.privileged.ThorRgbController
 import jr.brian.commandpannel.ui.settings.companionPaletteFrom
+import jr.brian.commandpannel.ui.theme.CustomLook
 import jr.brian.commandpannel.ui.theme.CustomLookJson
 import jr.brian.commandpannel.ui.theme.LookRef
 import jr.brian.commandpannel.ui.theme.PinnedColors
 import jr.brian.commandpannel.ui.theme.TccColors
 import jr.brian.commandpannel.ui.theme.TccUiLook
 import jr.brian.commandpannel.ui.theme.resolveLookPalette
+import java.io.FileNotFoundException
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -31,7 +38,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Publishes the overlay's resolved colors, read-only, so another app (Jarn FE) can match them ([SharedThemeContract]).
  * It starts from the palette the companion gets when it follows the look, whether or not that setting is on, adds the
  * built-in look's colors ([publishedLookPalette]), and never uses Theme Studio's unsaved draft. Colors aren't secret,
- * so the provider is open to any app.
+ * so the palette is open to any app.
+ *
+ * It also publishes the applied look's fonts ([SharedFontsContract]). The fonts row is open too, but an imported font's
+ * file is only opened for an app on [SharedFontReaders].
  *
  * Android creates providers before `Application.onCreate`, so nothing is read until the first query or the posted
  * [watch].
@@ -48,6 +58,7 @@ class ThemeProvider : ContentProvider() {
 
     // Only touched on [worker].
     private var published: Map<String, Int>? = null
+    private var publishedFonts: Map<String, Any?>? = null
 
     private val observer = object : ContentObserver(main) {
         override fun onChange(selfChange: Boolean) = queueRefresh()
@@ -72,6 +83,7 @@ class ThemeProvider : ContentProvider() {
                 ctx.contentResolver.registerContentObserver(Settings.System.getUriFor(it), false, observer)
             }
             published = currentRow(ctx)
+            publishedFonts = currentFontsRow(ctx)
         }.onFailure { Log.w(TAG, "couldn't watch the theme", it) }
     }
 
@@ -83,13 +95,21 @@ class ThemeProvider : ContentProvider() {
         }
     }
 
-    /** Tells clients only when the row really changed: most LED and pref changes don't touch the palette. */
+    /** Tells clients only when a row really changed: most LED and pref changes touch neither the palette nor the fonts. */
     private fun publishIfChanged() {
         val ctx = context ?: return
-        val row = runCatching { currentRow(ctx) }.getOrElse { Log.w(TAG, "couldn't read the theme", it); return }
-        if (row == published) return
-        published = row
-        ctx.contentResolver.notifyChange(uri(ctx), null)
+        runCatching { currentRow(ctx) }.onSuccess { row ->
+            if (row != published) {
+                published = row
+                ctx.contentResolver.notifyChange(uri(ctx, SharedThemeContract.PATH), null)
+            }
+        }.onFailure { Log.w(TAG, "couldn't read the theme", it) }
+        runCatching { currentFontsRow(ctx) }.onSuccess { row ->
+            if (row != publishedFonts) {
+                publishedFonts = row
+                ctx.contentResolver.notifyChange(uri(ctx, SharedFontsContract.PATH), null)
+            }
+        }.onFailure { Log.w(TAG, "couldn't read the fonts", it) }
     }
 
     // Follow-system theme mode changes with the night setting.
@@ -104,15 +124,51 @@ class ThemeProvider : ContentProvider() {
         sortOrder: String?,
     ): Cursor? {
         val ctx = context ?: return null
-        if (uri.pathSegments != listOf(SharedThemeContract.PATH)) return null
-        val columns = projection ?: SharedThemeContract.COLUMNS.toTypedArray()
-        val row = runCatching { currentRow(ctx) }.getOrElse { Log.w(TAG, "couldn't read the theme", it); return null }
-        val values = selectSharedThemeColumns(row, columns)
-        return MatrixCursor(columns, 1).apply { addRow(values) }
+        return when (uri.pathSegments) {
+            listOf(SharedThemeContract.PATH) -> {
+                val columns = projection ?: SharedThemeContract.COLUMNS.toTypedArray()
+                val row = runCatching { currentRow(ctx) }
+                    .getOrElse { Log.w(TAG, "couldn't read the theme", it); return null }
+                MatrixCursor(columns, 1).apply { addRow(selectSharedThemeColumns(row, columns)) }
+            }
+            listOf(SharedFontsContract.PATH) -> {
+                val columns = projection ?: SharedFontsContract.COLUMNS.toTypedArray()
+                val row = runCatching { currentFontsRow(ctx) }
+                    .getOrElse { Log.w(TAG, "couldn't read the fonts", it); return null }
+                MatrixCursor(columns, 1).apply { addRow(selectSharedColumns(row, columns)) }
+            }
+            else -> null
+        }
     }
 
-    override fun getType(uri: Uri): String? =
-        if (uri.pathSegments == listOf(SharedThemeContract.PATH)) MIME_TYPE else null
+    override fun getType(uri: Uri): String? = when {
+        uri.pathSegments == listOf(SharedThemeContract.PATH) -> MIME_TYPE
+        uri.pathSegments == listOf(SharedFontsContract.PATH) -> FONTS_MIME_TYPE
+        sharedFontFileId(uri.pathSegments) != null -> SharedFontsContract.FILE_MIME_TYPE
+        else -> null
+    }
+
+    /**
+     * An imported font's file, read-only, for a trusted caller only ([SharedFontReaders]). Bundled fonts aren't served:
+     * the client ships its own copies.
+     */
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
+        val ctx = context ?: throw FileNotFoundException(uri.toString())
+        if (mode != "r") throw SecurityException(READ_ONLY)
+        val id = sharedFontFileId(uri.pathSegments) ?: throw FileNotFoundException(uri.toString())
+        if (!isTrustedFontReader(ctx)) throw SecurityException("not allowed to read fonts")
+        val file = UserFontStore.sharedFile(ctx, id) ?: throw FileNotFoundException(uri.toString())
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+
+    private fun isTrustedFontReader(ctx: Context): Boolean {
+        val pm = ctx.packageManager
+        val packages = pm.getPackagesForUid(Binder.getCallingUid())?.toList().orEmpty()
+        return SharedFontReaders.isTrusted(packages, SharedFontReaders.allowed(BuildConfig.DEBUG)) { pkg ->
+            val info = runCatching { pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
+            PanelPluginTrust.signerDigests(info)
+        }
+    }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? = throw UnsupportedOperationException(READ_ONLY)
 
@@ -134,25 +190,35 @@ class ThemeProvider : ContentProvider() {
         return sharedThemeRow(publishedPalette(themeMode, night, accent, activeLook.of(prefs)))
     }
 
+    private fun currentFontsRow(ctx: Context): Map<String, Any?> =
+        sharedFontsRow(activeLook.of(Prefs.of(ctx)), { ctx.getString(it.labelRes) }) { UserFontStore.sha256(ctx, it) }
+
     private companion object {
         const val TAG = "ThemeProvider"
         const val WORKER_IDLE_SECONDS = 30L
         const val READ_ONLY = "the shared theme is read-only"
         const val MIME_TYPE = "vnd.android.cursor.item/vnd.jr.brian.commandpanel.theme"
+        const val FONTS_MIME_TYPE = "vnd.android.cursor.item/vnd.jr.brian.commandpanel.fonts"
         const val ACCENT_SYNC_PREF = "rgb_accent_sync"
-        val WATCHED_PREFS = setOf(CustomLookStore.LOOK_KEY, CustomLookStore.KEY, ACCENT_SYNC_PREF)
+        val WATCHED_PREFS = setOf(CustomLookStore.LOOK_KEY, CustomLookStore.KEY, ACCENT_SYNC_PREF, UserFontStore.KEY)
         val WATCHED_SETTINGS = listOf(SystemSettings.Keys.THEME_MODE, ThorRgbController.PICKER_COLOR_KEY)
 
-        fun uri(ctx: Context): Uri = Uri.Builder()
+        fun uri(ctx: Context, path: String): Uri = Uri.Builder()
             .scheme("content")
             .authority(ctx.packageName + SharedThemeContract.AUTHORITY_SUFFIX)
-            .path(SharedThemeContract.PATH)
+            .path(path)
             .build()
     }
 }
 
-/** What the applied look adds to the shared palette: a [builtIn] look's colors, or a saved look's [pinned] ones. */
-internal data class SharedLook(val builtIn: TccUiLook?, val pinned: PinnedColors?)
+/**
+ * What the applied look adds to the shared theme: a [builtIn] look's colors, or a saved look's [pinned] ones. A saved
+ * look also keeps its [custom] definition, for its fonts.
+ */
+internal data class SharedLook(val builtIn: TccUiLook?, val pinned: PinnedColors?, val custom: CustomLook? = null) {
+    /** The contract's `look_id`: the built-in look's name or the saved look's `custom:<id>` key. */
+    val id: String get() = custom?.ref?.key ?: (builtIn ?: TccUiLook.DEFAULT).name
+}
 
 /**
  * The applied look. Reads only the applied look and the saved looks, never Theme Studio's draft (`studio_draft`).
@@ -171,7 +237,7 @@ internal class ActiveSharedLook {
         val look = when (val ref = LookRef.parse(lookKey)) {
             is LookRef.BuiltIn -> SharedLook(ref.look, null)
             is LookRef.Custom -> CustomLookJson.decodeList(looksJson).firstOrNull { it.id == ref.id }
-                ?.let { SharedLook(null, it.colors) }
+                ?.let { SharedLook(null, it.colors, it) }
                 ?: SharedLook(TccUiLook.DEFAULT, null)
         }
         last = Decoded(lookKey, looksJson, look)
