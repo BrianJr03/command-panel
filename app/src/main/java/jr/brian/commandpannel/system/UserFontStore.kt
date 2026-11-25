@@ -13,6 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -33,14 +34,19 @@ data class UserFont(
 class FontImportException(@StringRes val messageRes: Int) : Exception()
 
 /**
- * User-imported TTF/OTF fonts. Files are copied into `filesDir/fonts/<id>.ttf` (app-private, never exported or
- * backed up) and indexed in the `user_fonts` pref. The overlay service runs in the same app, so both surfaces load
- * them from the same files. A look whose font file is missing falls back to the default font.
+ * User-imported TTF/OTF fonts. Files are copied into `filesDir/fonts/<id>.ttf` (app-private, never backed up) and
+ * indexed in the `user_fonts` pref. The overlay service runs in the same app, so both surfaces load them from the same
+ * files. A look whose font file is missing falls back to the default font. [ThemeProvider] serves these files
+ * read-only to the apps on [SharedFontReaders] (docs/SHARED_THEME.md), and to no one else.
  */
 object UserFontStore {
-    private const val KEY = "user_fonts"
+    internal const val KEY = "user_fonts"
     private const val MAX_BYTES = 5L * 1024 * 1024
     private val cache = ConcurrentHashMap<String, FontFamily>()
+    private val digests = ConcurrentHashMap<String, FileDigest>()
+
+    /** A file's SHA-256, valid while its size and modified time stay the same. */
+    private class FileDigest(val length: Long, val modified: Long, val sha256: String)
 
     private fun prefs(context: Context) = Prefs.of(context)
     private fun dir(context: Context) = File(context.filesDir, "fonts").apply { mkdirs() }
@@ -107,8 +113,39 @@ object UserFontStore {
     /** The app-private file holding [id] (for copying fonts out into `TCP Themes/fonts`). */
     fun fileOf(context: Context, id: String): File = file(context, id)
 
+    /**
+     * The file for imported font [id] when it's indexed and its file sits directly in the fonts folder, otherwise
+     * `null`. What the shared theme serves, so an id can never reach another file.
+     */
+    fun sharedFile(context: Context, id: String): File? {
+        if (all(context).none { it.id == id }) return null
+        val folder = dir(context).canonicalFile
+        return file(context, id).canonicalFile.takeIf { it.parentFile == folder && it.isFile }
+    }
+
+    /** SHA-256 of [id]'s file (lowercase hex), or `null` when it isn't an imported font any more. */
+    fun sha256(context: Context, id: String): String? {
+        val f = sharedFile(context, id) ?: return null
+        val length = f.length()
+        val modified = f.lastModified()
+        digests[id]?.takeIf { it.length == length && it.modified == modified }?.let { return it.sha256 }
+        val digest = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { input ->
+            val buf = ByteArray(16 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        val hex = digest.digest().joinToString("") { "%02x".format(it) }
+        digests[id] = FileDigest(length, modified, hex)
+        return hex
+    }
+
     fun delete(context: Context, id: String) {
         cache.remove(id)
+        digests.remove(id)
         file(context, id).delete()
         write(context, all(context).filterNot { it.id == id })
     }
