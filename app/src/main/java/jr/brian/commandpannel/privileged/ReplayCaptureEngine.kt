@@ -23,6 +23,8 @@ class ReplayCaptureEngine(
     private companion object {
         const val TAG = "ReplayCapture"
         const val MIME = MediaFormat.MIMETYPE_VIDEO_AVC
+        /** The drain loop's poll: well under [stop]'s 500 ms join, and 10x fewer idle wake-ups than 10 ms (#91). */
+        const val DRAIN_TIMEOUT_US = 100_000L
     }
 
     /** A physical screen to mirror: its SurfaceFlinger layer stack and real size. */
@@ -144,7 +146,8 @@ class ReplayCaptureEngine(
         val info = MediaCodec.BufferInfo()
         while (running) {
             val index = try {
-                encoder.dequeueOutputBuffer(info, 10_000)
+                // Returns as soon as a packet is ready; the timeout only paces the loop while nothing is encoded.
+                encoder.dequeueOutputBuffer(info, DRAIN_TIMEOUT_US)
             } catch (t: Throwable) {
                 Log.w(TAG, "dequeue failed", t); break
             }

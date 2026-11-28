@@ -9,6 +9,10 @@ package jr.brian.commandpannel.replay.studio
  * without saying so). A crash that takes the whole process down is covered by the service's restart, which arms the
  * buffer from the `replay_enabled` pref as usual.
  *
+ * The buffer also pauses while the screen is off (#91): capturing a dark screen only keeps audioserver's `AudioIn` wake
+ * lock held, so the device never reaches deep sleep. The two pauses stack: the buffer comes back only once neither the
+ * player nor the screen holds it.
+ *
  * Pure: the service feeds it events on one thread and runs the returned [Action] on the Replay Buffer. `enabled` is the
  * user's `replay_enabled` pref at the time of the call, so a buffer the user turned off is never armed again here.
  */
@@ -24,6 +28,10 @@ class ReplayPauseGate(private val timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
 
     /** True from the player opening until it closes, times out or is found gone. */
     var paused: Boolean = false
+        private set
+
+    /** True while the screen is off (#91). Nothing arms the buffer meanwhile, not even the user's own switch. */
+    var asleep: Boolean = false
         private set
 
     private var lastSeenMs = 0L
@@ -49,10 +57,23 @@ class ReplayPauseGate(private val timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
         return resume(enabled)
     }
 
+    /** The screen went off: stop the buffer if it's running. A clip save already under way finishes first. */
+    fun onScreenOff(armed: Boolean): Action {
+        asleep = true
+        return if (armed) Action.DISARM else Action.NONE
+    }
+
+    /** The screen came on: the buffer comes back unless the player still holds it. */
+    fun onScreenOn(enabled: Boolean): Action {
+        if (!asleep) return Action.NONE
+        asleep = false
+        return if (enabled && !paused) Action.REARM else Action.NONE
+    }
+
     private fun resume(enabled: Boolean): Action {
         if (!paused) return Action.NONE
         paused = false
-        return if (enabled) Action.REARM else Action.NONE
+        return if (enabled && !asleep) Action.REARM else Action.NONE
     }
 
     companion object {

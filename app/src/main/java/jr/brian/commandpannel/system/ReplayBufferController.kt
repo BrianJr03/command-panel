@@ -15,6 +15,8 @@ import jr.brian.commandpannel.privileged.RootShell
 import jr.brian.commandpannel.privileged.ScreenRecorderEngine
 import jr.brian.commandpannel.replay.studio.ClipAutoDelete
 import jr.brian.commandpannel.replay.studio.ClipRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /**
@@ -28,6 +30,12 @@ class ReplayBufferController(
     private val tag = "ReplayBuffer"
     private val prefs = Prefs.of(context)
     private val engine = ReplayCaptureEngine(context, privileged)
+
+    /**
+     * Held while a save cuts its clip from the running capture, so [disarmAfterSave] (the screen going off, #91) waits
+     * for that instead of pulling the ring out from under it. Muxing and copying the cut clip run outside it.
+     */
+    private val cutLock = Mutex()
 
     val isArmed: Boolean get() = engine.isRunning
 
@@ -74,20 +82,26 @@ class ReplayBufferController(
         return ReplayClipsLocation.DEFAULT
     }
 
-    /** Arms or disarms capture to match the `replay_enabled` pref. */
-    fun applyEnabledState() {
-        if (prefs.getBoolean("replay_enabled", false)) arm() else disarm()
+    /**
+     * Arms or disarms capture to match the `replay_enabled` pref. Without [allowArm] (the screen is off, #91) it only
+     * disarms; the pref is left alone, so the buffer comes back on screen on.
+     */
+    fun applyEnabledState(allowArm: Boolean = true) {
+        if (allowArm && prefs.getBoolean("replay_enabled", false)) arm() else disarm()
     }
 
-    /** Persists the enabled pref and arms/disarms to match. */
-    fun setEnabled(enable: Boolean) {
+    /** Persists the enabled pref and arms/disarms to match (see [applyEnabledState] for [allowArm]). */
+    fun setEnabled(enable: Boolean, allowArm: Boolean = true) {
         prefs.edit().putBoolean("replay_enabled", enable).apply()
-        applyEnabledState()
+        applyEnabledState(allowArm)
     }
 
     fun arm(): Boolean = engine.start(windowSeconds(), preset(), target(), sound())
 
     fun disarm() = engine.stop()
+
+    /** Disarms once a save under way has cut its clip, so the clip still saves (#91). */
+    suspend fun disarmAfterSave() = cutLock.withLock { disarm() }
 
     /**
      * Restarts a running capture with the current prefs, so a new target, window or bitrate applies now. The buffered
@@ -105,11 +119,15 @@ class ReplayBufferController(
 
     /** Saves the buffered clip (it waits on audio and the root copy). Returns the saved path, or `error:<code>`. */
     suspend fun save(): String {
-        if (!engine.isRunning) return "error:${ScreenRecorderEngine.REPLAY_ERR_NOT_ARMED}"
-        val format = engine.videoFormat ?: return "error:${ScreenRecorderEngine.REPLAY_ERR_START_FAILED}"
-        // A save right after arming would otherwise beat the first audio packet and come out video only.
-        engine.awaitAudio(AUDIO_READY_TIMEOUT_MS)
-        when (val slice = engine.slice()) {
+        // Everything read from the running capture is read here, under [cutLock]; the rest works on the cut clip.
+        val (slice, format, audioFormat, mode) = cutLock.withLock {
+            if (!engine.isRunning) return "error:${ScreenRecorderEngine.REPLAY_ERR_NOT_ARMED}"
+            val format = engine.videoFormat ?: return "error:${ScreenRecorderEngine.REPLAY_ERR_START_FAILED}"
+            // A save right after arming would otherwise beat the first audio packet and come out video only.
+            engine.awaitAudio(AUDIO_READY_TIMEOUT_MS)
+            Cut(engine.slice(), format, engine.audioFormat, engine.target.mode)
+        }
+        when (slice) {
             null, is ReplayRingBuffer.Slice.Failure -> {
                 val code = (slice as? ReplayRingBuffer.Slice.Failure)?.error?.let {
                     if (it == ReplayRingBuffer.SliceError.NO_KEYFRAME) ScreenRecorderEngine.REPLAY_ERR_NO_KEYFRAME
@@ -119,13 +137,13 @@ class ReplayBufferController(
             }
             is ReplayRingBuffer.Slice.Clip -> {
                 val tmp = File(context.cacheDir, "replay_tmp.mp4")
-                if (!ReplayClipWriter.write(slice, format, engine.audioFormat, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
+                if (!ReplayClipWriter.write(slice, format, audioFormat, tmp)) return "error:${ScreenRecorderEngine.REPLAY_ERR_WRITE_FAILED}"
                 lastSaveFellBack = false
                 val mounted = ReplayStorage.mountedIds(context)
                 val location = clipsLocation(mounted)
                 val basePath = ScreenRecorderEngine.buildReplayClipPath(
-                    targetMode = engine.target.mode,
-                    baseDir = "${location.path}/${ScreenRecorderEngine.replayTargetFolder(engine.target.mode)}",
+                    targetMode = mode,
+                    baseDir = "${location.path}/${ScreenRecorderEngine.replayTargetFolder(mode)}",
                 )
                 if (!ScreenRecorderEngine.isValidReplayClipOutputPath(basePath, mounted)) {
                     runCatching { tmp.delete() }
@@ -164,6 +182,14 @@ class ReplayBufferController(
             }
         }
     }
+
+    /** What [save] reads from the running capture before it lets go of [cutLock]. */
+    private data class Cut(
+        val slice: ReplayRingBuffer.Slice?,
+        val format: android.media.MediaFormat,
+        val audioFormat: android.media.MediaFormat?,
+        val mode: Int,
+    )
 
     companion object {
         const val PREF_GAME_AUDIO = "replay_game_audio"

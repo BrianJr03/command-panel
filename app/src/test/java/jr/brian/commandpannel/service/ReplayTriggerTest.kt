@@ -14,4 +14,10 @@ class ReplayTriggerTest {
         assertEquals(ReplayTriggerAction.NONE, replayTriggerAction(armed = true, standby = true))
         assertEquals(ReplayTriggerAction.NONE, replayTriggerAction(armed = false, standby = true))
     }
+
+    @Test fun screenOffDoesNothing() {
+        // The buffer is paused for sleep (#91): a press neither arms it nor saves.
+        assertEquals(ReplayTriggerAction.NONE, replayTriggerAction(armed = false, standby = false, asleep = true))
+        assertEquals(ReplayTriggerAction.NONE, replayTriggerAction(armed = true, standby = false, asleep = true))
+    }
 }

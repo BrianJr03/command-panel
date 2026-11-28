@@ -79,11 +79,17 @@ class AssistantService : Service() {
     private lateinit var coexistence: StockCoexistence
     private lateinit var tapWaker: ExternalDisplayTapWaker
     private lateinit var replay: jr.brian.commandpannel.system.ReplayBufferController
-    /** Pauses the Replay Buffer while Replay Studio's player is in front (#46); only touched on [replayPlayerOps]. */
-    private val replayPlayerGate = ReplayPauseGate()
-    /** One at a time, in order, so a quick open-then-close never re-arms before the pause ran. */
+    /**
+     * Pauses the Replay Buffer while Replay Studio's player is in front (#46) and while the screen is off (#91); only
+     * touched on [replayOps].
+     */
+    private val replayPauseGate = ReplayPauseGate()
+    /**
+     * Pause and resume, and the arms that must respect them, one at a time and in order, so a quick open-then-close
+     * (or screen off-then-on) never re-arms before the pause ran.
+     */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private val replayPlayerOps = Dispatchers.IO.limitedParallelism(1)
+    private val replayOps = Dispatchers.IO.limitedParallelism(1)
     private var replayPlayerWatch: kotlinx.coroutines.Job? = null
     private lateinit var bdsa: BdsaDetector
     private lateinit var quickLaunchReturn: QuickLaunchReturnWatcher
@@ -105,6 +111,11 @@ class AssistantService : Service() {
     private var hardwareRunning = false
     /** Set once the startup standby decision is made; re-checks before that are ignored. */
     private var standbyDecided = false
+    /**
+     * Whether the screen is off, set on the main thread as the broadcast arrives (#91), so a save-or-arm request
+     * decided on another thread already sees it. [replayPauseGate] holds the same state for the buffer itself.
+     */
+    @Volatile private var screenOff = false
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -114,12 +125,14 @@ class AssistantService : Service() {
                     // The lid closed (or the screen went off): the panel is what's there when it opens.
                     pluginSession.end(EndReason.SCREEN_OFF)
                     coexistence.onScreenOff()
+                    onScreenPower(on = false)
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     // A blanked screen's helper layer is put back if SurfaceFlinger dropped it over the sleep.
                     if (hardwareRunning) screenMode.onScreenOn()
                     coexistence.onScreenOn()
                     recheckStandby(force = false)
+                    onScreenPower(on = true)
                 }
             }
         }
@@ -219,12 +232,15 @@ class AssistantService : Service() {
                     }
                 }
             }
-            ACTION_REPLAY_SET_ENABLED -> scope.launch(Dispatchers.IO) {
-                if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false))
-                else replay.applyEnabledState()
+            // While the screen is off (#91) the switch is saved, and the buffer waits for screen on to arm.
+            ACTION_REPLAY_SET_ENABLED -> scope.launch(replayOps) {
+                val allowArm = !replayPauseGate.asleep
+                if (intent.hasExtra(EXTRA_ENABLE)) replay.setEnabled(intent.getBooleanExtra(EXTRA_ENABLE, false), allowArm)
+                else replay.applyEnabledState(allowArm)
             }
-            ACTION_REPLAY_REARM -> scope.launch(Dispatchers.IO) {
-                val armed = Prefs.of(applicationContext).getBoolean("replay_enabled", false) && replay.rearm()
+            ACTION_REPLAY_REARM -> scope.launch(replayOps) {
+                // Asleep, the new settings apply when screen on arms the buffer, so an enabled buffer counts as armed.
+                val armed = if (replayPauseGate.asleep) replayEnabled() else replayEnabled() && replay.rearm()
                 sendBroadcast(Intent(ACTION_REPLAY_REARMED).setPackage(packageName).putExtra(EXTRA_REPLAY_ARMED, armed))
             }
             ACTION_REPLAY_SAVE -> scope.launch(Dispatchers.IO) {
@@ -240,6 +256,10 @@ class AssistantService : Service() {
         isRunning = true
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
+        // Started with the screen off (e.g. a boot with the lid closed): nothing arms until screen on (#91).
+        val interactive = getSystemService(android.os.PowerManager::class.java).isInteractive
+        screenOff = !interactive
+        if (!interactive) replayPauseGate.onScreenOff(armed = false)
         screenMode = ScreenModeController(
             applicationContext, privileged,
             onHideOverlay = {
@@ -356,7 +376,7 @@ class AssistantService : Service() {
             }
             applyStandby(inControl)
             coexistence.sibling.observe(::onStockOwnerChanged)
-            withContext(Dispatchers.IO) { replay.applyEnabledState() }
+            withContext(replayOps) { replay.applyEnabledState(allowArm = !replayPauseGate.asleep) }
         }
     }
 
@@ -515,23 +535,23 @@ class AssistantService : Service() {
      * is gone or stops checking in, so the buffer never stays off. [ReplayPauseGate] makes every decision.
      */
     private fun onReplayPlayer(open: Boolean) {
-        scope.launch(replayPlayerOps) {
+        scope.launch(replayOps) {
             val action = if (open) {
-                replayPlayerGate.onPlayerOpen(SystemClock.elapsedRealtime(), replay.isArmed)
+                replayPauseGate.onPlayerOpen(SystemClock.elapsedRealtime(), replay.isArmed)
             } else {
-                replayPlayerGate.onPlayerClose(replayEnabled())
+                replayPauseGate.onPlayerClose(replayEnabled())
             }
-            applyReplayPlayerAction(action, if (open) "player open" else "player closed")
-            if (replayPlayerGate.paused && replayPlayerWatch?.isActive != true) {
-                replayPlayerWatch = scope.launch(replayPlayerOps) {
-                    while (replayPlayerGate.paused) {
+            applyReplayPauseAction(action, if (open) "player open" else "player closed")
+            if (replayPauseGate.paused && replayPlayerWatch?.isActive != true) {
+                replayPlayerWatch = scope.launch(replayOps) {
+                    while (replayPauseGate.paused) {
                         delay(ReplayPauseGate.CHECK_MS)
-                        val check = replayPlayerGate.onCheck(
+                        val check = replayPauseGate.onCheck(
                             SystemClock.elapsedRealtime(),
                             playerAlive = ReplayPlayerActivity.isStarted,
                             enabled = replayEnabled(),
                         )
-                        applyReplayPlayerAction(check, "player watch")
+                        applyReplayPauseAction(check, "player watch")
                     }
                 }
             }
@@ -540,34 +560,58 @@ class AssistantService : Service() {
 
     private fun replayEnabled(): Boolean = Prefs.of(applicationContext).getBoolean("replay_enabled", false)
 
-    /** Runs a [ReplayPauseGate] decision on the buffer. Logged as `replay-pause:` for scripts (verify-46.sh). */
-    private fun applyReplayPlayerAction(action: ReplayPauseGate.Action, reason: String) {
+    /**
+     * The screen went off or came on (#91, #92). The Replay Buffer pauses for sleep without touching its pref, and
+     * comes back on screen on unless Replay Studio's player still holds it. The panel's pollers follow too.
+     */
+    private fun onScreenPower(on: Boolean) {
+        screenOff = !on
+        scope.launch(replayOps) {
+            val action = if (on) replayPauseGate.onScreenOn(replayEnabled()) else replayPauseGate.onScreenOff(replay.isArmed)
+            applyReplayPauseAction(action, if (on) "screen on" else "screen off")
+        }
+    }
+
+    /**
+     * Runs a [ReplayPauseGate] decision on the buffer, on [replayOps]. A disarm waits for a save that is cutting its
+     * clip. Logged as `replay-pause:` for scripts (verify-46.sh, verify-sleep-drain.sh).
+     */
+    private suspend fun applyReplayPauseAction(action: ReplayPauseGate.Action, reason: String) {
         when (action) {
-            ReplayPauseGate.Action.DISARM -> runCatching { replay.disarm() }
+            ReplayPauseGate.Action.DISARM -> runCatching { replay.disarmAfterSave() }
                 .onFailure { Log.w(TAG, "replay-pause: disarm failed", it) }
             ReplayPauseGate.Action.REARM -> if (!replay.isArmed) {
                 runCatching { replay.arm() }.onFailure { Log.w(TAG, "replay-pause: re-arm failed", it) }
             }
             ReplayPauseGate.Action.NONE -> if (reason == "player watch") return
         }
-        Log.i(TAG, "replay-pause: $reason -> $action paused=${replayPlayerGate.paused} armed=${replay.isArmed}")
+        Log.i(TAG, "replay-pause: $reason -> $action paused=${replayPauseGate.paused} asleep=${replayPauseGate.asleep} armed=${replay.isArmed}")
     }
 
     /**
      * AYN double press or an external trigger ([source]): arms the Replay Buffer if it's off, otherwise saves a clip.
      * Either way, a toast says so. Only the external trigger checks standby here; the button handler already keeps
-     * double presses from reaching the machine on standby.
+     * double presses from reaching the machine on standby. With the screen off (#91) the request is dropped: there's
+     * no screen to toast on, and arming would keep the device awake.
      */
     private fun saveOrArmReplay(source: String) {
         scope.launch(Dispatchers.IO) {
-            val action = replayTriggerAction(replay.isArmed, standby = source == SOURCE_EXTERNAL && standby)
-            Log.i(TAG, "save-or-arm ($source): $action")
+            val action = replayTriggerAction(replay.isArmed, standby = source == SOURCE_EXTERNAL && standby, asleep = screenOff)
+            Log.i(TAG, "save-or-arm ($source): $action screenOff=$screenOff")
             when (action) {
                 ReplayTriggerAction.NONE -> return@launch
                 ReplayTriggerAction.ARM -> {
-                    replay.setEnabled(true)
+                    // In order with the sleep pause, so an arm decided just before the screen went off can't outlive it.
+                    val armedNow = withContext(replayOps) {
+                        if (replayPauseGate.asleep) {
+                            null
+                        } else {
+                            replay.setEnabled(true)
+                            replay.isArmed
+                        }
+                    } ?: return@launch
                     val armed = if (source == SOURCE_EXTERNAL) R.string.msg_replay_trigger_armed else R.string.msg_replay_double_armed
-                    toast.show(getString(if (replay.isArmed) armed else R.string.msg_replay_double_arm_failed))
+                    toast.show(getString(if (armedNow) armed else R.string.msg_replay_double_arm_failed))
                     return@launch
                 }
                 ReplayTriggerAction.SAVE -> Unit

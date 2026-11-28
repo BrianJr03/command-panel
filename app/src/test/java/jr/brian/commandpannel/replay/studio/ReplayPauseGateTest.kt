@@ -105,4 +105,66 @@ class ReplayPauseGateTest {
 
     @Test fun checkWhileNotPausedDoesNothing() =
         assertEquals(Action.NONE, gate().onCheck(1_000_000, playerAlive = false, enabled = true))
+
+    // ---- screen off (#91) ----
+
+    @Test fun screenOffStopsARunningBuffer() {
+        val g = gate()
+        assertEquals(Action.DISARM, g.onScreenOff(armed = true))
+        assertTrue(g.asleep)
+    }
+
+    @Test fun screenOnRearms() {
+        val g = gate()
+        g.onScreenOff(armed = true)
+        assertEquals(Action.REARM, g.onScreenOn(enabled = true))
+        assertFalse(g.asleep)
+    }
+
+    @Test fun screenOnRespectsTheUserTurningItOff() {
+        val g = gate()
+        g.onScreenOff(armed = true)
+        assertEquals(Action.NONE, g.onScreenOn(enabled = false))
+    }
+
+    @Test fun startingWithTheScreenOffArmsOnScreenOn() {
+        // The service started with the lid closed: nothing to stop, and the first screen on arms it.
+        val g = gate()
+        assertEquals(Action.NONE, g.onScreenOff(armed = false))
+        assertEquals(Action.REARM, g.onScreenOn(enabled = true))
+    }
+
+    @Test fun screenOnWithoutScreenOffDoesNothing() = assertEquals(Action.NONE, gate().onScreenOn(enabled = true))
+
+    @Test fun playerClosingWhileAsleepWaitsForScreenOn() {
+        val g = gate()
+        g.onPlayerOpen(0, armed = true)
+        g.onScreenOff(armed = false)
+        assertEquals(Action.NONE, g.onPlayerClose(enabled = true))
+        assertEquals(Action.REARM, g.onScreenOn(enabled = true))
+    }
+
+    @Test fun playerWatchWhileAsleepWaitsForScreenOn() {
+        val g = gate()
+        g.onPlayerOpen(0, armed = true)
+        g.onScreenOff(armed = false)
+        assertEquals(Action.NONE, g.onCheck(nowMs = 30_000, playerAlive = false, enabled = true))
+        assertFalse(g.paused)
+        assertEquals(Action.REARM, g.onScreenOn(enabled = true))
+    }
+
+    @Test fun screenOnWhilePlayerStillOpenWaitsForThePlayer() {
+        val g = gate()
+        g.onPlayerOpen(0, armed = true)
+        g.onScreenOff(armed = false)
+        assertEquals(Action.NONE, g.onScreenOn(enabled = true))
+        assertEquals(Action.REARM, g.onPlayerClose(enabled = true))
+    }
+
+    @Test fun screenOffDuringPlaybackStopsABufferArmedByHand() {
+        val g = gate()
+        g.onPlayerOpen(0, armed = true)
+        // The user armed it by hand during playback; sleep still stops it.
+        assertEquals(Action.DISARM, g.onScreenOff(armed = true))
+    }
 }

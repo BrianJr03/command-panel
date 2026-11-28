@@ -6,6 +6,11 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+- **Replay Buffer pauses while the Thor sleeps** (#91)
+  - Where: panel: Replay Buffer (automatic, no setting)
+  - Spot: none
+  - Callout: The Replay Buffer now pauses while the screen is off and turns back on when you wake the Thor, so it no longer drains the battery in sleep.
+
 ## v0.15.0
 
 - **Share your fonts with Jarn** (#89)
