@@ -92,12 +92,13 @@ Thor Command Panel ships **16 overlay themes** (plus the stock look) — the who
 > The reason to run this instead of the stock app.
 
 - 🖌️ **[Theme Studio](#theme-studio)** — mix parts from any look or build one from scratch (Custom parts, shapes, colors, your own fonts) with a live preview; share looks as packs or follow GitHub theme repos for updates.
+- 🔗 **Shared look for Jarn**: Jarn (the Jarngreipr frontend) can match your current look's colors and fonts, including fonts you imported. Turn it on in Jarn's Look settings.
 - 🎨 **16 overlay themes** — Aurora Glass, Tactical HUD, Terminal, Segment LCD, Comic Panel, Cockpit, Neon Arcade, Bloom, Jelly, Y2K Chrome, E-Ink, and more. Each restyles cards, tiles, gauges, sliders and fonts.
 - 🌄 **Backgrounds**: put your own PNG, JPG or WebP behind the panel on any look, or pick an **animated gradient**: 14 presets, or build your own in **Gradient Studio** (up to six colors, a style, a motion and a speed). Animated GIF/WebP images and moving gradients are under **Experimental**, play only while the panel is open, and a **Performance** page shows what they cost.
 - 📱 **Companion settings app** — a modern, fully **gamepad-navigable** console for configuring everything, with a guided tour of every section on first launch.
 - 🧩 **Customizable tiles** — turn each one on or off and **drag-and-drop to reorder** them. A **Background** tile switches your background image or gradient on and off right from the panel.
 - ✋ **Arrange mode** — long-press the overlay to drag-and-drop its cards into any layout.
-- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video. Save clips to internal storage or a folder on an **SD card or USB drive**; if the card is out, clips go to TCP Clips until it's back.
+- ⏺️ **Replay Buffer** — a rolling screen-capture buffer you can dump to an MP4 clip after the moment. Capture the top screen, the bottom screen, or both stacked into one video. Save clips to internal storage or a folder on an **SD card or USB drive**; if the card is out, clips go to TCP Clips until it's back. It pauses while the screen is off or the lid is closed, so the Thor can still reach deep sleep, and turns back on when you wake it.
 - 💡 **Ambient-LED → accent sync** — the overlay accent follows the Thor's stick LED color.
 - 🚀 **Quick Launch** — a one-tap app launcher button in the nav bar.
 - ⏯️ **Media controls**: turn on **Media Controls** in General for previous, play/pause and next buttons in the middle of the panel's status bar. They control whatever is playing.
@@ -128,7 +129,7 @@ Command Panel installs side-by-side (`.debug` builds carry a `-debug` suffix). A
 1. Install TCP SC **after** Command Panel, or press **Install** on the TCP SC card in Replay. If you installed it first, reinstall it: Android only grants the permission it needs if Command Panel is already installed.
 2. Point your shortcut at TCP SC and launch it on the bottom screen, so the game on the top screen keeps focus. In Back Button Hero, for example: pick a gesture or a Back + button combo, then **Launch app** → **TCP SC** → **bottom screen**.
 
-It works like an AYN double press: the first press turns the Replay Buffer on, later presses save a clip. It does nothing while Command Panel stands by, and shows a short message if Command Panel isn't running. Only a TCP SC signed with the same key as your Command Panel works, so the release trigger pairs with the release app, and a locally built debug trigger pairs with a debug build.
+It works like an AYN double press: the first press turns the Replay Buffer on, later presses save a clip. It does nothing while the screen is off or Command Panel stands by, and shows a short message if Command Panel isn't running. Only a TCP SC signed with the same key as your Command Panel works, so the release trigger pairs with the release app, and a locally built debug trigger pairs with a debug build.
 
 ---
 

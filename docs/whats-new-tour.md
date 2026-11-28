@@ -6,6 +6,8 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
 
 ## Unreleased
 
+## v0.15.1
+
 - **Replay Buffer pauses while the Thor sleeps** (#91)
   - Where: panel: Replay Buffer (automatic, no setting)
   - Spot: none

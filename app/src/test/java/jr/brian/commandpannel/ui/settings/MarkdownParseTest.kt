@@ -62,7 +62,8 @@ class MarkdownParseTest {
     fun `headings, bullets and the rule keep working`() {
         assertTrue(blocks.first() is MdBlock.Heading)
         assertEquals(2, (blocks.first() as MdBlock.Heading).level)
-        assertTrue(blocks.any { it is MdBlock.Heading && it.level == 3 && it.spans.plain() == "New" })
+        // A release has a New or a Fixes section (a fix-only release has just Fixes).
+        assertTrue(blocks.any { it is MdBlock.Heading && it.level == 3 && it.spans.plain() in setOf("New", "Fixes") })
         val bullet = blocks.filterIsInstance<MdBlock.Bullet>().first()
         assertTrue(bullet.spans.first().bold)
         assertTrue(blocks.contains(MdBlock.Rule))

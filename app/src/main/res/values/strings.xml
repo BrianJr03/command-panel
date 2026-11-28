@@ -1021,6 +1021,10 @@
     <string name="tour_new_jarn_colors_body">Jarn, the new Jarngreipr frontend, can now match your Command Panel colors, from built-in looks and your own. Turn it on in Jarn\'s Look settings.</string>
     <string name="tour_new_jarn_fonts_title">Share your fonts with Jarn</string>
     <string name="tour_new_jarn_fonts_body">Jarn can now use your look\'s fonts as well as its colors, including fonts you imported.</string>
+    <string name="tour_new_replay_sleep_title">Replay Buffer rests in sleep</string>
+    <string name="tour_new_replay_sleep_body">The Replay Buffer now pauses while the screen is off and turns back on when you wake the Thor, so it no longer drains the battery in sleep.</string>
+    <string name="tour_new_panel_sleep_title">Panel rests in sleep</string>
+    <string name="tour_new_panel_sleep_body">The panel stops refreshing its stats while the screen is off to save battery, and catches up the moment you wake the Thor.</string>
     <string name="tour_new_fixes_v014_title">CPU gauge and tiles fixed</string>
     <string name="tour_new_fixes_v014_body">The panel\'s CPU gauge shows your processor speed again, and the Bluetooth and Do Not Disturb tiles turn off as well as on.</string>
     <plurals name="msg_restored_settings">

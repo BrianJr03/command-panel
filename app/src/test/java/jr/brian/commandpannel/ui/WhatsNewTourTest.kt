@@ -45,9 +45,17 @@ class WhatsNewTourTest {
     }
 
     @Test
-    fun `the 0_15_0 tour covers its notes`() {
+    fun `the 0_15_1 tour covers its notes`() {
         val steps = whatsNewTourFor(WHATS_NEW_TOUR_VERSION)!!
-        assertEquals("0.15.0", WHATS_NEW_TOUR_VERSION)
+        assertEquals("0.15.1", WHATS_NEW_TOUR_VERSION)
+        // Both sleep fixes are automatic, with nothing to spotlight, so they're text steps.
+        assertTrue(steps.any { it.titleRes == R.string.tour_new_replay_sleep_title && it.spot == null })
+        assertTrue(steps.any { it.titleRes == R.string.tour_new_panel_sleep_title && it.spot == null })
+    }
+
+    @Test
+    fun `the 0_15_0 tour still covers its notes`() {
+        val steps = whatsNewTourFor("0.15.0")!!
         // The Jarn fonts change is in Jarn and the shared theme, so it's a text step.
         assertTrue(steps.any { it.titleRes == R.string.tour_new_jarn_fonts_title && it.spot == null })
     }
