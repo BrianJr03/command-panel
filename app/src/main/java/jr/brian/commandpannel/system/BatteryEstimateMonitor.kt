@@ -18,7 +18,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Samples battery data every [intervalMs] while enabled and feeds the pure [BatteryEstimator] (fork feature). Reads
+ * Samples battery data every [intervalMs] while enabled and feeds the pure [BatteryEstimator] (fork feature). The loop
+ * runs only while started and enabled: [sync] follows the pref, and the repository stops it with the screen off (#92).
+ * The estimator itself starts its average over after a gap that long, so a sleep never skews the estimate. Reads
  * charge counter / current / full capacity from `BatteryManager` with sysfs fallbacks, derives the charge direction
  * from status + plug state (never the current's sign), and exposes the short display string.
  */
@@ -46,18 +48,39 @@ class BatteryEstimateMonitor(
     val text: StateFlow<String?> = _text.asStateFlow()
 
     private var job: Job? = null
+    private var scope: CoroutineScope? = null
+    /** Set when the pref turns off; the next loop starts the estimate over (on its own thread, like every update). */
+    @Volatile private var resetPending = false
 
     fun start(scope: CoroutineScope) {
+        this.scope = scope
+        sync()
+    }
+
+    /** Runs the loop while started and enabled; while disabled it stops it and clears the text. Main thread. */
+    fun sync() {
+        val scope = scope ?: return
+        if (!enabled()) {
+            job?.cancel(); job = null
+            resetPending = true
+            _text.value = null
+            return
+        }
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) {
+            if (resetPending) { estimator.reset(); resetPending = false }
             while (isActive) {
-                _text.value = if (enabled()) BatteryEstimator.formatShort(sample(), labels) else { estimator.reset(); null }
+                _text.value = if (enabled()) BatteryEstimator.formatShort(sample(), labels) else null
+                PollTrace.tick("battery")
                 delay(intervalMs)
             }
         }
     }
 
-    fun stop() { job?.cancel(); job = null }
+    fun stop() {
+        scope = null
+        job?.cancel(); job = null
+    }
 
     private fun sysfs(path: String): Long? =
         runCatching { File(path).readText().trim().toLong() }.getOrNull()

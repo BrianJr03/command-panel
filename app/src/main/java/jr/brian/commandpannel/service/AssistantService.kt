@@ -256,10 +256,11 @@ class AssistantService : Service() {
         isRunning = true
         keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         repository = SettingsRepository(applicationContext, privileged)
-        // Started with the screen off (e.g. a boot with the lid closed): nothing arms until screen on (#91).
+        // Started with the screen off (e.g. a boot with the lid closed): nothing arms or polls until screen on (#91, #92).
         val interactive = getSystemService(android.os.PowerManager::class.java).isInteractive
         screenOff = !interactive
         if (!interactive) replayPauseGate.onScreenOff(armed = false)
+        repository.setScreenInteractive(interactive)
         screenMode = ScreenModeController(
             applicationContext, privileged,
             onHideOverlay = {
@@ -566,6 +567,7 @@ class AssistantService : Service() {
      */
     private fun onScreenPower(on: Boolean) {
         screenOff = !on
+        repository.setScreenInteractive(on)
         scope.launch(replayOps) {
             val action = if (on) replayPauseGate.onScreenOn(replayEnabled()) else replayPauseGate.onScreenOff(replay.isArmed)
             applyReplayPauseAction(action, if (on) "screen on" else "screen off")

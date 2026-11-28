@@ -47,7 +47,10 @@ object PermissionGranter {
             granted.add("appop:$op")
         }
 
-        // Keep the app process off the Doze idle list so the overlay service is not frozen.
+        // Keep the app process off the Doze idle list so the overlay service is not frozen. The whitelist only lets the
+        // service run; it doesn't keep the device awake. That is safe because the service goes quiet with the screen
+        // off: the Replay Buffer pauses for sleep (#91), and the panel's status, telemetry and battery pollers stop
+        // until screen on (#92). Anything new that runs while the screen is off must do the same.
         VendorRootShell.exec(RootShell.command("dumpsys", "deviceidle", "whitelist", "+$pkg"))
 
         return Result(granted, failed, held)

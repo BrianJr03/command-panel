@@ -10,6 +10,10 @@ The steps live in `WHATS_NEW_TOURS` (`ui/settings/CompanionTour.kt`), keyed by `
   - Where: panel: Replay Buffer (automatic, no setting)
   - Spot: none
   - Callout: The Replay Buffer now pauses while the screen is off and turns back on when you wake the Thor, so it no longer drains the battery in sleep.
+- **Panel stops refreshing while the screen is off** (#92)
+  - Where: panel: status bar and gauges (automatic, no setting)
+  - Spot: none
+  - Callout: The panel stops refreshing its stats while the screen is off to save battery, and catches up the moment you wake the Thor.
 
 ## v0.15.0
 

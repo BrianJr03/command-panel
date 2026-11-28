@@ -68,6 +68,9 @@ class TelemetryMonitor(
         private const val CURRENT_NOW = "/sys/class/power_supply/battery/current_now"
         private const val VOLTAGE_NOW = "/sys/class/power_supply/battery/voltage_now"
 
+        /** An FPS baseline older than this many intervals spans a pause, so it gives no reading (#92). */
+        private const val MAX_BASELINE_INTERVALS = 4
+
         /** Pref for per-game FPS from the task callback, with the "compositor FPS" label on fallback (#4). */
         const val PREF_TASK_FPS = "experimental_task_fps"
     }
@@ -82,10 +85,14 @@ class TelemetryMonitor(
 
     fun start(scope: CoroutineScope) {
         if (job?.isActive == true) return
+        // Stopped since the last run (the screen was off, #92): no FPS from a frame count taken before the gap.
+        lastFrames = null
+        _state.value = _state.value.copy(fps = 0)
         job = scope.launch {
             while (isActive) {
                 // File reads, binder calls and (without the helper) a root shell: never on the caller's main thread.
                 _state.value = withContext(Dispatchers.IO) { sample() }
+                PollTrace.tick("telemetry")
                 delay(intervalMs)
             }
         }
@@ -148,6 +155,8 @@ class TelemetryMonitor(
         val dt = now - lastFrameTime
         lastFrames = frames
         lastFrameTime = now
+        // A baseline far older than one interval spans a pause (a sample still running as the poller stopped).
+        if (delta != null && dt > intervalMs * MAX_BASELINE_INTERVALS) return 0
         return if (delta == null) _state.value.fps else TelemetryReader.fps(delta, dt, cap)
     }
 

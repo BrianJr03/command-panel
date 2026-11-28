@@ -62,7 +62,7 @@ class SettingsRepository(
         refreshRateCap = { if (uiState.value.is120Hz) 120 else 60 },
         taskFpsEnabled = { prefs.getBoolean(TelemetryMonitor.PREF_TASK_FPS, false) },
     )
-    private val batteryEstimate = BatteryEstimateMonitor(context, settings, enabled = { prefs.getBoolean("battery_estimate", false) })
+    private val batteryEstimate = BatteryEstimateMonitor(context, settings, enabled = { prefs.getBoolean(PREF_BATTERY_ESTIMATE, false) })
 
     private val _uiState = MutableStateFlow(OverlayUiState())
     val uiState: StateFlow<OverlayUiState> = _uiState.asStateFlow()
@@ -78,11 +78,21 @@ class SettingsRepository(
     }
 
     // App-private prefs the companion app changes (tile roster, quick launch, tip, theme sync, …).
-    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        // The estimate's loop runs only while it's turned on.
+        if (key == PREF_BATTERY_ESTIMATE && pollersRunning) batteryEstimate.sync()
         refreshFromSettings()
     }
 
     private var fastJob: Job? = null
+
+    /**
+     * Whether the screen is on, from the service (#92). The status, telemetry and battery estimate pollers run only
+     * while it is, and only between [start] and [stop]: nobody can see the panel with the screen off, and each sample
+     * wakes the CPU (telemetry may even fork a root shell).
+     */
+    private var screenInteractive = true
+    private var pollersRunning = false
     private val main = Handler(Looper.getMainLooper())
 
     // Bottom volume (#6): a drag only writes the setting when its 0..15 step changes, at most every
@@ -142,12 +152,10 @@ class SettingsRepository(
         }
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
         refreshFromSettings()
-        telemetry.start(scope)
         // The custom fan slider's range comes from the vendor fan service (a binder call, so off the main thread).
         scope.launch(Dispatchers.IO) {
             FanProvider.speedRange()?.let { range -> _uiState.update { it.copy(fanSpeedRange = range) } }
         }
-        batteryEstimate.start(scope)
         scope.launch { batteryEstimate.text.collect { est -> _uiState.update { it.copy(batteryEstimate = est) } } }
         scope.launch { uiState.collect { OverlayOnboarding.activeStep.value = it.onboardingStep } }
         scope.launch {
@@ -164,24 +172,57 @@ class SettingsRepository(
                 }
             }
         }
-        fastJob = scope.launch {
-            while (isActive) {
-                refreshFast()
-                delay(1000L)
-            }
-        }
+        syncPollers()
     }
 
     fun stop() {
         context.contentResolver.unregisterContentObserver(observer)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
-        telemetry.stop()
-        batteryEstimate.stop()
-        fastJob?.cancel(); fastJob = null
+        this.scope = null
+        syncPollers()
         main.removeCallbacks(bottomFlush)
         main.removeCallbacks(bottomCatchUp)
         main.removeCallbacks(topCatchUp)
         unregisterVolumeReceiver()
+    }
+
+    /** Called by the service on the main thread when the screen goes off or comes on (#92), and once before [start]. */
+    fun setScreenInteractive(on: Boolean) {
+        if (screenInteractive == on) return
+        screenInteractive = on
+        syncPollers()
+    }
+
+    /**
+     * Starts or stops the pollers to match [screenInteractive] and the service's scope. Each starts with an immediate
+     * sample, so the panel is fresh the moment the screen comes on.
+     */
+    private fun syncPollers() {
+        val scope = scope?.takeIf { it.isActive && screenInteractive }
+        if (scope == null) {
+            if (!pollersRunning) return
+            pollersRunning = false
+            telemetry.stop()
+            batteryEstimate.stop()
+            fastJob?.cancel(); fastJob = null
+            PollTrace.state("paused")
+            return
+        }
+        if (pollersRunning) return
+        pollersRunning = true
+        // The network speed is a delta: measure it from now, not across the sleep.
+        lastRxBytes = TrafficStats.getTotalRxBytes()
+        lastRxTime = System.currentTimeMillis()
+        telemetry.start(scope)
+        batteryEstimate.start(scope)
+        fastJob = scope.launch {
+            while (isActive) {
+                refreshFast()
+                PollTrace.tick("status")
+                delay(1000L)
+            }
+        }
+        PollTrace.state("running")
     }
 
     private fun now() = android.os.SystemClock.uptimeMillis()
@@ -811,6 +852,7 @@ class SettingsRepository(
         const val FAN_FALLBACK_DELAY_MS = 1500L
         /** How long a play/pause press holds the icon while the player starts or stops (#88). */
         const val MUSIC_HOLD_MS = 3000L
+        const val PREF_BATTERY_ESTIMATE = "battery_estimate"
         private const val GLOBAL_BLUETOOTH_ON = "bluetooth_on"
         private const val GLOBAL_ZEN_MODE = "zen_mode"
         // AudioManager's hidden VOLUME_CHANGED_ACTION and its stream extra.
